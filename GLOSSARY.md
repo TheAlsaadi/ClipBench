@@ -18,6 +18,14 @@ _Avoid_: grab, snapshot
 The ordered collection of Clips that ClipBench keeps, limited by count and age.
 _Avoid_: log, archive
 
+**Duplicate**:
+A Capture whose content is already in the History. It moves the existing Clip to the top instead of adding a new one, and the existing Clip keeps its pin.
+_Avoid_: copy, repeat
+
+**Preview**:
+The short single-line text that stands for a Clip in lists. It is cut between whole characters, never in the middle of one.
+_Avoid_: summary, snippet text
+
 **Pin**:
 To protect a Clip from being removed by the History limits. A pinned Clip stays until the user unpins or removes it.
 _Avoid_: favorite, star, lock
@@ -42,6 +50,10 @@ _Avoid_: bulk paste
 
 **Batch paste**:
 Pasting several selected Clips at once, joined by a separator.
+
+**Separator**:
+The text placed between Clips when they are joined, such as a line break, a comma or a custom text.
+_Avoid_: delimiter, joiner
 
 **Queue paste**:
 Loading a Queue and then pasting its Clips one at a time, one per Ctrl+V, in order.

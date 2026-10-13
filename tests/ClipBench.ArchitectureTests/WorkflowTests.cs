@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace ClipBench.ArchitectureTests;
@@ -109,6 +110,33 @@ public partial class WorkflowTests
         text.ShouldMatch(@"(?m)^  attribution-guard:\s*$");
         text.ShouldMatch(@"(?m)^  build-test:\s*$");
         text.ShouldContain("cancel-in-progress: true");
+    }
+
+    // The coverage loop lists each assembly with its floor, for example "Core:90".
+    [GeneratedRegex(@"""(?<name>[A-Za-z]+):(?<floor>\d+)""")]
+    private static partial Regex CoverageFloorEntry();
+
+    [Fact]
+    public void Ci_workflow_enforces_a_coverage_floor_of_at_least_90_on_Core()
+    {
+        var floors = CoverageFloorEntry().Matches(Read("ci.yml"))
+            .ToDictionary(match => match.Groups["name"].Value, match => int.Parse(match.Groups["floor"].Value, CultureInfo.InvariantCulture));
+
+        floors.ShouldContainKey("Core");
+        floors["Core"].ShouldBeGreaterThanOrEqualTo(90, "Rule 2 sets ClipBench.Core at 90% line coverage from Phase 1");
+    }
+
+    [Fact]
+    public void Ci_workflow_rejects_a_coverage_report_that_measured_no_lines()
+    {
+        // An assembly with no code, or a mistyped include filter, reports 100% coverage. Each run must be
+        // followed by the check that the report measured something, and that check must itself be tested.
+        var text = Read("ci.yml");
+
+        text.ShouldContain("bash scripts/check-coverage-report.sh \"artifacts/coverage/${name}\" \"$floor\"");
+        text.ShouldContain("bash scripts/tests/test-check-coverage-report.sh");
+        File.Exists(RepositoryRoot.Combine("scripts", "check-coverage-report.sh")).ShouldBeTrue();
+        File.Exists(RepositoryRoot.Combine("scripts", "tests", "test-check-coverage-report.sh")).ShouldBeTrue();
     }
 
     [Fact]

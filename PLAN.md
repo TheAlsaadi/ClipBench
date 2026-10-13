@@ -116,7 +116,7 @@ Core ──► (nothing but the BCL)
 
 | Component | Layer | Responsibility |
 |---|---|---|
-| `ClipItem`, `ClipContent`, `ClipFormat` | Core | Immutable models: text, HTML, RTF, image (PNG bytes), file list (paths only) |
+| `Clip`, `ClipContent`, `ClipFormat` | Core | Immutable models: text, HTML, RTF, image (PNG bytes), file list (paths only) |
 | `ClipHistory` | Core | Add, dedupe (content hash), pin, remove, retention (count/age), ordering |
 | `ClipSearch` | Core | Fuzzy and substring search over an in-memory decrypted index |
 | `PasteComposer` | Core | Batch join with separators, table (TSV) building, transform pipeline |
@@ -211,7 +211,7 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 **Skills**: `writing-plans`, `test-driven-development` (strict), `subagent-driven-development`, `domain-modeling` (update the glossary: Clip, Board, Queue, Collect Session, Transform, Snippet, Capture), `requesting-code-review`.
 
 **Tests first**
-- `ClipItem`: equality; size calculation; previews truncated safely (no surrogate pair split); file-list clips store paths only.
+- `Clip`: equality; size calculation; previews truncated safely (no surrogate pair split); file-list clips store paths only.
 - `ClipHistory`: adding a duplicate moves it to the top instead of duplicating; pinned items are never evicted; eviction by count and by age uses `TimeProvider`; remove and clear.
 - `ClipSearch`: case-insensitive substring; fuzzy matching ranks prefix matches higher; Arabic and other RTL text; emoji; an empty query returns recent items; results are stable when ranks are equal.
 - `PasteComposer` batch: each separator type; a custom separator with escape sequences (`\n`, `\t`); selection order is preserved; a mix of text and images is rejected with a clear result (images can't be joined into text).
