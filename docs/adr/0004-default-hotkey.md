@@ -1,10 +1,10 @@
 ---
-status: proposed
+status: accepted
 ---
 
-# Default hotkey: Win+Alt+V (proposed, awaiting the owner's confirmation)
+# Default hotkey: Win+Alt+V
 
-The popup opens from a global hotkey that is always configurable. The proposed default is **Win+Alt+V**: it was free on the probe machine, it sits next to the familiar Win+V, and Win-modified combinations are almost never used as shortcuts inside applications, so registering it globally takes nothing from them.
+The popup opens from a global hotkey that is always configurable. The default is **Win+Alt+V**, confirmed by the owner on 2026-10-13: it was free on the probe machine, it sits next to the familiar Win+V, and Win-modified combinations are almost never used as shortcuts inside applications, so registering it globally takes nothing from them.
 
 ## Probe
 
