@@ -146,7 +146,7 @@ internal sealed class TrayIcon : ITrayIcon
             return Failure("ClipBench's icon picture could not be loaded.");
         }
 
-        if (!_api.Add(_window, IconId, CallbackMessage, icon, TrayText.Fit(model.ToolTip, TrayText.MaxToolTip)))
+        if (!AddToNotificationArea(icon, model.ToolTip))
         {
             _api.DestroyIcon(icon);
             return Failure("Windows would not add ClipBench's icon to the notification area.");
@@ -205,8 +205,25 @@ internal sealed class TrayIcon : ITrayIcon
             return false;
         }
 
-        _ = _api.Add(_window, IconId, CallbackMessage, _icon, TrayText.Fit(_model.ToolTip, TrayText.MaxToolTip));
+        _ = AddToNotificationArea(_icon, _model.ToolTip);
         return true;
+    }
+
+    // Adds the icon and asks for version 4 messages. An icon Windows would not give those is taken away again rather than left behind.
+    private bool AddToNotificationArea(nint icon, string toolTip)
+    {
+        if (!_api.Add(_window, IconId, CallbackMessage, icon, TrayText.Fit(toolTip, TrayText.MaxToolTip)))
+        {
+            return false;
+        }
+
+        if (_api.UseVersion4(_window, IconId))
+        {
+            return true;
+        }
+
+        _ = _api.Delete(_window, IconId);
+        return false;
     }
 
     // Runs on a pool thread.

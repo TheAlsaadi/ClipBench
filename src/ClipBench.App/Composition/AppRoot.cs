@@ -114,41 +114,56 @@ internal sealed class AppRoot : IAsyncDisposable
         }
 
         var services = BuildServices(platform, storage, log, dispatcher, time, tray);
-
-        var library = services.GetRequiredService<ClipLibrary>();
-        var loaded = await library.LoadAsync(cancellationToken);
-        if (loaded.IsFailure)
+        PopupWindow? popup = null;
+        try
         {
-            tray?.Dispose();
-            await DisposeAllAsync(services, storage, platform);
-            return new StartOutcome(null, "ClipBench could not read its saved history. Check that the folder is readable, then start ClipBench again.");
-        }
+            var library = services.GetRequiredService<ClipLibrary>();
+            var loaded = await library.LoadAsync(cancellationToken);
+            if (loaded.IsFailure)
+            {
+                await ReleaseAsync(services, storage, platform, tray, popup);
+                return new StartOutcome(null, "ClipBench could not read its saved history. Check that the folder is readable, then start ClipBench again.");
+            }
 
-        log.Write(ActivityLevel.Information, ActivityEvent.HistoryLoaded, new ActivityDetails { Count = loaded.Value.Loaded });
-        if (loaded.Value.Unreadable > 0)
+            log.Write(ActivityLevel.Information, ActivityEvent.HistoryLoaded, new ActivityDetails { Count = loaded.Value.Loaded });
+            if (loaded.Value.Unreadable > 0)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.HistorySkipped, new ActivityDetails { Count = loaded.Value.Unreadable });
+            }
+
+            // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
+            _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
+
+            var popupViewModel = services.GetRequiredService<PopupViewModel>();
+            popup = new PopupWindow(popupViewModel);
+            var handle = WinRT.Interop.WindowNative.GetWindowHandle(popup);
+            if (!options.AllowScreenCapture)
+            {
+                _ = platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
+            }
+
+            _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
+
+            var root = new AppRoot(services, platform, storage, popup, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
+            await root.ShowTrayAsync(cancellationToken);
+            await root.RegisterShortcutAsync(options.Hotkey ?? Hotkey.Default, cancellationToken);
+            platform.Hotkeys.Pressed += root.OnHotkeyPressed;
+            guard.ShowRequested += root.OnShowRequested;
+            return new StartOutcome(root, null);
+        }
+        catch
         {
-            log.Write(ActivityLevel.Warning, ActivityEvent.HistorySkipped, new ActivityDetails { Count = loaded.Value.Unreadable });
+            // Something failed half way: let go of what was already created, so no icon or connection is left behind.
+            await ReleaseAsync(services, storage, platform, tray, popup);
+            throw;
         }
+    }
 
-        // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
-        _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
-
-        var popupViewModel = services.GetRequiredService<PopupViewModel>();
-        var popup = new PopupWindow(popupViewModel);
-        var handle = WinRT.Interop.WindowNative.GetWindowHandle(popup);
-        if (!options.AllowScreenCapture)
-        {
-            _ = platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
-        }
-
-        _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
-
-        var root = new AppRoot(services, platform, storage, popup, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
-        await root.ShowTrayAsync(cancellationToken);
-        await root.RegisterShortcutAsync(options.Hotkey ?? Hotkey.Default, cancellationToken);
-        platform.Hotkeys.Pressed += root.OnHotkeyPressed;
-        guard.ShowRequested += root.OnShowRequested;
-        return new StartOutcome(root, null);
+    private static async Task ReleaseAsync(ServiceProvider services, ClipStorage storage, WindowsPlatform platform, ITrayIcon? tray, PopupWindow? popup)
+    {
+        tray?.Dispose();
+        popup?.Close();
+        await DisposeAllAsync(services, storage, platform);
     }
 
     /// <summary>Shows the popup, or hides it when it is already open.</summary>
@@ -280,8 +295,15 @@ internal sealed class AppRoot : IAsyncDisposable
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
-        // Pausing changes the tool tip and the wording of the pause item.
-        _trayViewModel.PropertyChanged += (_, _) => _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+        // Pausing changes the tool tip and the wording of the pause item. The tool tip changes exactly when the state does,
+        // so it is the one change to answer: the icon is updated once, not once per property.
+        _trayViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TrayViewModel.ToolTip) && !_disposed)
+            {
+                _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+            }
+        };
 
         var shown = await _tray.ShowAsync(TrayMenu.Build(_trayViewModel), cancellationToken);
         if (shown.IsFailure)

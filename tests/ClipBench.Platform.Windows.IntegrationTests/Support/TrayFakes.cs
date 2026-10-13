@@ -16,6 +16,10 @@ internal sealed class FakeTrayApi(FakeWindow window) : ITrayApi
 
     public bool ModifySucceeds { get; set; } = true;
 
+    public bool VersionSucceeds { get; set; } = true;
+
+    public List<uint> VersionRequests { get; } = [];
+
     public List<string> LoadedFrom { get; } = [];
 
     public List<nint> Destroyed { get; } = [];
@@ -46,6 +50,13 @@ internal sealed class FakeTrayApi(FakeWindow window) : ITrayApi
         window.OnWindowThread.ShouldBeTrue("the icon is added on the window thread");
         Added.Add((owner, iconId, callbackMessage, icon, toolTip));
         return AddSucceeds;
+    }
+
+    public bool UseVersion4(nint owner, uint iconId)
+    {
+        window.OnWindowThread.ShouldBeTrue("the icon version is set on the window thread");
+        VersionRequests.Add(iconId);
+        return VersionSucceeds;
     }
 
     public bool Modify(nint owner, uint iconId, string toolTip)

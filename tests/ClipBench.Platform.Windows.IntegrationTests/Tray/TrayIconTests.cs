@@ -98,6 +98,32 @@ public sealed class TrayIconTests : IDisposable
     }
 
     [Fact]
+    public async Task Windows_is_asked_for_version_4_messages_right_after_the_icon_is_added_and_again_when_it_is_added_again()
+    {
+        await ShowAsync();
+        _api.VersionRequests.ShouldBe([1u]);
+
+        _window.Send(_api.TaskbarCreatedMessage);
+
+        _api.Added.Count.ShouldBe(2);
+        _api.VersionRequests.ShouldBe([1u, 1u]);
+    }
+
+    [Fact]
+    public async Task An_icon_whose_version_windows_refuses_is_taken_away_again_and_reported()
+    {
+        // Windows accepted the icon but not the message version: the icon must not stay behind with a picture that is freed.
+        _api.VersionSucceeds = false;
+
+        var result = await _icon.ShowAsync(Model(), Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(ErrorCode.PlatformFailure);
+        _api.Deleted.ShouldBe([(Handle, 1u)]);
+        _api.Destroyed.ShouldBe([(nint)0x77]);
+    }
+
+    [Fact]
     public async Task Showing_twice_adds_the_icon_once()
     {
         await ShowAsync();

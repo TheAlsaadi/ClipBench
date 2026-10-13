@@ -37,12 +37,13 @@ internal sealed unsafe class Win32TrayApi : ITrayApi
         data.hIcon = new HICON(icon);
         Copy(toolTip, data.szTip.AsSpan());
 
-        if (!PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_ADD, in data))
-        {
-            return false;
-        }
+        return PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_ADD, in data);
+    }
 
-        // Version 4 sends the anchor point with each message and a separate notice for keyboard selection.
+    /// <inheritdoc/>
+    public bool UseVersion4(nint window, uint iconId)
+    {
+        var data = Data(window, iconId, 0);
         data.Anonymous.uVersion = Version4;
         return PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_SETVERSION, in data);
     }

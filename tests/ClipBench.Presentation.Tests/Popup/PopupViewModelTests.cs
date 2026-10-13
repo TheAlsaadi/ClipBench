@@ -452,6 +452,41 @@ public sealed class PopupViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task A_clip_copied_while_the_question_is_open_does_not_withdraw_it_and_the_next_press_removes_the_pinned_clip()
+    {
+        (await _library.AddAsync(TestClips.Text("keep", pinned: true), Ct)).IsSuccess.ShouldBeTrue();
+        _vm.Open();
+        await _vm.DeleteCommand.ExecuteAsync(null);
+        _vm.IsConfirmingDelete.ShouldBeTrue();
+
+        await CopyAsync("fresh");
+
+        _vm.IsConfirmingDelete.ShouldBeTrue();
+        _vm.Current!.DisplayText.ShouldBe("keep");
+
+        await _vm.DeleteCommand.ExecuteAsync(null);
+
+        Shown().ShouldBe(["fresh"]);
+        _vm.IsConfirmingDelete.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_question_is_withdrawn_when_the_clip_it_was_about_is_removed_elsewhere()
+    {
+        var keep = TestClips.Text("keep", pinned: true);
+        (await _library.AddAsync(keep, Ct)).IsSuccess.ShouldBeTrue();
+        await CopyAsync("other");
+        _vm.Open();
+        _vm.MoveDownCommand.Execute(null);
+        await _vm.DeleteCommand.ExecuteAsync(null);
+        _vm.IsConfirmingDelete.ShouldBeTrue();
+
+        (await _library.RemoveAsync(keep.Id, Ct)).IsSuccess.ShouldBeTrue();
+
+        _vm.IsConfirmingDelete.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Moving_withdraws_the_question_about_deleting_a_pinned_clip()
     {
         (await _library.AddAsync(TestClips.Text("one"), Ct)).IsSuccess.ShouldBeTrue();

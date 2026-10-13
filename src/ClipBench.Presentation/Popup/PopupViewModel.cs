@@ -347,6 +347,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         var previousId = Current?.Id;
         var previousIndex = SelectedIndex;
+        var wasConfirming = IsConfirmingDelete;
         var marked = Rows.Where(row => row.IsMarked).Select(row => row.Id).ToHashSet();
         var now = _timeProvider.GetUtcNow();
 
@@ -372,6 +373,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         }
 
         SelectedIndex = index;
+
+        // Moving the highlight withdraws the question, but a refresh is not the user moving: when the same clip is
+        // still highlighted, a clip copied meanwhile (or the list pushing -1 through the binding) must not withdraw it.
+        IsConfirmingDelete = wasConfirming && keepSelection && previousId is { } kept && Current?.Id == kept;
         NotifyListChanged();
     }
 

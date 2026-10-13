@@ -18,9 +18,13 @@ internal interface ITrayApi
     /// <param name="icon">The handle.</param>
     void DestroyIcon(nint icon);
 
-    /// <summary>Adds the icon, asking for version 4 callback messages.</summary>
+    /// <summary>Adds the icon.</summary>
     /// <returns>False when Windows refused.</returns>
     bool Add(nint window, uint iconId, uint callbackMessage, nint icon, string toolTip);
+
+    /// <summary>Asks for version 4 callback messages, which carry the anchor point and a separate notice for the keyboard. Call it right after <see cref="Add"/>.</summary>
+    /// <returns>False when Windows refused.</returns>
+    bool UseVersion4(nint window, uint iconId);
 
     /// <summary>Changes the tool tip of the icon.</summary>
     /// <returns>False when Windows refused.</returns>

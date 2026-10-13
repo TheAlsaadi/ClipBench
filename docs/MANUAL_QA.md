@@ -11,6 +11,7 @@ How to start a build for checking: `dotnet build -c Release`, then run `src\Clip
 - [ ] Starting the app shows an icon in the notification area (it may be in the overflow flyout). Nothing else appears on screen.
 - [ ] Hovering over the icon shows "ClipBench · capturing".
 - [ ] Starting the app a second time does not start a second copy: the first copy's popup opens instead.
+- [ ] Left-click the icon: the popup opens near the pointer. Pick a clip with Enter while a text field in another program had focus before you clicked: the clip appears there.
 - [ ] Right-click the icon: the menu shows **Open ClipBench** (bold), a line, **Pause capturing** and **Exit**. Click away: the menu closes.
 - [ ] **Exit** closes the app and removes the icon at once (no ghost icon is left when you move the pointer over it).
 - [ ] Restart Explorer (Task Manager, right-click Windows Explorer, Restart): the ClipBench icon comes back by itself.
