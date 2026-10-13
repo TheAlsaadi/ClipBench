@@ -24,3 +24,32 @@ HWND_MESSAGE
 WM_CLOSE
 WM_DESTROY
 WM_APP
+
+// The clipboard
+OpenClipboard
+CloseClipboard
+EmptyClipboard
+EnumClipboardFormats
+GetClipboardFormatName
+RegisterClipboardFormat
+GetClipboardData
+SetClipboardData
+GetClipboardSequenceNumber
+GetClipboardOwner
+IsClipboardFormatAvailable
+AddClipboardFormatListener
+RemoveClipboardFormatListener
+WM_CLIPBOARDUPDATE
+
+// Memory blocks handed to and taken from the clipboard
+GlobalAlloc
+GlobalLock
+GlobalUnlock
+GlobalSize
+GlobalFree
+
+// Which program owns the clipboard content (query rights only; never anything more)
+GetWindowThreadProcessId
+OpenProcess
+QueryFullProcessImageName
+CloseHandle
