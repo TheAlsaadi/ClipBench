@@ -53,7 +53,12 @@ public partial class DocumentationTests
     [GeneratedRegex(@"\A---\r?\nstatus: (proposed|accepted|deprecated|superseded by ADR-\d{4})\r?\n---\r?\n")]
     private static partial Regex AdrFrontMatter();
 
-    private static IEnumerable<(string Path, string Text)> TextFiles()
+    private static readonly Lazy<List<(string Path, string Text)>> _textFiles = new(() => [.. ReadTextFiles()]);
+
+    // Read once: every test below scans the same files.
+    private static List<(string Path, string Text)> TextFiles() => _textFiles.Value;
+
+    private static IEnumerable<(string Path, string Text)> ReadTextFiles()
     {
         var root = RepositoryRoot.Path;
         foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))

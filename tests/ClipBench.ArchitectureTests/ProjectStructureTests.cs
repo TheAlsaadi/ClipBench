@@ -71,8 +71,10 @@ public class ProjectStructureTests
     }
 
     [Fact]
-    public void Every_project_has_a_committed_NuGet_lock_file()
+    public void Every_project_has_a_NuGet_lock_file()
     {
+        // This checks the working tree. Whether the file is committed is enforced by CI: a fresh
+        // checkout has no lock files, so 'dotnet restore --locked-mode' fails if one was not committed.
         var missing = ProjectFile.LoadAll("src").Concat(ProjectFile.LoadAll("tests"))
             .Where(project => !File.Exists(Path.Combine(Path.GetDirectoryName(project.Path)!, "packages.lock.json")))
             .Select(project => project.Name)

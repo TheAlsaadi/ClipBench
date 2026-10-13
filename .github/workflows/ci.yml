@@ -106,9 +106,17 @@ jobs:
       - name: Check for vulnerable packages
         shell: bash
         run: |
-          # dotnet exits 0 even when it finds vulnerable packages, so read its report.
+          # dotnet exits 0 even when it finds vulnerable packages, so read its report. Every project
+          # must be reported as clean: if the advisory data cannot be fetched, the report has no
+          # verdict for the project and the check must fail instead of passing unchecked.
           dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
           if grep -q 'has the following vulnerable packages' vulnerable.txt; then
             echo 'Vulnerable packages found.' >&2
+            exit 1
+          fi
+          projects=$(find src tests -name '*.csproj' | wc -l)
+          clean=$(grep -c 'has no vulnerable packages' vulnerable.txt || true)
+          if [ "$clean" -ne "$projects" ]; then
+            echo "Only $clean of $projects projects were confirmed free of vulnerable packages." >&2
             exit 1
           fi
