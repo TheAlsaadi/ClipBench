@@ -44,4 +44,7 @@ public enum ErrorCode
 
     /// <summary>A clip is larger than storage accepts, so it was not saved.</summary>
     ContentTooLarge,
+
+    /// <summary>The saved history was written by a newer version of the app. It is left untouched, and starting fresh would destroy it.</summary>
+    HistoryTooNew,
 }
