@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Results;
 using ClipBench.Platform.Windows.Windowing;
+using Windows.Win32;
 
 namespace ClipBench.Platform.Windows.Hotkeys;
 
@@ -14,7 +15,7 @@ internal sealed class HotkeyService : IHotkeyService
 {
     private const int MaxId = 0xBFFF;                   // Windows allows 0 to 0xBFFF for a program's own shortcuts
     private const uint NoRepeat = 0x4000;               // MOD_NOREPEAT: holding the keys down presses once
-    private const uint HotkeyMessage = 0x0312;          // WM_HOTKEY
+    private const uint HotkeyMessage = PInvoke.WM_HOTKEY;
     private const int AlreadyRegistered = 1409;         // ERROR_HOTKEY_ALREADY_REGISTERED
     private static readonly TimeSpan _stopTimeout = TimeSpan.FromSeconds(5);
 

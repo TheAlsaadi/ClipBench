@@ -50,6 +50,9 @@ internal sealed class ProjectFile
         return (string?)reference.Attribute("PrivateAssets") ?? reference.Element("PrivateAssets")?.Value;
     }
 
+    /// <summary>Gets whether the project allows unsafe code (AllowUnsafeBlocks).</summary>
+    public bool AllowsUnsafeCode => string.Equals(_document.Descendants("AllowUnsafeBlocks").Select(element => element.Value.Trim()).LastOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Gets the ids of the FrameworkReference items.</summary>
     public IReadOnlyList<string> FrameworkReferences => Includes("FrameworkReference")
         .Order(StringComparer.Ordinal)

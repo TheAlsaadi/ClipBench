@@ -1,6 +1,7 @@
 using ClipBench.Core.Capture;
 using ClipBench.Core.Results;
 using ClipBench.Platform.Windows.Windowing;
+using Windows.Win32;
 
 namespace ClipBench.Platform.Windows.Clipboard;
 
@@ -11,7 +12,7 @@ namespace ClipBench.Platform.Windows.Clipboard;
 /// </summary>
 internal sealed class ClipboardListener : IClipboardListener
 {
-    private const uint ClipboardUpdateMessage = 0x031D;   // WM_CLIPBOARDUPDATE
+    private const uint ClipboardUpdateMessage = PInvoke.WM_CLIPBOARDUPDATE;
     private static readonly TimeSpan _stopTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IThreadInvoker _invoker;
