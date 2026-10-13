@@ -80,10 +80,10 @@ jobs:
         shell: bash
         run: |
           # One run per test project, each measuring only its own assembly. Core is enforced at 90 from
-          # Phase 1. Storage follows at 85 (Phase 2) and Presentation at 80 (Phase 4); they stay 0 while
-          # their assemblies are empty. An assembly with no code reports 100% coverage, and so does a run
+          # Phase 1 and Storage at 85 from Phase 2. Presentation follows at 80 (Phase 4) and stays 0 while
+          # its assembly is empty. An assembly with no code reports 100% coverage, and so does a run
           # whose include filter matches nothing, so each enforced floor is also checked against its report.
-          for entry in "Core:90" "Storage:0" "Presentation:0"; do
+          for entry in "Core:90" "Storage:85" "Presentation:0"; do
             name=${entry%%:*}
             floor=${entry##*:}
             dotnet test --project "tests/ClipBench.${name}.Tests" -c Release --no-build \

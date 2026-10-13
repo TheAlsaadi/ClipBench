@@ -1,0 +1,5 @@
+# Storage talks to a database that holds every secret on the clipboard, so SQL built at run time is an error,
+# not a warning. Statements are constants and values are named parameters (see docs/adr/0008-microsoft-data-sqlite.md).
+
+[*.cs]
+dotnet_diagnostic.CA2100.severity = error
