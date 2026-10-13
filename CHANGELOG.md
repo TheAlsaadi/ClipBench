@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Windows platform layer (`ClipBench.Platform.Windows`, ADR 0010 and ADR 0011): reading the clipboard
+  (text, HTML, rich text, file lists and pictures) with the privacy check made before any content is read;
+  writing it back in every form a program may ask for; a listener that reports each change once and
+  ignores ClipBench's own writes; global shortcuts that report a conflict by name; a paste that records the
+  target, refuses a program Windows would block, brings the target to the front and checks it, waits for held
+  keys, presses Ctrl+V and puts the user's clipboard back without overwriting a newer copy; and one running
+  copy per signed-in user. The master key is wrapped with the Windows data protection API for the current
+  user. Pictures are converted between Windows bitmaps and PNG by ClipBench's own reader and writer, checked
+  against Windows' own decoder. Architecture tests forbid key hooks, keyboard readers beyond the modifier
+  keys, program launchers, privilege changes and access to other processes' memory.
 - Encrypted history storage (`ClipBench.Storage`): clip content, previews and source app
   names are sealed with AES-256-GCM, each tied to its clip, column and format, so a value
   that was moved or changed is refused and never returned. The history is kept in SQLite

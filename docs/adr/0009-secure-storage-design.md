@@ -41,6 +41,8 @@ The plan put `DpapiKeyProtector` in Phase 2. It moves to the start of Phase 3, b
 
 `IKeyProtector` is in Core, and the key store, the storage and every test use it through a fake that behaves like DPAPI (it refuses a key wrapped for another user and a damaged wrap). Nothing in the app calls storage until Phase 4, so no history can be written unprotected in the meantime. Phase 3 starts with the owner's decision on CsWin32 and a second documented exception, next to the Windows App SDK, for the metadata licenses in the Phase 9 license audit. Then it adds `DpapiKeyProtector` with a Windows-only integration test.
 
+**Update (Phase 3).** The owner approved CsWin32 and the license exception on 2026-10-13 (ADR 0010), and `DpapiKeyProtector` was built first in Phase 3. Its tests run against the real DPAPI, including on CI: a round trip, a different entropy, every byte of a wrap changed in turn, and the size caps.
+
 ## Consequences
 
 - The "history can't be decrypted" error is the single path for a lost key, a wrong key, a damaged key file and a damaged database. The interface offers to start fresh and never does it by itself.

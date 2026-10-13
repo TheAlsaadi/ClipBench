@@ -1,7 +1,8 @@
 # Threat model
 
 **Status:** first draft, written in Phase 0 before any feature exists. Section 2 (storage)
-was brought up to date in Phase 2 with what was built and tested. Phase 9 revisits every
+was brought up to date in Phase 2 and sections 1 and 4 (capture and paste) in Phase 3, with what was
+built and tested. Phase 9 revisits every
 row and checks that each mitigation has a test or a documented reason.
 
 ClipBench sees everything a user copies, including passwords, tokens and personal data.
@@ -43,22 +44,24 @@ mitigation is built; "Evidence" is how it is checked.
 
 | STRIDE | Threat | Mitigation | Phase | Evidence |
 |---|---|---|---|---|
-| I | Recording content an app marked private (password managers) | Never capture the three privacy markers; never capture from excluded apps; Incognito stops capture | 1, 3, 7 | CaptureFilter and integration tests |
+| I | Recording content an app marked private (password managers) | Never capture the three privacy markers; never capture from excluded apps; Incognito stops capture. The filter is applied before any content is read, so a rejected change is never copied into memory | 1, 3, 7 | CaptureFilter tests; reader tests on an in-memory clipboard show no read of the content; the same checks against the real clipboard (markers, the history flag as Windows stores it, an excluded program by its real name, incognito) |
 | I | Secrets stay in History | Sensitive clips are masked and expire in minutes | 1, 7 | SensitiveDetector and expiry tests |
-| T | Malformed or oversized formats crash a parser or exhaust memory | Size cap on every parser; defaults 2 MB text and 20 MB image; no unbounded recursion | 1, 3, 9 | Unit and property tests |
+| T | Malformed or oversized formats crash a parser or exhaust memory | Size cap on every parser; defaults 2 MB text and 20 MB image; a hard cap on the raw data before it is copied (4 bytes per byte of the text limit, 36 million pixels); no unbounded recursion; a decompressor that stops at the size the header promises | 1, 3, 9 | Parser tests for HTML Format, file lists, bitmaps and PNG: damaged and hostile input, the boundary of every limit, random and mutated input, and a 256 MB decompression bomb that allocates almost nothing |
 | I | A privacy flag is present but cannot be read, so it is ignored | `CanIncludeInClipboardHistory` present with an unreadable value counts as "do not record" (fail closed) | 1 | CaptureFilter tests (done) |
 | I | A clip, its content or a result is printed into a log by accident | `ToString` of clips, contents and results shows the kind, size and error code only, never content or the source app | 1 | Unit tests (done) |
 | D | Hostile text makes a secret scan, a search or a preview slow | Hand-written linear scanners with no backtracking regular expressions; only the first 1,000,000 characters are scanned and 20,000 indexed; previews read only what they show | 1 | Hostile input tests (done) |
 | I | A secret is not recognised, so it is kept as an ordinary clip | Residual risk: the detector favours few false alarms, so it misses short keys (under 32 characters, such as AWS access key ids), hex keys and any key with no letter and digit mix. Phase 7 reviews the list of patterns with the owner | 1, 7 | SensitiveDetector tests state what is and is not flagged |
-| D | Another process holds the clipboard open, or floods it | Retry with backoff, then give up; one event per change by sequence number | 3 | Fake-surface tests |
-| S | A process impersonates another to dodge the exclusion list | Exclusion matches the owning process's executable name; the source name is advisory | 3 | Integration tests |
+| D | Another process holds the clipboard open, or floods it | Retry with a doubling wait (about a second in all), then report "busy" (never "empty"); the clipboard is open only while bytes are copied; one event per change by sequence number | 3 | Fake-surface tests for the waits and the dedupe; a real clipboard held open by another thread |
+| S | A process impersonates another to dodge the exclusion list | Exclusion matches the owning process's executable name; the source name is advisory. The owner is found with query-only rights, and a program that refuses is "unknown" and is never asked again with more rights | 3 | Owner lookup tests (every link can fail); real tests find this program by its real name |
 | E | Capture needs elevation | None: `asInvoker`, never elevate | 0 | Manifest test (done) |
+| T | A wrong call into Windows corrupts memory (a bitmap handle read as a block of memory) | One definition of which formats are memory; the binding refuses the others before calling Windows | 3 | A regression test that crashed the test host with a heap-corruption code before the fix; unit tests of every range boundary |
+| I | ClipBench records its own paste, or the restored clipboard, as a new copy | A private format tags every write, including a restore; the listener drops tagged changes and the capture filter rejects them | 3 | Listener, writer, snapshot and real-clipboard tests |
+| E | A hook, a keyboard reader, a program launcher, a privilege change or access to another process's memory is added | The list of Win32 functions is checked, the built assembly is inspected, the source is scanned, and only modifier keys are ever polled | 3 | Architecture tests, each shown to fail by adding what it forbids |
 
 ## 2. Storage (SQLite and crypto)
 
-Built in Phase 2 (ADR 0008 and ADR 0009). The key is wrapped through an interface, and the
-Windows binding for it (DPAPI) is built at the start of Phase 3 (ADR 0009), so until then the
-wrapping is tested against a fake that behaves like DPAPI.
+Built in Phase 2 (ADR 0008 and ADR 0009). The key is wrapped through an interface; its Windows
+binding (DPAPI, current user, ClipBench's own entropy) was built first in Phase 3 (ADR 0009, ADR 0010).
 
 | STRIDE | Threat | Mitigation | Phase | Evidence |
 |---|---|---|---|---|
@@ -69,6 +72,7 @@ wrapping is tested against a fake that behaves like DPAPI.
 | I | Guessing a clip by comparing hashes | Duplicate detection uses HMAC-SHA256 under a key derived from the master key, over the format and the content | 2 | Different keys give different hashes; a known-answer test pins the derivation |
 | I | Using the wrong key shows garbage or fails clip by clip | A sealed key check is verified once at open; a wrong key is one clear "history can't be decrypted" error and nothing is changed | 2 | Open and storage tests |
 | I | Content in logs, crash dumps or temp files | Storage logs nothing, and prints no clip, summary or result with its text. SQLite keeps temp files in memory. Phase 4 adds logging with a marker test; Phase 9 adds crash handling and an audit | 2, 4, 9 | Print tests; the leak tests see no extra files; log marker test later |
+| I | Another program of the same user unwraps the key by accident | The wrap uses ClipBench's own entropy, so a program that calls DPAPI without it cannot unwrap the key. **Residual:** the entropy is a constant in the open source, so it does not stop malware running as the same user that knows it (see the assumptions) | 3 | Wrong entropy fails, every byte of a wrap changed in turn fails, a truncated wrap fails (tests run against the real DPAPI, also on CI) |
 | I | Key material or plaintext lingers in memory | Working keys and the master key are zeroed when disposed, and plaintext buffers after use. **Residual:** .NET strings cannot be wiped, and the search index holds decrypted text | 2 | Review |
 | I | `key.bin` readable by other users | The file is created in the folder the caller names and inherits its permissions. For `%LOCALAPPDATA%` that is the current user only | 2, 3, 9 | Review; Phase 9 checks the real folder |
 | I | A deleted or evicted clip stays in the file | `secure_delete`; evicting, deleting and sweeping overwrite the value and empty the write-ahead log, which is best effort while another process has the database open (it has to wait for that reader). Wipe all also rebuilds the file, empties the log, deletes the files and overwrites the key file before deleting it (best effort on a solid-state drive, where old blocks may remain out of reach) | 2 | Tests read the files after delete, retention and sweep (while the database is still open, and after it is closed), after wipe, and at the moment the files are deleted |
@@ -92,10 +96,10 @@ Residual: the in-memory search index is decrypted while the app runs.
 
 | STRIDE | Threat | Mitigation | Phase | Evidence |
 |---|---|---|---|---|
-| S | Pasting into the wrong window after a focus change | Record the target window before the popup; restore focus and verify before sending keys | 3 | Command-sequence tests |
-| T | Another process replaces the clipboard between write and paste | Check the clipboard sequence number before sending Ctrl+V | 3 | Integration tests |
-| I | Pasted content lingers on the clipboard | Optional restore of the previous clipboard (on by default); own writes carry a private format and are not re-captured | 3, 5 | Integration tests |
-| E | Input into an elevated window is blocked (UIPI) | Detect it and notify; never elevate | 3 | Unit tests |
+| S | Pasting into the wrong window after a focus change | Record the target window before the popup; restore focus and believe only the foreground window itself; no key is sent unless the target has focus | 3 | Command-sequence tests on scripted focus (refused, slow, never); a real window test that skips unless the test window can take focus |
+| T | Another process replaces the clipboard between write and paste | Check the clipboard sequence number before sending Ctrl+V, and again before restoring: a restore never overwrites a newer copy | 3 | Command-sequence tests; real sequence-number tests |
+| I | Pasted content lingers on the clipboard | Optional restore of the previous clipboard (on by default) as a raw copy of every memory format, privacy markers included, overwritten after use; own writes and restores carry a private format and are not re-captured | 3, 5 | Snapshot tests (byte for byte, markers, size cap, overwrite on dispose); paste tests; a real snapshot |
+| E | Input into an elevated window is blocked (UIPI) | Compare integrity levels first, and treat a program that refuses to be asked as higher; report "target elevated" before touching the clipboard; never elevate | 3 | Tracker and paste tests for every level and for a refusal; real level reads (this program, the desktop shell, the system process) |
 | D | Queue mode leaves Ctrl+V registered after a fault | Unregister on exhaustion, cancel, exit and crash paths; the OS releases it when the process ends | 5 | Dispose-path tests |
 
 ## 5. OCR (Phase 8)
