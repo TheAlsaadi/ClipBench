@@ -1,0 +1,21 @@
+# Normalize line endings: LF in the repository AND in every working tree,
+# whatever core.autocrlf says. This keeps shell scripts (the commit-msg hook
+# runs under Git for Windows' sh) working and keeps `dotnet format` stable
+# between developer machines and CI.
+* text=auto eol=lf
+
+.githooks/* text eol=lf
+*.sh        text eol=lf
+
+# Windows batch files need CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Binary assets.
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.zip       binary
+*.exe       binary
+*.dll       binary
+*.pfx       binary
