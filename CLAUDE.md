@@ -26,8 +26,8 @@ dotnet restore --locked-mode
 dotnet build -c Release -warnaserror
 dotnet test --solution ClipBench.slnx -c Release --filter-not-trait "Category=Integration"
 dotnet test --project tests/ClipBench.Core.Tests -c Release --coverlet --coverlet-output-format cobertura --coverlet-include "[ClipBench.Core]*" --coverlet-threshold 90 --coverlet-threshold-type line
-dotnet format --verify-no-changes
-dotnet list package --vulnerable --include-transitive
+dotnet format --verify-no-changes                  # set the environment variable Configuration=Release first
+dotnet list package --vulnerable --include-transitive   # exits 0 even on findings; read the report (CI greps it)
 ```
 
 Tests run on xUnit v3 over Microsoft.Testing.Platform, enabled for `dotnet test` by `global.json` (ADR 0006). The VSTest switches `--collect:"XPlat Code Coverage"` and `--filter` do not apply. Coverage comes from `coverlet.MTP`: run it once per test project with `--coverlet-include` set to that project's assembly, so each coverage floor measures only its own assembly. Reports are written as Cobertura XML to `--results-directory` (default `TestResults/`).

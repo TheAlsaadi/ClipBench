@@ -76,8 +76,9 @@ ClipBench/
 ├─ docs/
 │  ├─ adr/                           ← Architecture Decision Records (0001-…)
 │  ├─ security/THREAT_MODEL.md, PRIVACY.md
-│  ├─ GLOSSARY.md, ROADMAP.md, ARCHITECTURE.md, MANUAL_QA.md
+│  ├─ ROADMAP.md, ARCHITECTURE.md, MANUAL_QA.md
 ├─ installer/ClipBench.iss
+├─ scripts/attribution-guard.sh, tests/test-attribution-guard.sh
 ├─ src/
 │  ├─ ClipBench.Core/                 net10.0 — domain, no Windows/UI refs
 │  ├─ ClipBench.Storage/              net10.0 — SQLite repo + crypto (key protection via interface)
@@ -94,7 +95,7 @@ ClipBench/
 ├─ Directory.Build.props, Directory.Packages.props, global.json, nuget.config
 ├─ .editorconfig, .gitignore, .gitattributes
 ├─ CLAUDE.md, PLAN.md, README.md, LICENSE (MIT), SECURITY.md, CONTRIBUTING.md
-└─ CODE_OF_CONDUCT.md, CHANGELOG.md
+└─ CODE_OF_CONDUCT.md, CHANGELOG.md, GLOSSARY.md
 ```
 
 ### 2.2 Dependency rules (enforced by ArchitectureTests)
