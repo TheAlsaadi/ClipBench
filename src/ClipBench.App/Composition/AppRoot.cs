@@ -5,10 +5,12 @@ using ClipBench.Core.Hosting;
 using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Notifications;
 using ClipBench.Core.Results;
+using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
+using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
 using ClipBench.Storage.Clips;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +34,8 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly ClipStorage _storage;
     private readonly PopupWindow _popup;
     private readonly PopupViewModel _popupViewModel;
+    private readonly TrayViewModel _trayViewModel;
+    private readonly ITrayIcon? _tray;
     private readonly IActivityLog _log;
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
@@ -44,6 +48,8 @@ internal sealed class AppRoot : IAsyncDisposable
         ClipStorage storage,
         PopupWindow popup,
         PopupViewModel popupViewModel,
+        TrayViewModel trayViewModel,
+        ITrayIcon? tray,
         IActivityLog log,
         ISingleInstanceGuard guard,
         IUiDispatcher dispatcher)
@@ -53,10 +59,15 @@ internal sealed class AppRoot : IAsyncDisposable
         _storage = storage;
         _popup = popup;
         _popupViewModel = popupViewModel;
+        _trayViewModel = trayViewModel;
+        _tray = tray;
         _log = log;
         _guard = guard;
         _dispatcher = dispatcher;
     }
+
+    /// <summary>Raised on the UI thread when the user chooses Exit in the tray menu.</summary>
+    public event EventHandler? ExitRequested;
 
     /// <summary>Opens the history, creates and wires the services, and registers the popup shortcut.</summary>
     /// <param name="options">The command-line options.</param>
@@ -93,7 +104,16 @@ internal sealed class AppRoot : IAsyncDisposable
         }
 
         var dispatcher = new DispatcherQueueDispatcher(queue);
-        var services = BuildServices(platform, storage, log, dispatcher, time);
+
+        // The tray icon is also how the app tells the user things, so it comes before the services that need to.
+        var trayCreated = WindowsPlatform.CreateTray(Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico"));
+        var tray = trayCreated.IsSuccess ? trayCreated.Value : null;
+        if (trayCreated.IsFailure)
+        {
+            log.Write(ActivityLevel.Error, ActivityEvent.TrayFailed, new ActivityDetails { Error = trayCreated.Error.Code });
+        }
+
+        var services = BuildServices(platform, storage, log, dispatcher, time, tray);
 
         var library = services.GetRequiredService<ClipLibrary>();
         var loaded = await library.LoadAsync(cancellationToken);
@@ -122,7 +142,8 @@ internal sealed class AppRoot : IAsyncDisposable
 
         _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
 
-        var root = new AppRoot(services, platform, storage, popup, popupViewModel, log, guard, dispatcher);
+        var root = new AppRoot(services, platform, storage, popup, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
+        await root.ShowTrayAsync(cancellationToken);
         await root.RegisterShortcutAsync(options.Hotkey ?? Hotkey.Default, cancellationToken);
         platform.Hotkeys.Pressed += root.OnHotkeyPressed;
         guard.ShowRequested += root.OnShowRequested;
@@ -165,6 +186,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _log.Write(ActivityLevel.Information, ActivityEvent.AppStopping);
         _guard.ShowRequested -= OnShowRequested;
         _platform.Hotkeys.Pressed -= OnHotkeyPressed;
+        _tray?.Dispose();
         _popupViewModel.Close();
         _popup.Close();
         await DisposeAllAsync(_services, _storage, _platform);
@@ -178,7 +200,7 @@ internal sealed class AppRoot : IAsyncDisposable
         platform.Dispose();
     }
 
-    private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time)
+    private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
     {
         var services = new ServiceCollection();
         _ = services.AddSingleton(time);
@@ -189,14 +211,16 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(platform.ClipboardWriter);
         _ = services.AddSingleton(platform.ForegroundTracker);
         _ = services.AddSingleton(platform.PasteInjector);
-        _ = services.AddSingleton<IUserNotifier, NullNotifier>();
+        _ = tray is null ? services.AddSingleton<IUserNotifier, NullNotifier>() : services.AddSingleton<IUserNotifier>(tray);
         _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
         _ = services.AddSingleton<CaptureService>();
+        _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
         _ = services.AddSingleton<PopupViewModel>();
+        _ = services.AddSingleton<TrayViewModel>();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
     }
 
@@ -236,6 +260,28 @@ internal sealed class AppRoot : IAsyncDisposable
                 return (null, "Windows would not protect ClipBench's encryption key for your account, so ClipBench cannot save your history safely.");
             default:
                 return (null, "ClipBench could not open its history database. Check that its folder can be written to and that the disk has room, then try again.");
+        }
+    }
+
+    private async Task ShowTrayAsync(CancellationToken cancellationToken)
+    {
+        if (_tray is null)
+        {
+            return;
+        }
+
+        _tray.OpenRequested += (_, _) => _dispatcher.Post(TogglePopup);
+        _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
+        _trayViewModel.OpenRequested += (_, _) => TogglePopup();
+        _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
+
+        // Pausing changes the tool tip and the wording of the pause item.
+        _trayViewModel.PropertyChanged += (_, _) => _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+
+        var shown = await _tray.ShowAsync(TrayMenu.Build(_trayViewModel), cancellationToken);
+        if (shown.IsFailure)
+        {
+            _log.Write(ActivityLevel.Error, ActivityEvent.TrayFailed, new ActivityDetails { Error = shown.Error.Code });
         }
     }
 

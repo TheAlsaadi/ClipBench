@@ -70,6 +70,9 @@ public enum ActivityEvent
 
     /// <summary>The popup shortcut could not be registered, with the reason as an error code.</summary>
     HotkeyFailed,
+
+    /// <summary>The tray icon could not be shown, with the reason as an error code.</summary>
+    TrayFailed,
 }
 
 /// <summary>

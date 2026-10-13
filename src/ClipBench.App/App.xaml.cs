@@ -47,6 +47,7 @@ public partial class App : Application
         if (outcome.Root is { } root)
         {
             _root = root;
+            root.ExitRequested += (_, _) => _ = ShutDownAsync();
             _notice?.Close();
             return;
         }
