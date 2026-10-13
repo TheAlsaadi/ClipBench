@@ -71,3 +71,17 @@ GetCurrentProcess
 GetSidSubAuthority
 GetSidSubAuthorityCount
 TOKEN_MANDATORY_LABEL
+
+// Where the popup goes: the text caret, the pointer, and the monitor they are on
+GetGUIThreadInfo
+ClientToScreen
+GetCursorPos
+MonitorFromPoint
+GetMonitorInfo
+GetDpiForMonitor
+
+// Window effects: hidden from screenshots and screen sharing, rounded corners
+SetWindowDisplayAffinity
+GetWindowDisplayAffinity
+DwmSetWindowAttribute
+DWM_WINDOW_CORNER_PREFERENCE
