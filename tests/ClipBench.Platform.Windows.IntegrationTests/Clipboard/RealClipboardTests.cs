@@ -372,6 +372,27 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
     }
 
     [Fact]
+    public async Task A_format_that_is_a_handle_and_not_memory_is_refused_and_does_not_corrupt_the_heap()
+    {
+        // Regression: Windows adds a bitmap handle (CF_BITMAP) next to every bitmap. Treating a handle as a block
+        // of memory (GlobalSize, GlobalLock) corrupted the heap and crashed the process.
+        var rows = Enumerable.Range(0, 3).Select(_ => new byte[9]).ToList();
+        await PutAsync((ClipboardFormats.Dib, DibBuilder.Join(DibBuilder.InfoHeader(3, 3, 24), DibBuilder.Rows(rows))));
+        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
+        session.ShouldNotBeNull();
+        session.Formats().Select(format => format.Id).ShouldContain(2u, "Windows made a bitmap handle from the DIB");
+
+        session.SizeOf(2).ShouldBeNull();
+        session.Read(2, 1 << 20).ShouldBeNull();
+
+        // A damaged heap shows up when memory is allocated and freed. Give it every chance to.
+        for (var i = 0; i < 2_000; i++)
+        {
+            System.Runtime.InteropServices.Marshal.FreeHGlobal(System.Runtime.InteropServices.Marshal.AllocHGlobal(32 + i));
+        }
+    }
+
+    [Fact]
     public void The_generated_declarations_are_for_the_functions_this_test_relies_on()
     {
         // A wrong signature would show up as a crash or a wrong value in the tests above. This pins the one

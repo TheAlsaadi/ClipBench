@@ -98,6 +98,11 @@ internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
 
         public int? SizeOf(uint format)
         {
+            if (!ClipboardFormats.IsMemoryBlock(format))
+            {
+                return null;
+            }
+
             var memory = DataOf(format);
             if (memory.IsNull)
             {
@@ -110,6 +115,11 @@ internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
 
         public byte[]? Read(uint format, int maxBytes)
         {
+            if (!ClipboardFormats.IsMemoryBlock(format))
+            {
+                return null;
+            }
+
             var memory = DataOf(format);
             if (memory.IsNull || PInvoke.GlobalSize(memory) > (nuint)maxBytes)
             {

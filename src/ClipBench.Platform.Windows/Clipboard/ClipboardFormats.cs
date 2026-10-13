@@ -23,6 +23,18 @@ internal static class ClipboardFormats
 
     /// <summary>The registered format that holds a PNG file, which keeps alpha for programs that read it.</summary>
     public const string Png = "PNG";
+
+    /// <summary>
+    /// Whether the data of a format is a block of global memory, which can be sized, locked and copied. The
+    /// others hold a handle to a graphics object (CF_BITMAP, the metafile and palette formats and their display
+    /// forms, the GDI range), no data at all (CF_OWNERDISPLAY) or something private to a program (the private
+    /// range). Windows' global-memory functions must never be called on those: they treat the handle as a
+    /// pointer and corrupt the heap.
+    /// </summary>
+    /// <param name="format">The format number.</param>
+    /// <returns>True when the data is a block of memory.</returns>
+    public static bool IsMemoryBlock(uint format) =>
+        !(format is 2 or 3 or 9 or 14 or 0x0080 or 0x0082 or 0x0083 or 0x008E || format is >= 0x0200 and <= 0x03FF);
 }
 
 /// <summary>A format on the clipboard.</summary>

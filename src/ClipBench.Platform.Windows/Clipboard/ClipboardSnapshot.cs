@@ -32,7 +32,7 @@ internal sealed class ClipboardSnapshot : IDisposable
         long total = 0;
         foreach (var format in session.Formats())
         {
-            if (IsHandle(format.Id))
+            if (!ClipboardFormats.IsMemoryBlock(format.Id))
             {
                 continue;
             }
@@ -84,11 +84,6 @@ internal sealed class ClipboardSnapshot : IDisposable
     /// <summary>Overwrites the copies.</summary>
     public void Dispose() => Zero(_entries);
 
-    // Formats whose data is a handle to a graphics object or is private to a program, not a block of memory:
-    // CF_BITMAP, CF_METAFILEPICT, CF_PALETTE, CF_ENHMETAFILE, the owner-display formats and the private and
-    // GDI ranges.
-    private static bool IsHandle(uint format) =>
-        format is 2 or 3 or 9 or 14 or 0x0082 or 0x0083 or 0x008E || format is >= 0x0200 and <= 0x03FF;
 
     private static void Zero(List<(uint Format, byte[] Data)> entries)
     {
