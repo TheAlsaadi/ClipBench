@@ -12,6 +12,12 @@ public enum ErrorCode
     /// <summary>The paste queue is not armed, so there is nothing to paste.</summary>
     QueueNotArmed,
 
+    /// <summary>The paste queue is still pasting a clip and cannot take another step yet.</summary>
+    QueuePasteInProgress,
+
+    /// <summary>The paste queue has no paste running that could be completed.</summary>
+    QueueNotPasting,
+
     /// <summary>No clip with the given id is in the history.</summary>
     ClipNotFound,
 
