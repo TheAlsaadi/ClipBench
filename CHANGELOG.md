@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Encrypted history storage (`ClipBench.Storage`): clip content, previews and source app
+  names are sealed with AES-256-GCM, each tied to its clip, column and format, so a value
+  that was moved or changed is refused and never returned. The history is kept in SQLite
+  (write-ahead logging, secure delete) with a key check that spots a wrong key at start-up,
+  atomic schema migrations, retention by count, age and total size that follows the same
+  rules as the in-memory history, expiry, and a wipe that overwrites stored values before the
+  files are deleted. A key or database that cannot be used is reported and left untouched,
+  and starting fresh is a separate step. Tests read every byte on disk to prove nothing
+  readable is stored, and the SQL is constants with named parameters, checked by the compiler
+  and by a source scan. The Windows binding for the key (DPAPI) follows at the start of
+  Phase 3 (ADR 0009).
+- The in-memory history now also limits the unpinned clips to 256 MiB together
+  (`HistoryOptions.MaxTotalBytes`); the newest clip is always kept and pinned clips are exempt.
 - Core domain (`ClipBench.Core`, no Windows code): the `Clip` model with text, HTML, RTF,
   image and file-list content and previews that never split a character; the clip history
   with duplicate handling, pinning and retention by count and age; ranked substring and fuzzy
@@ -16,8 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the queue paste state machine; collect sessions; the capture filter (privacy markers,
   excluded applications, incognito, size limits); and a detector for card numbers, IBANs,
   JSON web tokens, private keys and random-looking tokens.
-- CI now enforces 90% line coverage on `ClipBench.Core` and fails a coverage run that
-  measured no lines (an empty assembly reports 100%).
+- CI now enforces 90% line coverage on `ClipBench.Core` and 85% on `ClipBench.Storage`, and
+  fails a coverage run that measured no lines (an empty assembly reports 100%).
 - Solution skeleton for .NET 10: `ClipBench.Core`, `ClipBench.Storage`,
   `ClipBench.Platform.Windows`, `ClipBench.Presentation` and a minimal unpackaged,
   self-contained WinUI 3 app on Windows App SDK 2.5.1, for x64 and ARM64.
@@ -34,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and pull request titles and bodies.
 - Community files: security policy, contributing guide, code of conduct, issue forms
   and a pull request template.
-- Architecture decision records 0001 to 0007, a glossary, a roadmap and a first
+- Architecture decision records 0001 to 0009, a glossary, a roadmap and a first
   draft of the threat model.
 
 ### Changed

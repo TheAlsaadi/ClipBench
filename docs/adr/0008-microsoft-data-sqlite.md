@@ -33,4 +33,4 @@ The native library is SQLite 3.53.3 according to the SQLitePCL.raw release notes
 - **The native library has one maintainer.** `SQLitePCLRaw` is maintained by Eric Sink, not Microsoft, and the provider depends on it. A compromise or abandonment there would reach ClipBench. Dependabot tracks it, the Phase 9 dependency audit re-checks the maintainers, and the `winsqlite3` bundle above is the fallback because it needs no native file from this author.
 - **A native library ships with the app** for x64 and ARM64. The Phase 10 notices file lists it with its Apache-2.0 license, and the Phase 9 license audit expects it.
 - **The provider's 3.0 line exists but is not used.** Version 10.0.12 depends on `SQLitePCLRaw` 2.1.12. Move only when Microsoft's provider does.
-- **SQL is parameterized only.** Statements are constants, and a test and an analyzer rule enforce it.
+- **SQL is parameterized only.** Statements are constants, and a test and an analyzer rule enforce it (see ADR 0009).
