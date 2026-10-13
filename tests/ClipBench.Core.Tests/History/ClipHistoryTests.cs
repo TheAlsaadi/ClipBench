@@ -9,8 +9,18 @@ public class ClipHistoryTests
 {
     private readonly FakeTimeProvider _clock = new();
 
-    private ClipHistory Create(int maxCount = 1000, TimeSpan? maxAge = null) =>
-        new(new HistoryOptions { MaxCount = maxCount, MaxAge = maxAge ?? TimeSpan.FromDays(30) }, _clock);
+    private ClipHistory Create(int maxCount = 1000, TimeSpan? maxAge = null, long? maxBytes = null) =>
+        new(
+            new HistoryOptions
+            {
+                MaxCount = maxCount,
+                MaxAge = maxAge ?? TimeSpan.FromDays(30),
+                MaxTotalBytes = maxBytes ?? new HistoryOptions().MaxTotalBytes,
+            },
+            _clock);
+
+    // A text clip of exactly this many bytes (ASCII, so one byte per character).
+    private static Clip Sized(int bytes, char fill = 'x') => TestClips.Text(new string(fill, bytes));
 
     private static string[] Texts(ClipHistory history) =>
         [.. history.Clips.Select(clip => ((TextContent)clip.Content).Text)];
@@ -205,6 +215,141 @@ public class ClipHistoryTests
         }
 
         history.Count.ShouldBe(1);
+    }
+
+    // --- eviction by total size ---
+
+    [Fact]
+    public void The_oldest_clips_are_evicted_when_the_total_size_exceeds_the_budget()
+    {
+        var history = Create(maxBytes: 10);
+        var oldest = history.Add(Sized(4, 'a')).Clip;
+        history.Add(Sized(4, 'b'));
+
+        var result = history.Add(Sized(4, 'c'));
+
+        Texts(history).ShouldBe(["cccc", "bbbb"]);
+        result.Evicted.ShouldBe([oldest]);
+    }
+
+    [Fact]
+    public void A_total_exactly_at_the_budget_is_kept()
+    {
+        var history = Create(maxBytes: 8);
+        history.Add(Sized(4, 'a'));
+
+        var result = history.Add(Sized(4, 'b'));
+
+        history.Count.ShouldBe(2);
+        result.Evicted.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Pinned_clips_are_never_evicted_by_size_and_do_not_count_toward_the_budget()
+    {
+        // The pinned clip is the newest, so a history that counted it would push out the two older clips.
+        var history = Create(maxBytes: 6);
+        history.Add(Sized(3, 'a'));
+        history.Add(Sized(3, 'b'));
+
+        var pinned = history.Add(TestClips.Text(new string('p', 100), pinned: true)).Clip;
+
+        history.Count.ShouldBe(3);
+        history.Trim().ShouldBeEmpty();
+        history.Get(pinned.Id)!.IsPinned.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_newest_clip_is_kept_even_when_it_alone_exceeds_the_budget()
+    {
+        var history = Create(maxBytes: 3);
+
+        var result = history.Add(Sized(10, 'a'));
+
+        Texts(history).ShouldBe([new string('a', 10)]);
+        result.Evicted.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_clip_that_exceeds_the_budget_pushes_out_everything_older()
+    {
+        var history = Create(maxBytes: 10);
+
+        history.Add(Sized(10, 'a'));
+        var result = history.Add(Sized(10, 'b'));
+
+        Texts(history).ShouldBe([new string('b', 10)]);
+        result.Evicted.Length.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Once_the_budget_is_exceeded_older_clips_are_evicted_even_if_they_are_small()
+    {
+        // Newest first the sizes are 2, 5, 9, 1. The 9 does not fit, and the small 1 behind it must
+        // not survive it: keeping an older clip over a newer one would make the history unpredictable.
+        // The clips are pinned while they are added so that the single trim below sees all four.
+        var history = Create(maxBytes: 10);
+        var clips = new[] { Sized(1, 'd'), Sized(9, 'c'), Sized(5, 'b'), Sized(2, 'a') };
+        foreach (var clip in clips)
+        {
+            history.Pin(history.Add(clip).Clip.Id);
+        }
+
+        foreach (var clip in clips)
+        {
+            history.Unpin(clip.Id);
+        }
+
+        var evicted = history.Trim();
+
+        Texts(history).ShouldBe(["aa", "bbbbb"]);
+        evicted.Select(clip => clip.Id).ShouldBe([clips[1].Id, clips[0].Id]);
+    }
+
+    [Fact]
+    public void Images_count_by_their_byte_size()
+    {
+        var history = Create(maxBytes: 5);
+        history.Add(TestClips.Image(1)); // 3 bytes
+
+        var result = history.Add(TestClips.Image(2));
+
+        history.Count.ShouldBe(1);
+        result.Evicted.Length.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_trim_applies_the_budget_after_a_large_clip_is_unpinned()
+    {
+        var history = Create(maxBytes: 10);
+        var large = history.Add(Sized(9, 'l')).Clip;
+        history.Pin(large.Id);
+        history.Add(Sized(5, 'a'));
+        history.Unpin(large.Id);
+        history.Count.ShouldBe(2);
+
+        var evicted = history.Trim();
+
+        evicted.ShouldBe([large]);
+        Texts(history).ShouldBe(["aaaaa"]);
+    }
+
+    [Fact]
+    public void A_clip_that_is_too_old_does_not_count_toward_the_budget()
+    {
+        // The list is C, B, A. B was captured before A (A was stamped ahead of the clock), so B expires
+        // first. Its 9 bytes must not spend the budget and push out A, which still fits next to C.
+        var history = Create(maxAge: TimeSpan.FromHours(1), maxBytes: 12);
+        var start = _clock.GetUtcNow();
+        var a = history.Add(TestClips.Text("aa", start + TimeSpan.FromMinutes(30))).Clip;
+        history.Add(TestClips.Text(new string('b', 9), start));
+        history.Count.ShouldBe(2);
+        _clock.Advance(TimeSpan.FromMinutes(70));
+
+        history.Add(TestClips.Text("ccccc", _clock.GetUtcNow()));
+
+        Texts(history).ShouldBe(["ccccc", "aa"]);
+        history.Get(a.Id).ShouldNotBeNull();
     }
 
     // --- eviction by age ---
@@ -420,12 +565,21 @@ public class ClipHistoryTests
     // --- options, construction and concurrency ---
 
     [Fact]
-    public void The_default_limits_are_a_thousand_clips_and_thirty_days()
+    public void The_default_limits_are_a_thousand_clips_thirty_days_and_256_mebibytes()
     {
         var options = new HistoryOptions();
 
         options.MaxCount.ShouldBe(1000);
         options.MaxAge.ShouldBe(TimeSpan.FromDays(30));
+        options.MaxTotalBytes.ShouldBe(256L * 1024 * 1024);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void A_size_budget_below_one_byte_is_a_bug(long bytes)
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new HistoryOptions { MaxTotalBytes = bytes });
     }
 
     [Theory]

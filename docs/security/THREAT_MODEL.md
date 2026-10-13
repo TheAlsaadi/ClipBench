@@ -1,7 +1,8 @@
 # Threat model
 
-**Status:** first draft, written in Phase 0 before any feature exists. Phase 9 revisits
-every row and checks that each mitigation has a test or a documented reason.
+**Status:** first draft, written in Phase 0 before any feature exists. Section 2 (storage)
+was brought up to date in Phase 2 with what was built and tested. Phase 9 revisits every
+row and checks that each mitigation has a test or a documented reason.
 
 ClipBench sees everything a user copies, including passwords, tokens and personal data.
 That makes it a high-value target, and it shapes every decision below.
@@ -55,16 +56,27 @@ mitigation is built; "Evidence" is how it is checked.
 
 ## 2. Storage (SQLite and crypto)
 
+Built in Phase 2 (ADR 0008 and ADR 0009). The key is wrapped through an interface, and the
+Windows binding for it (DPAPI) is built at the start of Phase 3 (ADR 0009), so until then the
+wrapping is tested against a fake that behaves like DPAPI.
+
 | STRIDE | Threat | Mitigation | Phase | Evidence |
 |---|---|---|---|---|
-| I | Reading the history database (`clipbench.db`) from disk or a backup | AES-256-GCM per value; key wrapped by DPAPI | 2 | Plaintext leak test over the db, `-wal` and `-shm` |
-| T | Swapping or editing ciphertext | GCM tag plus associated data (row id, column); failure is closed | 2 | Tamper tests on every byte |
-| I | Guessing a clip by comparing hashes | Keyed HMAC for duplicate detection | 2 | Different keys give different hashes |
-| I | Content in logs, crash dumps or temp files | Logs hold event types, sizes and ids only; no minidumps with clipboard memory | 4, 9 | Log marker test; audit |
-| I | `key.bin` readable by other users | Inherits the user-only ACL of `%LOCALAPPDATA%` | 2 | Review |
-| E | SQL injection | Parameterized SQL only | 2 | Review and tests |
-| D | Corrupt key file or database | Clear, recoverable error and an offer to start fresh | 2 | Key management tests |
-| I | Deleted rows linger in the file | `secure_delete`, `VACUUM` on wipe | 2 | Wipe test with marker bytes |
+| I | Reading the history database (`clipbench.db`) from disk or a backup | AES-256-GCM per value (content, preview, source app); the master key is wrapped for the current user, with the Windows binding in Phase 3 | 2, 3 | Leak tests read every byte of every file in the storage folder (database, `-wal`, `-shm`, key file) in UTF-8 and UTF-16, while open, after close and after later changes; a control proves the scan can see a leak; mutations that store a preview, source, content or key in plain are caught |
+| T | Swapping or editing ciphertext | GCM tag plus associated data (clip id, column, format); failure is closed; a damaged record is skipped and counted and never returned | 2 | Tests flip every bit of a sealed value and swap values between rows, columns, ids and formats |
+| T | Editing the plain metadata (times, pin flag, size, format) | **Residual, accepted.** An attacker with the file can reorder, pin, expire or break clips. They cannot reveal, forge or move content, and the format is bound into the content | 2 | A test records what a change can and cannot do |
+| T | Deleting rows, or putting back an older copy of the database | **Residual, not defended.** The history has no counter beyond the schema version | | |
+| I | Guessing a clip by comparing hashes | Duplicate detection uses HMAC-SHA256 under a key derived from the master key, over the format and the content | 2 | Different keys give different hashes; a known-answer test pins the derivation |
+| I | Using the wrong key shows garbage or fails clip by clip | A sealed key check is verified once at open; a wrong key is one clear "history can't be decrypted" error and nothing is changed | 2 | Open and storage tests |
+| I | Content in logs, crash dumps or temp files | Storage logs nothing, and prints no clip, summary or result with its text. SQLite keeps temp files in memory. Phase 4 adds logging with a marker test; Phase 9 adds crash handling and an audit | 2, 4, 9 | Print tests; the leak tests see no extra files; log marker test later |
+| I | Key material or plaintext lingers in memory | Working keys and the master key are zeroed when disposed, and plaintext buffers after use. **Residual:** .NET strings cannot be wiped, and the search index holds decrypted text | 2 | Review |
+| I | `key.bin` readable by other users | The file is created in the folder the caller names and inherits its permissions. For `%LOCALAPPDATA%` that is the current user only | 2, 3, 9 | Review; Phase 9 checks the real folder |
+| I | A deleted or evicted clip stays in the file | `secure_delete`; evicting, deleting and sweeping overwrite the value and empty the write-ahead log, which is best effort while another process has the database open (it has to wait for that reader). Wipe all also rebuilds the file, empties the log, deletes the files and overwrites the key file before deleting it (best effort on a solid-state drive, where old blocks may remain out of reach) | 2 | Tests read the files after delete, retention and sweep (while the database is still open, and after it is closed), after wipe, and at the moment the files are deleted |
+| E | SQL injection | Constants and named parameters only. CA2100 is an error, the one helper that takes variable SQL accepts constants only (CA1857), and a source scan rejects anything else | 2 | Hostile-text tests; the scan test; mutations that add concatenation, interpolation and a variable name are caught |
+| D | A lost, wrong or damaged key or database | One recoverable error; nothing is replaced; the user is offered a fresh start, which is a separate action. A database whose key file is missing is never given a new key. A database from a newer version is refused | 2 | Key store and storage tests |
+| D | A key that was written but cannot be read back | A new wrap is unwrapped before it is written; the file is written beside the target and moved into place | 2 | Key store tests |
+| D | The history grows without bound | 1,000 clips, 30 days and 256 MiB for unpinned clips, applied in memory and on disk by the same rules; a size cap on every encoded clip and a part limit on file lists | 1, 2 | Retention tests, a randomized agreement test, codec limit tests |
+| D | Hostile or damaged stored bytes crash the decoder | Counts and lengths are checked before anything is allocated; invalid UTF-8 and trailing bytes are rejected | 2 | Truncation, trailing-byte, huge-count and random-input tests |
 
 Residual: the in-memory search index is decrypted while the app runs.
 
@@ -122,5 +134,11 @@ download a new one, which is an accepted cost of having no network code.
 - Does the Windows App SDK runtime open any network connection in an unpackaged,
   self-contained app? (Phase 9)
 - Which Windows reserved hotkeys will a future update claim? (ADR 0004)
-- How should the app behave if DPAPI is unavailable, for example for a roaming profile
-  restored on a new machine? (Phase 2)
+- Which permission does the real storage folder have on a machine whose
+  `%LOCALAPPDATA%` is redirected or shared? (Phase 3 and Phase 9)
+
+Answered:
+
+- **If DPAPI cannot unwrap the key** (a roaming profile restored on a new machine, a
+  changed account): the key store reports "history can't be decrypted" and changes
+  nothing. The interface offers to start fresh and never does it by itself (ADR 0009).

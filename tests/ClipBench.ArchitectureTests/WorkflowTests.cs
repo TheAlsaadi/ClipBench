@@ -143,6 +143,16 @@ public partial class WorkflowTests
     }
 
     [Fact]
+    public void Ci_workflow_enforces_a_coverage_floor_of_at_least_85_on_Storage()
+    {
+        var floors = CoverageFloorEntry().Matches(Read("ci.yml"))
+            .ToDictionary(match => match.Groups["name"].Value, match => int.Parse(match.Groups["floor"].Value, CultureInfo.InvariantCulture));
+
+        floors.ShouldContainKey("Storage");
+        floors["Storage"].ShouldBeGreaterThanOrEqualTo(85, "Rule 2 sets ClipBench.Storage at 85% line coverage from Phase 2");
+    }
+
+    [Fact]
     public void Ci_workflow_rejects_a_coverage_report_that_measured_no_lines()
     {
         // An assembly with no code, or a mistyped include filter, reports 100% coverage. Each run must be

@@ -13,7 +13,7 @@ public class ProjectStructureTests
     private static readonly Dictionary<string, (string[] Projects, string[] Packages, string Framework)> _architecture = new()
     {
         ["ClipBench.Core"] = ([], [], "net10.0"),
-        ["ClipBench.Storage"] = (["ClipBench.Core"], [], "net10.0"),
+        ["ClipBench.Storage"] = (["ClipBench.Core"], ["Microsoft.Data.Sqlite"], "net10.0"),
         ["ClipBench.Platform.Windows"] = (["ClipBench.Core"], [], WindowsFramework),
         ["ClipBench.Presentation"] = (["ClipBench.Core"], [], "net10.0"),
         ["ClipBench.App"] = (

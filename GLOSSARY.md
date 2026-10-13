@@ -88,5 +88,26 @@ The state in which ClipBench captures nothing until it is switched off.
 _Avoid_: pause, private mode
 
 **Wipe**:
-Deleting the entire History together with its encryption key.
+Deleting the entire History together with its encryption key. The stored values are overwritten before the files are deleted.
 _Avoid_: reset, clear all
+
+### Storage
+
+**Master key**:
+The random key from which the encryption key and the duplicate-detection key are derived. It is kept on disk only in wrapped form, readable by the current Windows user, and in memory only while ClipBench runs.
+_Avoid_: password, secret
+
+**Sealed value**:
+Stored data that is encrypted, checked for tampering when read, and tied to the Clip, column and format it was written for. A sealed value that was moved or changed is refused, never returned.
+_Avoid_: encrypted blob, ciphertext
+
+**Key check**:
+A sealed constant stored with the History. It tells ClipBench at start-up whether the key it has is the one that created the History.
+
+**Retention**:
+Removing the oldest unpinned Clips when the History passes its limits on count, age or total size, and removing expired Clips.
+_Avoid_: cleanup, eviction
+
+**Start fresh**:
+Throwing away a History that can no longer be decrypted, together with its key, and beginning an empty one. ClipBench offers it and never does it without the user's agreement.
+_Avoid_: reset, repair

@@ -191,20 +191,40 @@ public sealed class ClipHistory
     }
 
     // The list is newest first, so walking it keeps the newest unpinned clips and evicts the rest.
+    // The size budget is a prefix rule: once a clip does not fit, every older unpinned clip goes too,
+    // even a small one that would fit, so the history never keeps an older clip over a newer one.
     private ImmutableArray<Clip> TrimLocked()
     {
         var now = _timeProvider.GetUtcNow();
         var kept = ImmutableArray.CreateBuilder<Clip>(_clips.Length);
         var evicted = ImmutableArray.CreateBuilder<Clip>();
         var unpinnedKept = 0;
+        var unpinnedBytes = 0L;
+        var budgetSpent = false;
 
         foreach (var clip in _clips)
         {
             if (clip.IsPinned)
             {
                 kept.Add(clip);
+                continue;
             }
-            else if (now - clip.CapturedAt > _options.MaxAge || unpinnedKept >= _options.MaxCount)
+
+            // A clip that is too old or over the count goes before the budget is looked at, so it never
+            // counts toward the budget and cannot be the one that spends it.
+            if (now - clip.CapturedAt > _options.MaxAge || unpinnedKept >= _options.MaxCount)
+            {
+                evicted.Add(clip);
+                continue;
+            }
+
+            var size = clip.SizeInBytes;
+            if (!budgetSpent && unpinnedKept > 0 && unpinnedBytes + size > _options.MaxTotalBytes)
+            {
+                budgetSpent = true;
+            }
+
+            if (budgetSpent)
             {
                 evicted.Add(clip);
             }
@@ -212,6 +232,7 @@ public sealed class ClipHistory
             {
                 kept.Add(clip);
                 unpinnedKept++;
+                unpinnedBytes += size;
             }
         }
 

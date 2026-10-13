@@ -29,4 +29,22 @@ public enum ErrorCode
 
     /// <summary>A custom separator is too long or has an unknown escape sequence.</summary>
     InvalidSeparator,
+
+    /// <summary>Stored data failed its integrity check: it was altered, or it belongs to another key or place.</summary>
+    DecryptionFailed,
+
+    /// <summary>A new encryption key could not be protected or stored, so there is nothing to lose by trying again.</summary>
+    KeyProtectionFailed,
+
+    /// <summary>The saved history cannot be decrypted because its key is missing, damaged or not this user's. The caller can offer to start fresh.</summary>
+    HistoryUnreadable,
+
+    /// <summary>The disk or the database refused an operation. The data on disk is unchanged unless the operation says otherwise.</summary>
+    StorageFailure,
+
+    /// <summary>A clip is larger than storage accepts, so it was not saved.</summary>
+    ContentTooLarge,
+
+    /// <summary>The saved history was written by a newer version of the app. It is left untouched, and starting fresh would destroy it.</summary>
+    HistoryTooNew,
 }

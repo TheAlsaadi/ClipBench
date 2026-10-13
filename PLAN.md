@@ -243,7 +243,7 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 - Wipe all: deletes all rows, runs `VACUUM`, deletes the key file, and leaves no marker bytes behind.
 - Content hash is a keyed HMAC: the same content under different master keys gives different hashes.
 
-**Implementation**: Microsoft.Data.Sqlite with parameterized SQL only (no string concatenation). Schema versioning table. `PRAGMA secure_delete=ON`, WAL mode. `System.Security.Cryptography.AesGcm`. HKDF to derive separate subkeys for encryption and HMAC from the master key. In Platform.Windows, implement `DpapiKeyProtector` (with an integration test that runs on Windows only).
+**Implementation**: Microsoft.Data.Sqlite with parameterized SQL only (no string concatenation). Schema versioning table. `PRAGMA secure_delete=ON`, WAL mode. `System.Security.Cryptography.AesGcm`. HKDF to derive separate subkeys for encryption and HMAC from the master key. `IKeyProtector` is in Core. Its Windows implementation, `DpapiKeyProtector`, moves to the start of Phase 3 because it needs CsWin32, a second package that the owner has not approved (ADR 0009).
 
 **Acceptance**: Storage coverage ≥ 85%; the leak test is green; the security review is clean.
 
@@ -262,6 +262,7 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 - Unit (with fakes): clipboard-open retry with backoff when another process holds the clipboard (`OpenClipboard` fails); source-process resolution via `GetClipboardOwner` → `GetWindowThreadProcessId`, failing gracefully; the HTML Format header parser handles malformed offsets and oversized input; `HotkeyService` reports conflicts when `RegisterHotKey` fails; the `PasteInjector` command sequence is correct (focus → set clipboard → send keys → optional restore) using a fake Win32 surface.
 
 **Implementation**
+- First, `DpapiKeyProtector` (moved from Phase 2, ADR 0009): `CryptProtectData` and `CryptUnprotectData` with the `CurrentUser` scope and app-specific entropy, with a Windows-only integration test (round trip; a wrong entropy or a changed wrap fails). It needs the owner's approval of CsWin32 and a second documented license exception, next to the Windows App SDK, for CsWin32's three build-time metadata packages, which carry the Windows SDK license.
 - CsWin32 `NativeMethods.txt` lists only the APIs needed.
 - A message-only window plus `AddClipboardFormatListener` for capture. Do not use the legacy clipboard viewer chain.
 - Supported formats: `CF_UNICODETEXT`, `HTML Format`, `Rich Text Format`, `CF_DIB`/`CF_DIBV5` → PNG, `CF_HDROP`.
