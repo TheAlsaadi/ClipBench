@@ -14,7 +14,11 @@ public interface IUiDispatcher
 public interface IPasteFlow
 {
     /// <summary>Remembers the window that has focus now, as the place to paste. Call it before the popup takes focus.</summary>
-    void Begin();
+    /// <param name="recordTarget">
+    /// False when the window that has focus is no place to paste, such as the taskbar after a click on the tray icon:
+    /// the paste then goes to whatever has focus once the popup is hidden.
+    /// </param>
+    void Begin(bool recordTarget = true);
 
     /// <summary>
     /// Pastes a clip into the remembered window. The popup is already hidden. When the paste fails, the user is told

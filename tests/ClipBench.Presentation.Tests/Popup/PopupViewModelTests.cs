@@ -67,6 +67,16 @@ public sealed class PopupViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Opening_from_the_tray_icon_does_not_record_a_window_to_paste_into_and_opening_by_shortcut_does()
+    {
+        _vm.Open();
+        _vm.Close();
+        _vm.Open(pasteIntoPreviousWindow: false);
+
+        _paste.RecordedTargets.ShouldBe([true, false]);
+    }
+
+    [Fact]
     public async Task Opening_lists_the_clips_newest_first_and_highlights_the_first()
     {
         await CopyAsync("one", "two", "three");

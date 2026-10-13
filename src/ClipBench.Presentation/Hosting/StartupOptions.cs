@@ -92,7 +92,12 @@ public sealed record StartupOptions
             }
             else if (isDataDirectory)
             {
-                if (Path.IsPathFullyQualified(value))
+                if (value.StartsWith(@"\\", StringComparison.Ordinal))
+                {
+                    // A network share or a device path: the app makes no network calls, and the system would make them for it.
+                    problems.Add($"{DataDirectorySwitch} needs a folder on this computer, so it was ignored.");
+                }
+                else if (Path.IsPathFullyQualified(value))
                 {
                     dataDirectory = value;
                 }

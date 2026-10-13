@@ -76,12 +76,18 @@ public partial class App : Application
     /// <returns>A task that completes when the app is ready to exit.</returns>
     public async Task ShutDownAsync()
     {
-        if (_root is { } root)
+        try
         {
-            _root = null;
-            await root.DisposeAsync();
+            if (_root is { } root)
+            {
+                _root = null;
+                await root.DisposeAsync();
+            }
         }
-
-        Exit();
+        finally
+        {
+            // Whatever went wrong while stopping, the app still has to end: nothing is left running to clean up.
+            Exit();
+        }
     }
 }

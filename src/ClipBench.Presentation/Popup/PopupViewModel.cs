@@ -109,10 +109,14 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Shows the popup: remembers where to paste, clears the search and lists the clips.</summary>
-    public void Open()
+    /// <param name="pasteIntoPreviousWindow">
+    /// True (the default) to paste into the window that has focus now. False when it is the taskbar, because the popup
+    /// was opened from the tray icon: the paste then goes to whatever has focus once the popup is hidden.
+    /// </param>
+    public void Open(bool pasteIntoPreviousWindow = true)
     {
         // The window that has focus now is where the paste goes. The popup must not have taken focus yet.
-        _paste.Begin();
+        _paste.Begin(pasteIntoPreviousWindow);
 
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;

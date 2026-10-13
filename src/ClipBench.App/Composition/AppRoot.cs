@@ -119,6 +119,7 @@ internal sealed class AppRoot : IAsyncDisposable
         var loaded = await library.LoadAsync(cancellationToken);
         if (loaded.IsFailure)
         {
+            tray?.Dispose();
             await DisposeAllAsync(services, storage, platform);
             return new StartOutcome(null, "ClipBench could not read its saved history. Check that the folder is readable, then start ClipBench again.");
         }
@@ -151,7 +152,11 @@ internal sealed class AppRoot : IAsyncDisposable
     }
 
     /// <summary>Shows the popup, or hides it when it is already open.</summary>
-    public void TogglePopup()
+    /// <param name="fromTray">
+    /// True when the tray icon was used: the window that has focus is then the taskbar, which is no place to paste, so
+    /// the paste goes to whatever has focus once the popup is hidden.
+    /// </param>
+    public void TogglePopup(bool fromTray = false)
     {
         if (_disposed)
         {
@@ -164,12 +169,12 @@ internal sealed class AppRoot : IAsyncDisposable
             return;
         }
 
-        var focused = _platform.ForegroundTracker.Capture();
+        var focused = fromTray ? default : _platform.ForegroundTracker.Capture();
         var anchor = _platform.ScreenLocator.Locate(focused.IsSuccess ? focused.Value.Window : null);
         var bounds = PopupPlacement.Compute(anchor, PopupWindow.WidthDip, PopupWindow.HeightDip);
 
         // Opening records the window that has focus now, so it has to come before the popup takes focus.
-        _popupViewModel.Open();
+        _popupViewModel.Open(pasteIntoPreviousWindow: !fromTray);
         _popup.ShowAt(bounds);
     }
 
@@ -270,9 +275,9 @@ internal sealed class AppRoot : IAsyncDisposable
             return;
         }
 
-        _tray.OpenRequested += (_, _) => _dispatcher.Post(TogglePopup);
+        _tray.OpenRequested += (_, _) => _dispatcher.Post(() => TogglePopup(fromTray: true));
         _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
-        _trayViewModel.OpenRequested += (_, _) => TogglePopup();
+        _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         // Pausing changes the tool tip and the wording of the pause item.
@@ -306,7 +311,7 @@ internal sealed class AppRoot : IAsyncDisposable
     {
         if (_hotkey is { } own && e.Id == own)
         {
-            _dispatcher.Post(TogglePopup);
+            _dispatcher.Post(() => TogglePopup());
         }
     }
 

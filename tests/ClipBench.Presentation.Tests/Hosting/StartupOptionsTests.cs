@@ -89,6 +89,17 @@ public class StartupOptionsTests
         options.Problems.ShouldBe(["--data-dir needs a full path, so it was ignored."]);
     }
 
+    [Theory]
+    [InlineData(@"\\server\share\clips")]
+    [InlineData(@"\\?\C:\clips")]
+    public void A_network_or_device_path_is_ignored_with_a_note_because_the_app_makes_no_network_calls(string path)
+    {
+        var options = StartupOptions.Parse(["--data-dir", path]);
+
+        options.DataDirectory.ShouldBeNull();
+        options.Problems.ShouldBe(["--data-dir needs a folder on this computer, so it was ignored."]);
+    }
+
     [Fact]
     public void A_shortcut_that_does_not_parse_is_ignored_with_a_note()
     {

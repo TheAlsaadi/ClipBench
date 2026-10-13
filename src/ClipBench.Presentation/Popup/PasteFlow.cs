@@ -63,12 +63,12 @@ public sealed class PasteFlow : IPasteFlow
     }
 
     /// <inheritdoc/>
-    public void Begin()
+    public void Begin(bool recordTarget = true)
     {
-        var focused = _tracker.Capture();
+        var focused = recordTarget ? _tracker.Capture() : default;
         lock (_gate)
         {
-            _target = focused.IsSuccess ? focused.Value.Window : null;
+            _target = recordTarget && focused.IsSuccess ? focused.Value.Window : null;
         }
     }
 

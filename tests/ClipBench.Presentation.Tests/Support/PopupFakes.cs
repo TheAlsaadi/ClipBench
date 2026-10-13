@@ -28,9 +28,13 @@ internal sealed class FakePasteFlow : IPasteFlow
     /// <summary>Runs inside <see cref="Begin"/>, so a test can look at the state at that moment.</summary>
     public Action? OnBegin { get; set; }
 
-    public void Begin()
+    /// <summary>What each call to <see cref="Begin"/> asked for.</summary>
+    public List<bool> RecordedTargets { get; } = [];
+
+    public void Begin(bool recordTarget = true)
     {
         Begins++;
+        RecordedTargets.Add(recordTarget);
         Order.Add("begin");
         OnBegin?.Invoke();
     }

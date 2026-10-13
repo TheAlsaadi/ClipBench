@@ -68,6 +68,31 @@ public class PasteFlowTests
     }
 
     [Fact]
+    public async Task Without_asking_for_a_target_the_tracker_is_left_alone_and_the_paste_goes_to_whatever_has_focus()
+    {
+        // The popup was opened from the tray icon, so the window that had focus is the taskbar, which is no place to paste.
+        var flow = Create();
+        flow.Begin(recordTarget: false);
+
+        await flow.PasteAsync(Clip(), Ct);
+
+        _tracker.Captures.ShouldBe(0);
+        _injector.Requests.Single().Target.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Beginning_without_a_target_forgets_an_earlier_one()
+    {
+        var flow = Create();
+        flow.Begin();
+        flow.Begin(recordTarget: false);
+
+        await flow.PasteAsync(Clip(), Ct);
+
+        _injector.Requests.Single().Target.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task A_window_on_record_is_used_once_so_a_later_paste_never_lands_in_a_stale_window()
     {
         var flow = Create();
