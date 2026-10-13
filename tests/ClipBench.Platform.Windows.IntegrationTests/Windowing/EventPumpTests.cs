@@ -30,16 +30,20 @@ public class EventPumpTests
     }
 
     [Fact]
-    public async Task Events_are_delivered_on_another_thread_than_the_one_that_posted_them()
+    public async Task An_event_is_not_delivered_before_Post_has_returned()
     {
-        var delivered = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var pump = new EventPump<int>(_ => delivered.TrySetResult(Environment.CurrentManagedThreadId));
+        // Comparing thread numbers cannot show this: the poster is a pool thread too, and once it yields at an await
+        // the pool may run the delivery on that very thread (about 1 round in 20 here). What matters is that the
+        // poster is never held up, so the subscriber is made to wait for a signal that is only given after Post returns.
+        // A delivery that ran inside Post would wait for a signal that cannot come, and time out.
+        using var postReturned = new ManualResetEventSlim();
+        var seenAfterPostReturned = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var pump = new EventPump<int>(_ => seenAfterPostReturned.TrySetResult(postReturned.Wait(TimeSpan.FromSeconds(5))));
 
-        // The poster is the thread that calls Post. Read it here: after the await the test may resume on any pool thread.
-        var poster = Environment.CurrentManagedThreadId;
         pump.Post(1);
+        postReturned.Set();
 
-        (await delivered.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct)).ShouldNotBe(poster);
+        (await seenAfterPostReturned.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct)).ShouldBeTrue();
     }
 
     [Fact]
