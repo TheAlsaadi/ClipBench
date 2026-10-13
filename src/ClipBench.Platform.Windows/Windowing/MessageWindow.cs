@@ -24,7 +24,7 @@ internal interface IThreadInvoker
 /// a window (registering a hotkey, receiving a clipboard-change notice, owning the clipboard), so
 /// everything of that kind runs here: one thread, one queue, one place to look when something goes wrong.
 /// </summary>
-internal sealed unsafe class MessageWindow : IThreadInvoker, IDisposable
+internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDisposable
 {
     private const uint RunMessage = PInvoke.WM_APP + 1;
     private static readonly TimeSpan _startTimeout = TimeSpan.FromSeconds(10);

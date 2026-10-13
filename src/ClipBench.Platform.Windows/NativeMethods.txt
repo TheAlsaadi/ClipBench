@@ -53,3 +53,10 @@ GetWindowThreadProcessId
 OpenProcess
 QueryFullProcessImageName
 CloseHandle
+
+// Global shortcuts (RegisterHotKey; no keyboard hook is ever installed)
+RegisterHotKey
+UnregisterHotKey
+
+// Sending keystrokes (Ctrl+V to paste; tests press F24)
+SendInput
