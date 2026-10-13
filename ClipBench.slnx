@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ClipBench.App/ClipBench.App.csproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="src/ClipBench.Core/ClipBench.Core.csproj" />
     <Project Path="src/ClipBench.Platform.Windows/ClipBench.Platform.Windows.csproj" />
     <Project Path="src/ClipBench.Presentation/ClipBench.Presentation.csproj" />

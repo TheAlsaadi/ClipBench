@@ -19,4 +19,8 @@
     <PackageVersion Include="TngTech.ArchUnitNET" Version="0.13.4" />
   </ItemGroup>
 
+  <ItemGroup Label="UI platform (ADR 0001)">
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+  </ItemGroup>
+
 </Project>
