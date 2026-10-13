@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The test runner sends usage data to Microsoft unless it is told not to.
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  TESTINGPLATFORM_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  attribution-guard:
+    name: attribution-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test the guard
+        run: bash scripts/tests/test-attribution-guard.sh
+
+      - name: Scan commits and pull request text
+        # Event text reaches the script only through environment variables and is read as data.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/attribution-guard.sh "$BASE_SHA" "$HEAD_SHA"
+
+  build-test:
+    name: build-test
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Build (Release, warnings as errors)
+        run: dotnet build -c Release -warnaserror --no-restore
+
+      - name: Build the app for ARM64
+        run: dotnet build src/ClipBench.App/ClipBench.App.csproj -c Release -p:Platform=ARM64 -p:RestoreLockedMode=true -warnaserror
+
+      - name: Test (unit and architecture)
+        run: dotnet test --solution ClipBench.slnx -c Release --no-build --filter-not-trait "Category=Integration" --minimum-expected-tests 1
+
+      - name: Test with coverage floors
+        shell: bash
+        run: |
+          # One run per test project, each measuring only its own assembly.
+          # The floors are 0 while the assemblies are empty. Phase 1 raises Core to 90, Storage
+          # follows at 85 and Presentation at 80 (from Phase 4). Phase 1 must also assert
+          # lines-valid > 0 in each report: an assembly with no code reports 100% coverage.
+          for entry in "Core:0" "Storage:0" "Presentation:0"; do
+            name=${entry%%:*}
+            floor=${entry##*:}
+            dotnet test --project "tests/ClipBench.${name}.Tests" -c Release --no-build \
+              --coverlet --coverlet-output-format cobertura \
+              --coverlet-include "[ClipBench.${name}]*" \
+              --coverlet-threshold "$floor" --coverlet-threshold-type line \
+              --results-directory "artifacts/coverage/${name}"
+          done
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: artifacts/coverage
+          retention-days: 14
+
+      - name: Verify formatting
+        env:
+          # Format loads this configuration; Release is the one that was just built.
+          Configuration: Release
+        run: dotnet format --verify-no-changes
+
+      - name: Check for vulnerable packages
+        shell: bash
+        run: |
+          # dotnet exits 0 even when it finds vulnerable packages, so read its report. Every project
+          # must be reported as clean: if the advisory data cannot be fetched, the report has no
+          # verdict for the project and the check must fail instead of passing unchecked.
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+          if grep -q 'has the following vulnerable packages' vulnerable.txt; then
+            echo 'Vulnerable packages found.' >&2
+            exit 1
+          fi
+          projects=$(find src tests -name '*.csproj' | wc -l)
+          clean=$(grep -c 'has no vulnerable packages' vulnerable.txt || true)
+          if [ "$clean" -ne "$projects" ]; then
+            echo "Only $clean of $projects projects were confirmed free of vulnerable packages." >&2
+            exit 1
+          fi

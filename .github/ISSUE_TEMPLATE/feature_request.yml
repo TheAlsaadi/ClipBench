@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an idea
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ClipBench makes no network calls and keeps history encrypted on disk. Ideas that
+        need the network (cloud sync, update checks, telemetry) are out of scope. See the
+        [roadmap](https://github.com/TheAlsaadi/ClipBench/blob/main/docs/ROADMAP.md).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe what you are trying to do and what gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

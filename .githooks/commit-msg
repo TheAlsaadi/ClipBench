@@ -1,0 +1,21 @@
+#!/bin/sh
+# ClipDeck commit-msg hook.
+# Policy: the repository owner is the sole author. This hook removes any
+# AI attribution lines (Co-Authored-By trailers for Claude/Anthropic,
+# Claude-Session links, "Generated with Claude Code" footers) from every
+# commit message before the commit is created.
+#
+# Install once per clone:  git config core.hooksPath .githooks
+
+msg_file="$1"
+tmp_file="$msg_file.clipdeck-tmp"
+
+grep -v -i -E \
+  -e '^[[:space:]]*Co-Authored-By:.*(claude|anthropic)' \
+  -e '^[[:space:]]*Claude-Session:' \
+  -e 'Generated with \[?Claude Code' \
+  -e 'claude\.ai/code/session_' \
+  "$msg_file" > "$tmp_file" || true
+
+mv "$tmp_file" "$msg_file"
+exit 0

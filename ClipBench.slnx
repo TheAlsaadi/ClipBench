@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ClipBench.App/ClipBench.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/ClipBench.Core/ClipBench.Core.csproj" />
+    <Project Path="src/ClipBench.Platform.Windows/ClipBench.Platform.Windows.csproj" />
+    <Project Path="src/ClipBench.Presentation/ClipBench.Presentation.csproj" />
+    <Project Path="src/ClipBench.Storage/ClipBench.Storage.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ClipBench.ArchitectureTests/ClipBench.ArchitectureTests.csproj" />
+    <Project Path="tests/ClipBench.Core.Tests/ClipBench.Core.Tests.csproj" />
+    <Project Path="tests/ClipBench.Platform.Windows.IntegrationTests/ClipBench.Platform.Windows.IntegrationTests.csproj" />
+    <Project Path="tests/ClipBench.Presentation.Tests/ClipBench.Presentation.Tests.csproj" />
+    <Project Path="tests/ClipBench.Storage.Tests/ClipBench.Storage.Tests.csproj" />
+    <Project Path="tests/ClipBench.UiSmokeTests/ClipBench.UiSmokeTests.csproj" />
+  </Folder>
+</Solution>
