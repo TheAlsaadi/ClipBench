@@ -1,0 +1,9 @@
+// The Win32 APIs ClipBench calls, and nothing else (ADR 0010). CsWin32 generates internal declarations
+// for exactly these names. A test fails the build if this list names a hook, a shell-execute or a
+// process-creation API. Add a name here in the same commit as the code that uses it.
+
+// Key protection (DPAPI)
+CryptProtectData
+CryptUnprotectData
+CRYPTPROTECT_UI_FORBIDDEN
+LocalFree
