@@ -40,6 +40,15 @@ public enum ActivityEvent
 
     /// <summary>A change could not be saved to the history database.</summary>
     StoreFailed,
+
+    /// <summary>A clip was pasted into another program.</summary>
+    PasteSucceeded,
+
+    /// <summary>A paste did not happen, with the reason as an error code.</summary>
+    PasteFailed,
+
+    /// <summary>A paste threw an exception that was not expected.</summary>
+    PasteFaulted,
 }
 
 /// <summary>
