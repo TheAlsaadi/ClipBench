@@ -292,8 +292,8 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 - Mica backdrop, rounded corners, light/dark following system theme, Segoe Fluent Icons.
 - Accessibility: full keyboard operation, UI Automation names on all controls, visible focus, high-contrast theme support, and respect for "reduce motion".
 - The tray icon is implemented through CsWin32 `Shell_NotifyIcon`, with no third-party tray package (Rule 3, dependencies).
-- Composition root uses `Microsoft.Extensions.DependencyInjection` and `Microsoft.Extensions.Hosting`.
-- Logging uses `Microsoft.Extensions.Logging` with a small size-capped rolling file sink written in-house. Add a test that log output never contains clip text (use a marker string again).
+- Composition root uses `Microsoft.Extensions.DependencyInjection`; the owner decided against `Microsoft.Extensions.Hosting` on 2026-10-14 (ADR 0012).
+- Logging goes through `IActivityLog`, whose events carry only codes, sizes and types, into a small size-capped rolling file written in-house; `Microsoft.Extensions.Logging` is not used (ADR 0012, ADR 0014). A test reads the written files for a marker string, as planned.
 
 **Acceptance**: The user can copy things, open the popup, search, and paste one item into Notepad, Word, a browser, and VS Code. Write `docs/MANUAL_QA.md` with a checklist.
 

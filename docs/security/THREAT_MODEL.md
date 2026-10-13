@@ -88,9 +88,15 @@ Residual: the in-memory search index is decrypted while the app runs.
 
 | STRIDE | Threat | Mitigation | Phase | Evidence |
 |---|---|---|---|---|
-| I | Screen capture or sharing shows secrets | `SetWindowDisplayAffinity` (setting, on by default); sensitive previews masked | 4 | Manual QA |
-| T | Clip content abused through rendering (script in HTML) | Previews are plain text and images only; no web view | 4 | Review |
-| D | A huge clip freezes the UI | Previews are truncated | 4 | ViewModel tests |
+| I | Screen capture or sharing shows secrets | The popup asks Windows to leave it out of screenshots, recordings and screen sharing (`SetWindowDisplayAffinity`, on by default; the setting arrives in Phase 7). The `--allow-screen-capture` switch turns it off for tests only | 4 | A real window keeps the setting (read back from Windows); a screenshot of the popup comes out black; manual QA |
+| I | A secret is read over the shoulder, or aloud by a screen reader | Clips that look like secrets (card numbers, IBANs, tokens, keys) show a mask whose length does not depend on the secret and are never read out; Ctrl+R reveals one. The detector is a heuristic, so this is a courtesy, not a guarantee. A list of files is not scanned: a path is not a secret | 4 | Row, popup and library tests; the UI smoke test reads the names a screen reader would read |
+| T | Clip content abused through rendering (script in HTML) | Previews are plain text and thumbnails only; there is no web view in the app. Thumbnails are decoded at 96 pixels wide by the system decoder | 4 | Review; the app references no web-view assembly |
+| D | A huge clip freezes the UI | Rows show at most two lines of 100 characters and only the start of a very long line is looked at; the list holds at most 50 rows; pictures are decoded at thumbnail size, and only for the rows on screen | 4 | Row text tests (long lines, many lines) |
+| I | The activity log reveals what was copied | `IActivityLog` has no text field: events are a fixed list, details are codes, sizes, kinds and types. An unexpected exception is logged by type only. Files are size-capped and rotated | 4 | Marker test over the written files (UTF-8 and UTF-16), log format tests |
+| I | A notice reveals what was copied | The text of every notice is written by the app; the tray tool tip is fixed text | 4 | Paste flow tests (every message), review |
+| T | The command line changes behavior | Three switches exist (`--data-dir`, `--hotkey`, `--allow-screen-capture`); wrong ones are ignored with a note and never fatal. Whoever can start the program with arguments already runs code as the user | 4 | Startup option tests |
+| D | A second copy opens the same history | One running copy per data folder (a named mutex derived from the folder); a second launch opens the first copy's popup | 3, 4 | Guard tests; the smoke test starts the app on its own folder next to a running one |
+| T | The tray icon is spoofed or lost | The icon lives on a hidden top-level window of the app, is added again when Explorer restarts, and is removed on exit | 4 | Fake-window tests; a real icon is added, changed and removed; manual QA |
 
 ## 4. Paste (focus, clipboard write, key injection)
 
@@ -100,6 +106,7 @@ Residual: the in-memory search index is decrypted while the app runs.
 | T | Another process replaces the clipboard between write and paste | Check the clipboard sequence number before sending Ctrl+V, and again before restoring: a restore never overwrites a newer copy | 3 | Command-sequence tests; real sequence-number tests |
 | I | Pasted content lingers on the clipboard | Optional restore of the previous clipboard (on by default) as a raw copy of every memory format, privacy markers included, overwritten after use; own writes and restores carry a private format and are not re-captured | 3, 5 | Snapshot tests (byte for byte, markers, size cap, overwrite on dispose); paste tests; a real snapshot |
 | E | Input into an elevated window is blocked (UIPI) | Compare integrity levels first, and treat a program that refuses to be asked as higher; report "target elevated" before touching the clipboard; never elevate | 3 | Tracker and paste tests for every level and for a refusal; real level reads (this program, the desktop shell, the system process) |
+| E | The target is an administrator window and the paste cannot be made | The clip is put on the clipboard instead and a notice says to press Ctrl+V; if even that fails, the notice says only that Windows blocked it. The same for keystrokes Windows blocks | 4 | Paste flow tests |
 | D | Queue mode leaves Ctrl+V registered after a fault | Unregister on exhaustion, cancel, exit and crash paths; the OS releases it when the process ends | 5 | Dispose-path tests |
 
 ## 5. OCR (Phase 8)
