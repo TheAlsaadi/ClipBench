@@ -4,7 +4,7 @@ status: accepted
 
 # FlaUI for the UI smoke test
 
-CLAUDE.md names FlaUI for UI smoke tests, and PLAN.md Phase 4 asks for one: the app starts, the hotkey opens the popup, typing filters the list, and Esc closes it. FlaUI is a third-party package, so it needs its own record. The owner approved it in chat on 2026-10-14. The versions and licenses were read from nuget.org the same day.
+ADR 0001 names FlaUI for UI smoke tests, and PLAN.md Phase 4 asks for one: the app starts, the hotkey opens the popup, typing filters the list, and Esc closes it. FlaUI is a third-party package, so it needs its own record. The owner approved it in chat on 2026-10-14. The versions and licenses were read from nuget.org the same day.
 
 ## What is added
 
