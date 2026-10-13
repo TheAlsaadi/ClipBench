@@ -39,12 +39,44 @@ public class WindowsPlatformTests
         WindowsPlatform.CreateKeyProtector().ShouldBeOfType<DpapiKeyProtector>();
     }
 
-    [Fact]
-    public void The_single_instance_guard_can_be_acquired_and_released()
-    {
-        using var guard = WindowsPlatform.AcquireSingleInstance();
+    private static string NewFolder() => Path.Combine(Path.GetTempPath(), "clipbench-instance-" + Guid.NewGuid().ToString("N"));
 
-        guard.ShouldNotBeNull();
+    [Fact]
+    public void The_first_copy_for_a_data_folder_is_the_running_one_and_a_second_is_not()
+    {
+        var folder = NewFolder();
+        using var first = WindowsPlatform.AcquireSingleInstance(folder);
+        using var second = WindowsPlatform.AcquireSingleInstance(folder);
+
+        first.IsFirstInstance.ShouldBeTrue();
+        second.IsFirstInstance.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_same_folder_written_differently_is_still_the_same_folder()
+    {
+        var folder = NewFolder();
+        using var first = WindowsPlatform.AcquireSingleInstance(folder);
+        using var second = WindowsPlatform.AcquireSingleInstance(folder.ToUpperInvariant() + @"\");
+
+        second.IsFirstInstance.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Copies_that_use_different_data_folders_do_not_get_in_each_others_way()
+    {
+        using var first = WindowsPlatform.AcquireSingleInstance(NewFolder());
+        using var second = WindowsPlatform.AcquireSingleInstance(NewFolder());
+
+        first.IsFirstInstance.ShouldBeTrue();
+        second.IsFirstInstance.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_folder_name_that_is_not_a_full_path_is_refused()
+    {
+        Should.Throw<ArgumentException>(() => WindowsPlatform.AcquireSingleInstance(@"relative\folder"));
+        Should.Throw<ArgumentException>(() => WindowsPlatform.AcquireSingleInstance(""));
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using ClipBench.Core.Capture;
 using ClipBench.Core.Hosting;
 using ClipBench.Core.Hotkeys;
@@ -106,9 +108,25 @@ public sealed class WindowsPlatform : IDisposable
         }
     }
 
-    /// <summary>Makes sure only one copy runs for the signed-in user.</summary>
+    /// <summary>
+    /// Makes sure only one copy runs for the signed-in user and a data folder. Copies that use different folders (a
+    /// test run with its own folder) do not get in each other's way, and a second copy for the same folder never opens
+    /// the same history twice.
+    /// </summary>
+    /// <param name="dataDirectory">The full path of the folder that holds the history. Case and a trailing separator do not matter.</param>
     /// <returns>The guard. When it is not the first instance, signal the first one and exit.</returns>
-    public static ISingleInstanceGuard AcquireSingleInstance() => SingleInstanceGuard.ForCurrentUser();
+    public static ISingleInstanceGuard AcquireSingleInstance(string dataDirectory)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
+        if (!Path.IsPathFullyQualified(dataDirectory))
+        {
+            throw new ArgumentException("The data folder must be a full path.", nameof(dataDirectory));
+        }
+
+        var normal = Path.GetFullPath(dataDirectory).TrimEnd('\\', '/').ToUpperInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normal)))[..16];
+        return SingleInstanceGuard.Acquire($"{SingleInstanceGuard.AppName}.{hash}");
+    }
 
     /// <summary>The key protector that wraps the history key with the current user's Windows account.</summary>
     /// <returns>The protector.</returns>
