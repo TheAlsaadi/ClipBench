@@ -2,7 +2,7 @@ namespace ClipBench.Core.Privacy;
 
 /// <summary>
 /// Finds long random-looking tokens such as API keys. A token is a run of 32 to 256 characters from the base64
-/// alphabets that has both letters and digits, at most a few slashes, and a high Shannon entropy.
+/// alphabets that has a digit, at most a few slashes, and a high Shannon entropy.
 /// </summary>
 /// <remarks>
 /// The entropy bar of 4.3 bits per character does the real work. Hex strings (commit hashes, MD5, SHA-256)
@@ -50,22 +50,21 @@ internal static class TokenScanner
     {
         Span<int> counts = stackalloc int[128];
         var hasDigit = false;
-        var hasLetter = false;
         var slashes = 0;
 
         foreach (var c in token)
         {
             counts[c]++;
             hasDigit |= Ascii.IsDigit(c);
-            hasLetter |= Ascii.IsLetter(c);
             if (c == '/')
             {
                 slashes++;
             }
         }
 
-        // Several slashes mean a path or a URL, not a token. Digits and letters both rule out words and numbers.
-        if (!hasDigit || !hasLetter || slashes > MaxSlashes)
+        // Several slashes mean a path or a URL, not a token. Requiring a digit rules out words and identifiers; a string
+        // of digits alone cannot reach the entropy bar, which needs more than 3.3 bits per character.
+        if (!hasDigit || slashes > MaxSlashes)
         {
             return false;
         }

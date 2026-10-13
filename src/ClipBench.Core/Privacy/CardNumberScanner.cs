@@ -9,7 +9,6 @@ namespace ClipBench.Core.Privacy;
 /// </summary>
 internal static class CardNumberScanner
 {
-    private const int MinDigits = 13;
     private const int MaxDigits = 19;
     private const int MaxGroups = 8;
 
@@ -81,7 +80,7 @@ internal static class CardNumberScanner
         }
 
         var number = digits[..count];
-        return count >= MinDigits && HasCardGrouping(groups[..groupCount]) && PassesLuhn(number) && IsKnownBrand(number);
+        return IsKnownBrand(number) && HasCardGrouping(groups[..groupCount]) && PassesLuhn(number);
     }
 
     // The digit's value for any script's decimal digits (so Arabic-Indic digits count), or -1.
@@ -135,6 +134,12 @@ internal static class CardNumberScanner
 
     private static bool IsKnownBrand(ReadOnlySpan<int> d)
     {
+        // Every brand has at least 13 digits, which the length tests below enforce. This only keeps the prefix reads in range.
+        if (d.Length < 4)
+        {
+            return false;
+        }
+
         var length = d.Length;
         var p2 = (d[0] * 10) + d[1];
         var p3 = (p2 * 10) + d[2];
