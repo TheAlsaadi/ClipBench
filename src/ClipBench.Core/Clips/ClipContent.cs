@@ -9,7 +9,7 @@ public abstract record ClipContent
     /// <summary>The default maximum length of a preview, in UTF-16 units.</summary>
     public const int DefaultPreviewLength = 200;
 
-    private const string Ellipsis = "…";
+    private const string Ellipsis = "\u2026";
 
     private protected ClipContent()
     {
@@ -89,7 +89,7 @@ public abstract record ClipContent
             // A lone surrogate is malformed UTF-16 and would not survive encoding. Replace it.
             if (element.Length == 1 && char.IsSurrogate(element[0]))
             {
-                result.Append('�');
+                result.Append('\uFFFD');
             }
             else
             {

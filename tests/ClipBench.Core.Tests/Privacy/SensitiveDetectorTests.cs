@@ -198,6 +198,9 @@ public class SensitiveDetectorTests
     [InlineData("DE00 3704 0044 0532 0130 00")]
     [InlineData("GB82 WEST 1234 5698 7654 33")]
     [InlineData("DE89 3704")]                       // too short
+    [InlineData("DE89 37045 0044 0532 0130 00")]    // a group of five
+    [InlineData("DE89370400440532013000123456789012345")]   // 37 characters: longer than any IBAN
+    [InlineData("XX12 3456 7890 1234 5678 9012 3456 7890 1234 5678")]   // ten groups: longer than any IBAN
     [InlineData("AB12 CDEF GHIJ KLMN")]
     public void Something_that_only_looks_like_an_IBAN_is_not_flagged(string text)
     {
