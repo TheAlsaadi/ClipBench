@@ -69,21 +69,7 @@ internal static class SchemaMigrator
         }
     }
 
-    /// <summary>Reads the schema version of a database.</summary>
-    /// <param name="connection">An open connection.</param>
-    /// <returns>The newest applied step, or 0 for a database that has none.</returns>
-    public static int ReadVersion(SqliteConnection connection)
-    {
-        ArgumentNullException.ThrowIfNull(connection);
-
-        using var exists = connection.CreateCommand();
-        exists.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_version';";
-        return Convert.ToInt64(exists.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) == 0
-            ? 0
-            : ReadMax(connection, transaction: null);
-    }
-
-    private static int ReadMax(SqliteConnection connection, SqliteTransaction? transaction)
+    private static int ReadMax(SqliteConnection connection, SqliteTransaction transaction)
     {
         using var command = connection.CreateCommand();
         command.Transaction = transaction;

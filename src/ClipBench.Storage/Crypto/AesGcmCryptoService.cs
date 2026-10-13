@@ -12,7 +12,9 @@ namespace ClipBench.Storage.Crypto;
 /// <remarks>
 /// The nonce source is deliberately not injectable. A caller-supplied nonce is the classic way to reuse
 /// one, which breaks GCM completely. Tests prove uniqueness instead. Safe to use from many threads: each
-/// call builds its own <see cref="AesGcm"/> and nothing is shared except the read-only derived keys.
+/// call builds its own <see cref="AesGcm"/> and shares only the derived keys, which are read under a shared
+/// lock. <see cref="Dispose"/> takes the exclusive lock before it wipes them, so no call can seal or open
+/// a value with a half-wiped or zeroed key.
 /// </remarks>
 public sealed class AesGcmCryptoService : ICryptoService, IDisposable
 {
@@ -29,6 +31,7 @@ public sealed class AesGcmCryptoService : ICryptoService, IDisposable
     private readonly byte[] _encryptionKey;
     private readonly byte[] _hashKey;
     private readonly int _maxPlaintextBytes;
+    private readonly ReaderWriterLockSlim _keysInUse = new();
     private bool _disposed;
 
     /// <summary>Derives the working keys from the master key. The master key is not kept.</summary>
@@ -53,7 +56,6 @@ public sealed class AesGcmCryptoService : ICryptoService, IDisposable
     /// <inheritdoc/>
     public byte[] Encrypt(ReadOnlySpan<byte> plaintext, ReadOnlySpan<byte> associatedData)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(plaintext.Length, _maxPlaintextBytes, nameof(plaintext));
 
         var sealedValue = new byte[NonceSize + plaintext.Length + TagSize];
@@ -62,25 +64,36 @@ public sealed class AesGcmCryptoService : ICryptoService, IDisposable
         var tag = sealedValue.AsSpan(NonceSize + plaintext.Length, TagSize);
 
         RandomNumberGenerator.Fill(nonce);
-        using var aes = new AesGcm(_encryptionKey, TagSize);
-        aes.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
+        _keysInUse.EnterReadLock();
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            using var aes = new AesGcm(_encryptionKey, TagSize);
+            aes.Encrypt(nonce, plaintext, ciphertext, tag, associatedData);
+        }
+        finally
+        {
+            _keysInUse.ExitReadLock();
+        }
+
         return sealedValue;
     }
 
     /// <inheritdoc/>
     public Result<byte[]> Decrypt(ReadOnlySpan<byte> sealedValue, ReadOnlySpan<byte> associatedData)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-
         // Check the size before allocating anything, so a damaged length cannot cause a huge allocation.
         if (sealedValue.Length < NonceSize + TagSize || sealedValue.Length - NonceSize - TagSize > _maxPlaintextBytes)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             return Failed();
         }
 
         var plaintext = new byte[sealedValue.Length - NonceSize - TagSize];
+        _keysInUse.EnterReadLock();
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             using var aes = new AesGcm(_encryptionKey, TagSize);
             aes.Decrypt(
                 sealedValue[..NonceSize],
@@ -96,26 +109,51 @@ public sealed class AesGcmCryptoService : ICryptoService, IDisposable
             CryptographicOperations.ZeroMemory(plaintext);
             return Failed();
         }
+        finally
+        {
+            _keysInUse.ExitReadLock();
+        }
     }
 
     /// <inheritdoc/>
-    public byte[] ComputeContentHash(ReadOnlySpan<byte> data)
+    public byte[] ComputeContentHash(byte kind, ReadOnlySpan<byte> data)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return HMACSHA256.HashData(_hashKey, data);
+        _keysInUse.EnterReadLock();
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            // The kind byte and the data are hashed one after the other, so a large clip is not copied to put a byte in front.
+            using var hmac = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, _hashKey);
+            hmac.AppendData([kind]);
+            hmac.AppendData(data);
+            return hmac.GetHashAndReset();
+        }
+        finally
+        {
+            _keysInUse.ExitReadLock();
+        }
     }
 
-    /// <summary>Wipes the derived keys. The service cannot be used afterwards.</summary>
+    /// <summary>Wipes the derived keys, after any call that is using them has finished. The service cannot be used afterwards.</summary>
     public void Dispose()
     {
-        if (_disposed)
+        _keysInUse.EnterWriteLock();
+        try
         {
-            return;
-        }
+            if (_disposed)
+            {
+                return;
+            }
 
-        _disposed = true;
-        CryptographicOperations.ZeroMemory(_encryptionKey);
-        CryptographicOperations.ZeroMemory(_hashKey);
+            _disposed = true;
+            CryptographicOperations.ZeroMemory(_encryptionKey);
+            CryptographicOperations.ZeroMemory(_hashKey);
+        }
+        finally
+        {
+            _keysInUse.ExitWriteLock();
+        }
     }
 
     private static Result<byte[]> Failed() =>

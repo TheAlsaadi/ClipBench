@@ -18,7 +18,8 @@ public interface ICryptoService
     Result<byte[]> Decrypt(ReadOnlySpan<byte> sealedValue, ReadOnlySpan<byte> associatedData);
 
     /// <summary>Computes the keyed hash that identifies duplicate content without revealing it.</summary>
+    /// <param name="kind">One byte that is hashed in front of the data, so the same bytes of another kind hash differently.</param>
     /// <param name="data">The content bytes.</param>
-    /// <returns>A 32-byte HMAC-SHA256 under a key derived from the master key.</returns>
-    byte[] ComputeContentHash(ReadOnlySpan<byte> data);
+    /// <returns>A 32-byte HMAC-SHA256, under a key derived from the master key, of the kind byte followed by the data.</returns>
+    byte[] ComputeContentHash(byte kind, ReadOnlySpan<byte> data);
 }

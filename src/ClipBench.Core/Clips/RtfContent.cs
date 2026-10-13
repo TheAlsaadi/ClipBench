@@ -5,6 +5,8 @@ namespace ClipBench.Core.Clips;
 /// <summary>Rich Text Format with a plain text alternative.</summary>
 public sealed record RtfContent : ClipContent
 {
+    private readonly long _sizeInBytes;
+
     /// <summary>Creates RTF content.</summary>
     /// <param name="rtf">The RTF document.</param>
     /// <param name="text">The plain text alternative.</param>
@@ -14,6 +16,7 @@ public sealed record RtfContent : ClipContent
         ArgumentNullException.ThrowIfNull(text);
         Rtf = rtf;
         Text = text;
+        _sizeInBytes = (long)Encoding.UTF8.GetByteCount(rtf) + Encoding.UTF8.GetByteCount(text);
     }
 
     /// <summary>The RTF document.</summary>
@@ -26,7 +29,7 @@ public sealed record RtfContent : ClipContent
     public override ClipFormat Format => ClipFormat.Rtf;
 
     /// <inheritdoc/>
-    public override long SizeInBytes => (long)Encoding.UTF8.GetByteCount(Rtf) + Encoding.UTF8.GetByteCount(Text);
+    public override long SizeInBytes => _sizeInBytes;
 
     /// <inheritdoc/>
     public override string? PlainText => Text;

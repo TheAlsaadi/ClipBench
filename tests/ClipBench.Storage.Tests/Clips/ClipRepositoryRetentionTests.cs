@@ -91,6 +91,22 @@ public sealed class ClipRepositoryRetentionTests : RepositoryTestBase
         removed.ShouldBe([older.Id]);
     }
 
+    [Theory]
+    [InlineData(long.MaxValue)]
+    [InlineData(3155378975999999999L)]
+    public async Task A_maximum_age_longer_than_the_calendar_keeps_every_clip_and_does_not_throw(long ticks)
+    {
+        // "Keep forever" is a setting someone will choose, and the in-memory history already accepts it.
+        var old = Sized(1, 10, Now.AddDays(-3650));
+        await using var repository = await OpenAsync();
+        await SaveAll(repository, old);
+
+        var result = await repository.RetainAsync(new HistoryOptions { MaxAge = TimeSpan.FromTicks(ticks) }, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Pinned_clips_are_never_removed_by_age()
     {

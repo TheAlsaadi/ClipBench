@@ -18,6 +18,8 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
 
     private static byte[] Bytes(string text) => Encoding.UTF8.GetBytes(text);
 
+    private static byte[] Prefixed(byte kind, byte[] data) => [.. new[] { kind }, .. data];
+
     // --- encrypt and decrypt ---
 
     [Fact]
@@ -202,17 +204,23 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
     [Fact]
     public void The_content_hash_is_32_bytes_and_stable_for_the_same_key_and_data()
     {
-        var first = _crypto.ComputeContentHash(Bytes("duplicate me"));
-        var second = _crypto.ComputeContentHash(Bytes("duplicate me"));
+        var first = _crypto.ComputeContentHash(0, Bytes("duplicate me"));
+        var second = _crypto.ComputeContentHash(0, Bytes("duplicate me"));
 
         first.Length.ShouldBe(32);
         first.ShouldBe(second);
     }
 
     [Fact]
+    public void The_same_bytes_of_another_kind_give_a_different_hash()
+    {
+        _crypto.ComputeContentHash(0, Bytes("x")).ShouldNotBe(_crypto.ComputeContentHash(1, Bytes("x")));
+    }
+
+    [Fact]
     public void Different_content_gives_a_different_hash()
     {
-        _crypto.ComputeContentHash(Bytes("one")).ShouldNotBe(_crypto.ComputeContentHash(Bytes("two")));
+        _crypto.ComputeContentHash(0, Bytes("one")).ShouldNotBe(_crypto.ComputeContentHash(0, Bytes("two")));
     }
 
     [Fact]
@@ -220,7 +228,7 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
     {
         using var other = new AesGcmCryptoService(TestKeys.Master(2));
 
-        other.ComputeContentHash(Bytes("same text")).ShouldNotBe(_crypto.ComputeContentHash(Bytes("same text")));
+        other.ComputeContentHash(0, Bytes("same text")).ShouldNotBe(_crypto.ComputeContentHash(0, Bytes("same text")));
     }
 
     [Fact]
@@ -229,7 +237,7 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
         // A plain SHA-256 would let anyone confirm a guess about a clip from the database alone.
         var data = Bytes("guess me");
 
-        _crypto.ComputeContentHash(data).ShouldNotBe(SHA256.HashData(data));
+        _crypto.ComputeContentHash(0, data).ShouldNotBe(SHA256.HashData(data));
     }
 
     [Fact]
@@ -238,13 +246,13 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
         var master = TestKeys.Master(1);
         var data = Bytes("domain separation");
 
-        _crypto.ComputeContentHash(data).ShouldNotBe(HMACSHA256.HashData(master, data));
+        _crypto.ComputeContentHash(0, data).ShouldNotBe(HMACSHA256.HashData(master, Prefixed(0, data)));
     }
 
     [Fact]
     public void Hashing_empty_content_works()
     {
-        _crypto.ComputeContentHash([]).Length.ShouldBe(32);
+        _crypto.ComputeContentHash(0, []).Length.ShouldBe(32);
     }
 
     // --- the stored format is pinned: data written today must open after an update ---
@@ -255,7 +263,7 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
         var hashKey = HKDF.DeriveKey(HashAlgorithmName.SHA256, TestKeys.Master(1), 32, salt: null, info: Bytes("ClipBench v1 content hash"));
         var data = Bytes("pinned");
 
-        _crypto.ComputeContentHash(data).ShouldBe(HMACSHA256.HashData(hashKey, data));
+        _crypto.ComputeContentHash(3, data).ShouldBe(HMACSHA256.HashData(hashKey, Prefixed(3, data)));
     }
 
     [Fact]
@@ -317,6 +325,46 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Disposing_while_other_threads_are_sealing_never_seals_under_a_wiped_key()
+    {
+        // The window is tiny, so this runs many rounds. Whatever was sealed before the service refused must still
+        // open with the real key: a value sealed under a zeroed key would not.
+        byte[] aad = [1, 2, 3];
+        using var verifier = new AesGcmCryptoService(TestKeys.Master(7));
+
+        for (var round = 0; round < 40; round++)
+        {
+            var service = new AesGcmCryptoService(TestKeys.Master(7));
+            var sealedValues = new System.Collections.Concurrent.ConcurrentBag<byte[]>();
+            var workers = Enumerable.Range(0, 6).Select(_ => Task.Run(
+                () =>
+                {
+                    try
+                    {
+                        while (true)
+                        {
+                            sealedValues.Add(service.Encrypt([9, 9, 9], aad));
+                        }
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // The service refused, as it should once it was disposed.
+                    }
+                },
+                TestContext.Current.CancellationToken)).ToArray();
+
+            await Task.Delay(1, TestContext.Current.CancellationToken);
+            service.Dispose();
+            await Task.WhenAll(workers);
+
+            foreach (var value in sealedValues)
+            {
+                verifier.Decrypt(value, aad).IsSuccess.ShouldBeTrue("a value was sealed under a wiped key");
+            }
+        }
+    }
+
+    [Fact]
     public void A_disposed_service_refuses_to_work()
     {
         var crypto = new AesGcmCryptoService(TestKeys.Master(1));
@@ -324,7 +372,7 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
 
         Should.Throw<ObjectDisposedException>(() => crypto.Encrypt(Bytes("x"), _aad));
         Should.Throw<ObjectDisposedException>(() => crypto.Decrypt(new byte[40], _aad));
-        Should.Throw<ObjectDisposedException>(() => crypto.ComputeContentHash(Bytes("x")));
+        Should.Throw<ObjectDisposedException>(() => crypto.ComputeContentHash(0, Bytes("x")));
         crypto.Dispose(); // disposing twice is allowed
     }
 }

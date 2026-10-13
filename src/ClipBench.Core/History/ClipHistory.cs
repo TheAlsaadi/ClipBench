@@ -218,7 +218,8 @@ public sealed class ClipHistory
                 continue;
             }
 
-            if (!budgetSpent && unpinnedKept > 0 && unpinnedBytes + clip.SizeInBytes > _options.MaxTotalBytes)
+            var size = clip.SizeInBytes;
+            if (!budgetSpent && unpinnedKept > 0 && unpinnedBytes + size > _options.MaxTotalBytes)
             {
                 budgetSpent = true;
             }
@@ -231,7 +232,7 @@ public sealed class ClipHistory
             {
                 kept.Add(clip);
                 unpinnedKept++;
-                unpinnedBytes += clip.SizeInBytes;
+                unpinnedBytes += size;
             }
         }
 

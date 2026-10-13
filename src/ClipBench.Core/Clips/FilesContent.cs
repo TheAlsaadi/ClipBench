@@ -6,6 +6,8 @@ namespace ClipBench.Core.Clips;
 /// <summary>A list of file paths. Only the paths are stored; the files are never read.</summary>
 public sealed record FilesContent : ClipContent
 {
+    private readonly long _sizeInBytes;
+
     /// <summary>Creates file list content. The paths are copied.</summary>
     /// <param name="paths">The file paths, in order.</param>
     public FilesContent(IEnumerable<string> paths)
@@ -23,6 +25,7 @@ public sealed record FilesContent : ClipContent
         }
 
         Paths = copy;
+        _sizeInBytes = copy.Sum(path => (long)Encoding.UTF8.GetByteCount(path));
     }
 
     /// <summary>The file paths, in order.</summary>
@@ -32,7 +35,7 @@ public sealed record FilesContent : ClipContent
     public override ClipFormat Format => ClipFormat.Files;
 
     /// <inheritdoc/>
-    public override long SizeInBytes => Paths.Sum(path => (long)Encoding.UTF8.GetByteCount(path));
+    public override long SizeInBytes => _sizeInBytes;
 
     /// <inheritdoc/>
     public override string? PlainText => string.Join("\r\n", Paths);

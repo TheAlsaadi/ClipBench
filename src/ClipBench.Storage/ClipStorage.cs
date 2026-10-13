@@ -16,7 +16,9 @@ public sealed class ClipStorage : IAsyncDisposable
     private readonly StoragePaths _paths;
     private readonly MasterKeyStore _keyStore;
     private readonly AesGcmCryptoService _crypto;
-    private bool _closed;
+    private readonly Lock _closeLock = new();
+    private volatile bool _closed;
+    private Task? _closing;
 
     private ClipStorage(StoragePaths paths, MasterKeyStore keyStore, AesGcmCryptoService crypto, ClipRepository repository)
     {
@@ -135,16 +137,23 @@ public sealed class ClipStorage : IAsyncDisposable
         return rows.IsFailure ? rows : files.IsFailure ? files : key;
     }
 
-    /// <summary>Closes the database and wipes the working keys from memory. Safe to call twice.</summary>
+    /// <summary>
+    /// Closes the database and wipes the working keys from memory. Safe to call twice, and a second caller waits for the
+    /// same close.
+    /// </summary>
     /// <returns>A task that completes when everything is closed.</returns>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (_closed)
+        lock (_closeLock)
         {
-            return;
+            _closed = true;
+            _closing ??= CloseAsync();
+            return new ValueTask(_closing);
         }
+    }
 
-        _closed = true;
+    private async Task CloseAsync()
+    {
         await Repository.DisposeAsync().ConfigureAwait(false);
         _crypto.Dispose();
     }

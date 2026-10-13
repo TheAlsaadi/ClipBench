@@ -5,6 +5,8 @@ namespace ClipBench.Core.Clips;
 /// <summary>HTML with a plain text alternative.</summary>
 public sealed record HtmlContent : ClipContent
 {
+    private readonly long _sizeInBytes;
+
     /// <summary>Creates HTML content.</summary>
     /// <param name="html">The HTML fragment.</param>
     /// <param name="text">The plain text alternative.</param>
@@ -14,6 +16,7 @@ public sealed record HtmlContent : ClipContent
         ArgumentNullException.ThrowIfNull(text);
         Html = html;
         Text = text;
+        _sizeInBytes = (long)Encoding.UTF8.GetByteCount(html) + Encoding.UTF8.GetByteCount(text);
     }
 
     /// <summary>The HTML fragment.</summary>
@@ -26,7 +29,7 @@ public sealed record HtmlContent : ClipContent
     public override ClipFormat Format => ClipFormat.Html;
 
     /// <inheritdoc/>
-    public override long SizeInBytes => (long)Encoding.UTF8.GetByteCount(Html) + Encoding.UTF8.GetByteCount(Text);
+    public override long SizeInBytes => _sizeInBytes;
 
     /// <inheritdoc/>
     public override string? PlainText => Text;

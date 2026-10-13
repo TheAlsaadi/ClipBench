@@ -127,7 +127,7 @@ public sealed class ClipRepositoryCrudTests : RepositoryTestBase
         await using var repository = await OpenAsync();
         await SaveAll(repository, clip);
 
-        var expected = Crypto.ComputeContentHash([(byte)ClipFormat.Text, .. Encoding.UTF8.GetBytes("hash me")]);
+        var expected = Crypto.ComputeContentHash((byte)ClipFormat.Text, Encoding.UTF8.GetBytes("hash me"));
 
         RawBlob("content_hash", clip.Id).ShouldBe(expected);
         RawBlob("content_hash", clip.Id).ShouldNotBe(SHA256.HashData(Encoding.UTF8.GetBytes("hash me")));

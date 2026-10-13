@@ -92,7 +92,9 @@ public sealed class ClipRepository : IAsyncDisposable
     private readonly TimeProvider _timeProvider;
     private readonly int _maxContentBytes;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly Lock _disposeLock = new();
     private volatile bool _disposed;
+    private Task? _closing;
 
     private ClipRepository(SqliteConnection connection, ICryptoService crypto, TimeProvider timeProvider, int maxContentBytes)
     {
@@ -144,20 +146,20 @@ public sealed class ClipRepository : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(clip);
 
-        var outcome = await RunAsync(
+        return await RunAsync(
             connection =>
             {
                 var encoded = ClipContentCodec.Encode(clip.Content, _maxContentBytes);
                 if (encoded.IsFailure)
                 {
-                    return Result.Failure<bool>(encoded.Error);
+                    return Result.Failure(encoded.Error);
                 }
 
                 var format = clip.Content.Format;
                 var plain = encoded.Value;
                 try
                 {
-                    var hash = _crypto.ComputeContentHash([(byte)format, .. plain]);
+                    var hash = _crypto.ComputeContentHash((byte)format, plain);
                     var content = _crypto.Encrypt(plain, RecordAad.ForClip(clip.Id, "content", format));
                     var preview = _crypto.Encrypt(Encoding.UTF8.GetBytes(clip.Content.GetPreview()), RecordAad.ForClip(clip.Id, "preview", format));
                     var source = clip.SourceApp is null
@@ -177,7 +179,7 @@ public sealed class ClipRepository : IAsyncDisposable
                     Blob(command, "$preview", preview);
                     Blob(command, "$source", source);
                     command.ExecuteNonQuery();
-                    return Result.Success(true);
+                    return Result.Success();
                 }
                 finally
                 {
@@ -185,8 +187,6 @@ public sealed class ClipRepository : IAsyncDisposable
                 }
             },
             cancellationToken).ConfigureAwait(false);
-
-        return outcome.IsSuccess ? Result.Success() : Result.Failure(outcome.Error);
     }
 
     /// <summary>Reads one clip.</summary>
@@ -280,9 +280,8 @@ public sealed class ClipRepository : IAsyncDisposable
     /// <param name="pinned">True to pin.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>Success, or <see cref="ErrorCode.ClipNotFound"/>.</returns>
-    public async Task<Result> SetPinnedAsync(ClipId id, bool pinned, CancellationToken cancellationToken)
-    {
-        var outcome = await RunAsync(
+    public Task<Result> SetPinnedAsync(ClipId id, bool pinned, CancellationToken cancellationToken) =>
+        RunAsync(
             connection =>
             {
                 using var command = connection.CreateCommand();
@@ -290,13 +289,10 @@ public sealed class ClipRepository : IAsyncDisposable
                 Integer(command, "$pinned", pinned ? 1 : 0);
                 Blob(command, "$id", IdBytes(id));
                 return command.ExecuteNonQuery() == 0
-                    ? Result.Failure<bool>(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."))
-                    : Result.Success(true);
+                    ? Result.Failure(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."))
+                    : Result.Success();
             },
-            cancellationToken).ConfigureAwait(false);
-
-        return outcome.IsSuccess ? Result.Success() : Result.Failure(outcome.Error);
-    }
+            cancellationToken);
 
     /// <summary>
     /// Deletes clips, pinned or not. A deleted value is overwritten on disk, not just marked free, and the write-ahead
@@ -377,7 +373,10 @@ public sealed class ClipRepository : IAsyncDisposable
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
                 command.CommandText = Retain;
-                Integer(command, "$cutoff", (_timeProvider.GetUtcNow() - options.MaxAge).UtcTicks);
+
+                // An age longer than the calendar means "keep forever". Subtracting it from a date would throw, so the
+                // cutoff stops at the earliest date, which no clip is older than.
+                Integer(command, "$cutoff", Math.Max(DateTimeOffset.MinValue.UtcTicks, _timeProvider.GetUtcNow().UtcTicks - options.MaxAge.Ticks));
                 Integer(command, "$maxCount", options.MaxCount);
                 Integer(command, "$maxBytes", options.MaxTotalBytes);
                 removed.AddRange(ReadIds(command));
@@ -399,9 +398,8 @@ public sealed class ClipRepository : IAsyncDisposable
     /// </summary>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>Success, or a storage failure.</returns>
-    public async Task<Result> WipeAsync(CancellationToken cancellationToken)
-    {
-        var outcome = await RunAsync(
+    public Task<Result> WipeAsync(CancellationToken cancellationToken) =>
+        RunAsync(
             connection =>
             {
                 Execute(connection, DeleteAll);
@@ -409,23 +407,27 @@ public sealed class ClipRepository : IAsyncDisposable
 
                 // Last, so the log that VACUUM wrote to is emptied and no removed page image is left in it.
                 Execute(connection, CheckpointTruncate);
-                return Result.Success(true);
+                return Result.Success();
             },
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
 
-        return outcome.IsSuccess ? Result.Success() : Result.Failure(outcome.Error);
+    /// <summary>
+    /// Waits for running operations, then closes the database. Safe to call twice, and a second caller waits for the
+    /// same close, so the files can be deleted as soon as any call has returned.
+    /// </summary>
+    /// <returns>A task that completes when the database is closed.</returns>
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeLock)
+        {
+            _disposed = true;
+            _closing ??= CloseAsync();
+            return new ValueTask(_closing);
+        }
     }
 
-    /// <summary>Waits for running operations, then closes the database. Safe to call twice.</summary>
-    /// <returns>A task that completes when the database is closed.</returns>
-    public async ValueTask DisposeAsync()
+    private async Task CloseAsync()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
         await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -590,6 +592,20 @@ public sealed class ClipRepository : IAsyncDisposable
         }
     }
 
+    // For operations with no value: the same, with the plain Result in and out.
+    private async Task<Result> RunAsync(Func<SqliteConnection, Result> work, CancellationToken cancellationToken)
+    {
+        var outcome = await RunAsync(
+            connection =>
+            {
+                var result = work(connection);
+                return result.IsSuccess ? Result.Success(true) : Result.Failure<bool>(result.Error);
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        return outcome.IsSuccess ? Result.Success() : Result.Failure(outcome.Error);
+    }
+
     private Result<T> Guard<T>(Func<SqliteConnection, Result<T>> work)
     {
         try
@@ -718,7 +734,7 @@ public sealed class ClipRepository : IAsyncDisposable
 
     private static bool TryTime(long ticks, out DateTimeOffset time)
     {
-        if (ticks is < 0 or > 3155378975999999999L)
+        if (ticks < DateTimeOffset.MinValue.UtcTicks || ticks > DateTimeOffset.MaxValue.UtcTicks)
         {
             time = default;
             return false;

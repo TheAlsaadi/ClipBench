@@ -31,6 +31,10 @@ public sealed class SchemaMigratorTests : IDisposable
         command.ExecuteNonQuery();
     }
 
+    // 0 for a database that has no version table yet.
+    private long ReadVersion() =>
+        TableCount("schema_version") == 0 ? 0 : Scalar("SELECT COALESCE(MAX(version), 0) FROM schema_version");
+
     private long TableCount(string name) =>
         Scalar($"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{name}'");
 
@@ -42,14 +46,8 @@ public sealed class SchemaMigratorTests : IDisposable
         var result = SchemaMigrator.Apply(_connection, [_createNotes, _addColumn], _clock);
 
         result.IsSuccess.ShouldBeTrue();
-        SchemaMigrator.ReadVersion(_connection).ShouldBe(2);
+        ReadVersion().ShouldBe(2);
         Scalar("SELECT COUNT(*) FROM pragma_table_info('notes') WHERE name = 'title'").ShouldBe(1);
-    }
-
-    [Fact]
-    public void A_database_with_no_version_table_reads_as_version_zero()
-    {
-        SchemaMigrator.ReadVersion(_connection).ShouldBe(0);
     }
 
     [Fact]
@@ -72,7 +70,7 @@ public sealed class SchemaMigratorTests : IDisposable
         var result = SchemaMigrator.Apply(_connection, [_createNotes, _addColumn], _clock);
 
         result.IsSuccess.ShouldBeTrue();
-        SchemaMigrator.ReadVersion(_connection).ShouldBe(2);
+        ReadVersion().ShouldBe(2);
         Scalar("SELECT COUNT(*) FROM notes").ShouldBe(1);
     }
 
@@ -95,7 +93,7 @@ public sealed class SchemaMigratorTests : IDisposable
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(ErrorCode.StorageFailure);
-        SchemaMigrator.ReadVersion(_connection).ShouldBe(0);
+        ReadVersion().ShouldBe(0);
         TableCount("notes").ShouldBe(0, "the step that did succeed must be rolled back with the one that failed");
         TableCount("schema_version").ShouldBe(0);
     }
@@ -120,7 +118,7 @@ public sealed class SchemaMigratorTests : IDisposable
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(ErrorCode.HistoryTooNew);
-        SchemaMigrator.ReadVersion(_connection).ShouldBe(5);
+        ReadVersion().ShouldBe(5);
     }
 
     // --- the list of steps itself ---
