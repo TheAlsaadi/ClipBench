@@ -90,20 +90,7 @@ internal sealed class ClipboardListener : IClipboardListener
         if (_started)
         {
             _started = false;
-            try
-            {
-                _invoker.InvokeAsync(
-                    () =>
-                    {
-                        _notifications.Unsubscribe();
-                        return true;
-                    },
-                    CancellationToken.None).Wait(_stopTimeout);
-            }
-            catch (AggregateException exception) when (exception.InnerException is ObjectDisposedException)
-            {
-                // The window is already gone, and its registrations with it.
-            }
+            _invoker.RunAndWait(_notifications.Unsubscribe, _stopTimeout);
         }
 
         _pump.Dispose();

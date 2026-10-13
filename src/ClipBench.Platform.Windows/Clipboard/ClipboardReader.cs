@@ -43,23 +43,21 @@ internal sealed class ClipboardReader : IClipboardReader
     {
         ArgumentNullException.ThrowIfNull(filter);
 
-        var session = await ClipboardOpener.OpenAsync(_api, _retry, _time, cancellationToken).ConfigureAwait(false);
-        if (session is null)
-        {
-            return Failure(ErrorCode.ClipboardBusy, "Another program is using the clipboard. Try again in a moment.");
-        }
+        // The copying runs inside the opener, in the same stretch as the open and the close; converting a picture waits until the clipboard is closed.
+        var use = await ClipboardOpener.UseAsync(
+            _api,
+            _retry,
+            _time,
+            session =>
+            {
+                var sequence = _api.SequenceNumber;
+                return (Sequence: sequence, Collected: Collect(session, filter, sequence));
+            },
+            cancellationToken).ConfigureAwait(false);
 
-        // Everything between here and the end of the using block is one synchronous stretch: Windows wants
-        // the clipboard closed by the thread that opened it, and other programs wait while it is open.
-        long sequence;
-        Collected collected;
-        using (session)
-        {
-            sequence = _api.SequenceNumber;
-            collected = Collect(session, filter, sequence);
-        }
-
-        return Finish(collected, filter, sequence);
+        return use.Opened
+            ? Finish(use.Value.Collected!, filter, use.Value.Sequence)
+            : Failure(ErrorCode.ClipboardBusy, "Another program is using the clipboard. Try again in a moment.");
     }
 
     private enum Candidate
@@ -245,7 +243,7 @@ internal sealed class ClipboardReader : IClipboardReader
                         return outcome;
                     }
 
-                    return new Found(new HtmlContent(fragment.Value, text ?? HtmlText.Strip(fragment.Value)));
+                    return new Found(new HtmlContent(fragment.Value, string.IsNullOrWhiteSpace(text) ? HtmlText.Strip(fragment.Value) : text));
                 }
 
             case Candidate.Rtf:

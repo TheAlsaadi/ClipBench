@@ -101,10 +101,10 @@ public class EventPumpTests
         pump.Post(1);
         await firstSeen.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
 
+        // Dispose returns only once delivery has stopped, so what is posted afterwards has nowhere to go and there is nothing to wait for.
         pump.Dispose();
         pump.Post(2);
         pump.Post(3);
-        await Task.Delay(100, Ct);   // a real wait: the claim is that nothing arrives
 
         count.ShouldBe(1);
     }

@@ -15,6 +15,8 @@ internal sealed class FakeWindow : IMessageSource, IThreadInvoker
     /// <summary>True while work given to <see cref="InvokeAsync{T}"/> or a message handler is running.</summary>
     public bool OnWindowThread { get; private set; }
 
+    public bool IsOnThread => OnWindowThread;
+
     public void AddHandler(uint message, Func<nint, nint, bool> handler)
     {
         if (!_handlers.TryGetValue(message, out var list))

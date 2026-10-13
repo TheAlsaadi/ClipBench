@@ -11,6 +11,9 @@ namespace ClipBench.Platform.Windows.Windowing;
 /// <summary>Runs work on a given thread.</summary>
 internal interface IThreadInvoker
 {
+    /// <summary>True when the calling code is running on the invoker's own thread.</summary>
+    bool IsOnThread { get; }
+
     /// <summary>Runs the work on the thread and returns its result.</summary>
     /// <typeparam name="T">The type of the result.</typeparam>
     /// <param name="work">The work. It runs on the invoker's thread.</param>
@@ -45,6 +48,9 @@ internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDi
         _windowProcedure = WindowProcedure;
         _thread = new Thread(Run) { IsBackground = true, Name = "ClipBench message window" };
     }
+
+    /// <inheritdoc/>
+    public bool IsOnThread => Environment.CurrentManagedThreadId == _thread.ManagedThreadId;
 
     /// <summary>The window handle, as a number.</summary>
     public nint Handle => _handle;
@@ -104,10 +110,17 @@ internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDi
 
         var item = new WorkItem<T>(work, cancellationToken);
         _queue.Enqueue(item);
-        if (!PInvoke.PostMessage(_handle, RunMessage, default, default) || IsDisposed)
+        var posted = PInvoke.PostMessage(_handle, RunMessage, default, default);
+        if (IsDisposed)
         {
             // Disposal may have drained the queue just before this item was added. Draining again settles it.
             FailPending();
+        }
+        else if (!posted)
+        {
+            // Windows keeps at most 10,000 posted messages for a thread, and the window is alive. Only this request
+            // is refused: work already waiting has its own wake-up message, and a refused item left in the queue is skipped.
+            item.Fail(new InvalidOperationException("Windows has no room in ClipBench's background window queue, so the work was not queued."));
         }
 
         return item.Task;
@@ -122,7 +135,7 @@ internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDi
         }
 
         PInvoke.PostMessage(_handle, PInvoke.WM_CLOSE, default, default);
-        if (Environment.CurrentManagedThreadId != _thread.ManagedThreadId)
+        if (!IsOnThread)
         {
             _thread.Join(_stopTimeout);
         }

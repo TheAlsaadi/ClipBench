@@ -36,6 +36,15 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
     public bool IsOpen { get; private set; }
 
+    /// <summary>The managed thread that opened the clipboard last. Windows wants the same thread to close it.</summary>
+    public int OpenedOnThread { get; private set; }
+
+    /// <summary>The managed thread that closed the clipboard last.</summary>
+    public int ClosedOnThread { get; private set; }
+
+    /// <summary>The copies handed out by reads, so a test can see whether they are overwritten later.</summary>
+    public List<byte[]> HandedOut { get; } = [];
+
     public long SequenceNumber { get; private set; } = 100;
 
     /// <summary>Called whenever a program (the test) changes the clipboard through <see cref="Put(uint, byte[])"/>.</summary>
@@ -64,6 +73,7 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
         IsOpen.ShouldBeFalse("a second program (or a bug) opened the clipboard while it was already open");
         IsOpen = true;
+        OpenedOnThread = Environment.CurrentManagedThreadId;
         Log.Add("open");
         return new Session(this);
     }
@@ -154,7 +164,9 @@ internal sealed class FakeClipboardApi : IClipboardApi
                 return null;
             }
 
-            return (byte[])data.Clone();
+            var copy = (byte[])data.Clone();
+            owner.HandedOut.Add(copy);
+            return copy;
         }
 
         public bool Empty()
@@ -192,6 +204,7 @@ internal sealed class FakeClipboardApi : IClipboardApi
         public void Dispose()
         {
             owner.IsOpen = false;
+            owner.ClosedOnThread = Environment.CurrentManagedThreadId;
             owner.Log.Add("close");
         }
     }

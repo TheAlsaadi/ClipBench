@@ -163,6 +163,34 @@ public class MessageWindowTests
     }
 
     [Fact]
+    public async Task When_Windows_has_no_room_for_the_wake_up_only_that_request_fails_and_work_already_waiting_still_runs()
+    {
+        using var window = MessageWindow.Create().Value;
+        using var gate = new ManualResetEventSlim();
+        var blocker = window.InvokeAsync(() =>
+        {
+            gate.Wait(Ct);
+            return 0;
+        }, Ct);
+        var waiting = window.InvokeAsync(() => 5, Ct);
+
+        // Windows keeps at most 10,000 posted messages for a thread. The thread is busy, so they pile up.
+        for (var i = 0; i < 10_500; i++)
+        {
+            PInvoke.PostMessage(new HWND(window.Handle), 0x8000 + 99, default, default);
+        }
+
+        var refused = window.InvokeAsync(() => 6, Ct);
+
+        var failure = await Should.ThrowAsync<InvalidOperationException>(refused);
+        failure.ShouldNotBeOfType<ObjectDisposedException>("the window is alive; only the wake-up could not be queued");
+        failure.Message.ShouldContain("queue");
+        gate.Set();
+        await blocker;
+        (await waiting).ShouldBe(5, "work that was already waiting is not a casualty");
+        (await window.InvokeAsync(() => 7, Ct)).ShouldBe(7, "the window is healthy afterwards");
+    }
+    [Fact]
     public async Task Disposing_from_the_window_thread_itself_does_not_wait_for_itself()
     {
         var window = MessageWindow.Create().Value;

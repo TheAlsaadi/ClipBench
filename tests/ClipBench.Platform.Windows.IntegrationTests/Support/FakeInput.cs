@@ -31,6 +31,9 @@ internal sealed class FakeInput : IWindowApi, IKeyboardApi
     /// <summary>How many times the held keys are looked at before they are let go. -1: they stay down.</summary>
     public int ReleaseAfterPolls { get; set; } = -1;
 
+    /// <summary>Run each time the held keys are looked at, with how many times that has been, so a test can have the user act meanwhile.</summary>
+    public Action<int>? OnModifierPoll { get; set; }
+
     /// <summary>When set, only this many of the events sent are accepted.</summary>
     public int? AcceptOnly { get; set; }
 
@@ -64,6 +67,7 @@ internal sealed class FakeInput : IWindowApi, IKeyboardApi
 
     public HotkeyModifiers GetHeldModifiers()
     {
+        OnModifierPoll?.Invoke(_modifierPolls + 1);
         if (ReleaseAfterPolls >= 0 && _modifierPolls++ >= ReleaseAfterPolls)
         {
             Held = HotkeyModifiers.None;

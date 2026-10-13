@@ -19,20 +19,36 @@ internal sealed record ClipboardRetryPolicy(int Attempts, TimeSpan InitialDelay,
     public TimeSpan MaxDelay { get; } = MaxDelay >= InitialDelay ? MaxDelay : throw new ArgumentOutOfRangeException(nameof(MaxDelay), MaxDelay, "The longest wait cannot be shorter than the first.");
 }
 
-/// <summary>Opens the clipboard, waiting for another program to let go of it.</summary>
+/// <summary>What came of trying to use the clipboard.</summary>
+/// <typeparam name="T">The type of the work's result.</typeparam>
+/// <param name="Opened">True when the clipboard was opened and the work ran. False when it stayed busy for every attempt.</param>
+/// <param name="Value">The work's result, or the default when the clipboard never opened.</param>
+internal readonly record struct ClipboardUse<T>(bool Opened, T? Value);
+
+/// <summary>Opens the clipboard, waiting for another program to let go of it, and runs work while it is open.</summary>
 internal static class ClipboardOpener
 {
     /// <summary>
-    /// Tries to open the clipboard, waiting with a doubling delay between attempts. The waiting happens here,
-    /// outside the open clipboard, so the caller's open-and-close stays on one thread without a pause in it.
+    /// Tries to open the clipboard, waiting with a doubling delay between attempts, and runs the work as soon as it
+    /// opens. The waiting happens before the clipboard is open, so other programs are never kept waiting by it. The work
+    /// runs in the same synchronous stretch as the open and the close, with no await in between: Windows wants the
+    /// thread that opened the clipboard to close it, and a session handed back through a task could be closed on another
+    /// thread, which leaves the clipboard open for every program until that thread ends.
     /// </summary>
+    /// <typeparam name="T">The type of the work's result.</typeparam>
     /// <param name="api">The Windows surface.</param>
     /// <param name="policy">How long to keep trying.</param>
     /// <param name="time">The clock the waits use.</param>
+    /// <param name="work">What to do with the open clipboard. It must not wait for anything.</param>
     /// <param name="cancellationToken">Ends the wait.</param>
-    /// <returns>The open clipboard, or null when it stayed busy for every attempt.</returns>
-    public static async Task<IClipboardSession?> OpenAsync(IClipboardApi api, ClipboardRetryPolicy policy, TimeProvider time, CancellationToken cancellationToken)
+    /// <returns>Whether the clipboard opened and, if so, what the work returned.</returns>
+    public static async Task<ClipboardUse<T>> UseAsync<T>(IClipboardApi api, ClipboardRetryPolicy policy, TimeProvider time, Func<IClipboardSession, T> work, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(api);
+        ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(time);
+        ArgumentNullException.ThrowIfNull(work);
+
         var delay = policy.InitialDelay;
         for (var attempt = 1; ; attempt++)
         {
@@ -40,12 +56,15 @@ internal static class ClipboardOpener
             var session = api.TryOpen();
             if (session is not null)
             {
-                return session;
+                using (session)
+                {
+                    return new ClipboardUse<T>(true, work(session));
+                }
             }
 
             if (attempt >= policy.Attempts)
             {
-                return null;
+                return new ClipboardUse<T>(false, default);
             }
 
             await Task.Delay(delay, time, cancellationToken).ConfigureAwait(false);

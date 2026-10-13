@@ -24,6 +24,9 @@ internal static class ClipboardFormats
     /// <summary>The registered format that holds a PNG file, which keeps alpha for programs that read it.</summary>
     public const string Png = "PNG";
 
+    /// <summary>The data of ClipBench's own-write marker. The value does not matter: a format needs some data, and its presence is the signal.</summary>
+    public static ReadOnlySpan<byte> OwnWriteMarkerData => [1, 0, 0, 0];
+
     /// <summary>
     /// Whether the data of a format is a block of global memory, which can be sized, locked and copied. The
     /// others hold a handle to a graphics object (CF_BITMAP, the metafile and palette formats and their display

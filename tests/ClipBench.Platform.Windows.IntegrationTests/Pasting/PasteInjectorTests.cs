@@ -198,6 +198,28 @@ public class PasteInjectorTests
         _input.Sent[0].Length.ShouldBe(4);
     }
 
+    [Fact]
+    public async Task If_focus_moves_to_another_window_while_waiting_for_held_keys_no_key_is_sent_and_the_clipboard_is_put_back()
+    {
+        GiveTheUserSomethingCopied();
+        _input.Foreground = 0x100;
+        _input.Held = HotkeyModifiers.Windows | HotkeyModifiers.Alt;
+        _input.ReleaseAfterPolls = 3;
+        _input.OnModifierPoll = poll =>
+        {
+            if (poll == 2)
+            {
+                _input.Foreground = 0x900;   // the user clicked another window
+            }
+        };
+
+        var result = await Paste(Request());
+
+        result.Error.Code.ShouldBe(ErrorCode.FocusNotRestored);
+        _input.Sent.ShouldBeEmpty("Ctrl+V would have pasted into the window the user switched to");
+        ClipboardText().ShouldBe("what the user had");
+    }
+
     [Theory]
     [InlineData(HotkeyModifiers.Alt)]
     [InlineData(HotkeyModifiers.Shift)]

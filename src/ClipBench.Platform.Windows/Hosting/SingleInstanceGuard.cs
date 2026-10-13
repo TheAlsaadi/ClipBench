@@ -16,8 +16,8 @@ internal sealed partial class SingleInstanceGuard : ISingleInstanceGuard
 
     private const int MaxNameLength = 100;
 
-    private readonly Mutex _mutex;
-    private readonly EventWaitHandle _signal;
+    private readonly Mutex? _mutex;
+    private readonly EventWaitHandle? _signal;
     private readonly EventPump<bool> _pump;
     private readonly RegisteredWaitHandle? _wait;
     private readonly Lock _gate = new();
@@ -28,15 +28,33 @@ internal sealed partial class SingleInstanceGuard : ISingleInstanceGuard
     private SingleInstanceGuard(string name)
     {
         // Not owned: the mutex only has to exist. Owning it would tie it to one thread, and it would be abandoned
-        // when that thread ended.
-        _mutex = new Mutex(false, $@"Local\{name}.Instance", out var created);
+        // when that thread ended. A copy started with "Run as administrator" makes its objects with a higher integrity
+        // label, and an ordinary copy is refused them: that is another running copy, and a launch must not crash for it.
+        var created = false;
+        try
+        {
+            _mutex = new Mutex(false, $@"Local\{name}.Instance", out created);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _mutex = null;
+        }
+
         IsFirstInstance = created;
 
         // Both launches open or create the event, so whichever comes first is fine and a signal is never lost.
-        _signal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{name}.ShowPopup");
+        try
+        {
+            _signal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{name}.ShowPopup");
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _signal = null;
+        }
+
         _pump = new EventPump<bool>(_ => Raise());
 
-        if (IsFirstInstance)
+        if (IsFirstInstance && _signal is not null)
         {
             _wait = ThreadPool.RegisterWaitForSingleObject(_signal, (_, _) => OnSignal(), null, Timeout.Infinite, executeOnlyOnce: false);
         }
@@ -107,7 +125,7 @@ internal sealed partial class SingleInstanceGuard : ISingleInstanceGuard
     /// <inheritdoc/>
     public bool SignalFirstInstance()
     {
-        if (IsFirstInstance || Volatile.Read(ref _disposed) != 0)
+        if (IsFirstInstance || _signal is null || Volatile.Read(ref _disposed) != 0)
         {
             return false;
         }
@@ -132,8 +150,8 @@ internal sealed partial class SingleInstanceGuard : ISingleInstanceGuard
 
         _wait?.Unregister(null);
         _pump.Dispose();
-        _signal.Dispose();
-        _mutex.Dispose();
+        _signal?.Dispose();
+        _mutex?.Dispose();
     }
 
     [GeneratedRegex("^[A-Za-z0-9._-]+$")]

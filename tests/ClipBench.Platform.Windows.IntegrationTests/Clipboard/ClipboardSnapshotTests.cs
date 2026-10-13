@@ -192,7 +192,7 @@ public class ClipboardSnapshotTests
     {
         _api.PutText("a secret");
         var snapshot = Take()!;
-        var buffers = snapshot.BuffersForTesting;
+        var buffers = _api.HandedOut;
         buffers.ShouldNotBeEmpty();
         buffers.All(buffer => buffer.Any(value => value != 0)).ShouldBeTrue("the copies hold the secret before disposal");
 

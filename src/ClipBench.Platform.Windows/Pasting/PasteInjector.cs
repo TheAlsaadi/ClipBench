@@ -109,6 +109,12 @@ internal sealed class PasteInjector : IPasteInjector
                 return Failure(ErrorCode.InputBlocked, "Keys are still held down, so Ctrl+V would become another shortcut. Let go of them and try again.");
             }
 
+            // Focus was confirmed before the wait for held keys, and the user can switch windows during it. The last look is right before the keys.
+            if (request.Target is { } stillTarget && _windows.GetForegroundWindow() != (nint)stillTarget.Value)
+            {
+                return Failure(ErrorCode.FocusNotRestored, "The window to paste into lost focus before the paste. Nothing was pasted.");
+            }
+
             var keys = KeystrokePlan.CtrlV(held.Value);
             if (_keyboard.Send(keys) != keys.Length)
             {
@@ -138,15 +144,19 @@ internal sealed class PasteInjector : IPasteInjector
     // and the old content is simply not put back.
     private async Task<(ClipboardSnapshot Snapshot, long Sequence)?> KeepClipboardAsync()
     {
-        using var session = await ClipboardOpener.OpenAsync(_clipboard, _retry, _time, CancellationToken.None).ConfigureAwait(false);
-        if (session is null)
-        {
-            return null;
-        }
+        var use = await ClipboardOpener.UseAsync<(ClipboardSnapshot Snapshot, long Sequence)?>(
+            _clipboard,
+            _retry,
+            _time,
+            session =>
+            {
+                var sequence = _clipboard.SequenceNumber;
+                var snapshot = ClipboardSnapshot.Take(session, _timing.SnapshotLimit);
+                return snapshot is null ? null : (snapshot, sequence);
+            },
+            CancellationToken.None).ConfigureAwait(false);
 
-        var sequence = _clipboard.SequenceNumber;
-        var snapshot = ClipboardSnapshot.Take(session, _timing.SnapshotLimit);
-        return snapshot is null ? null : (snapshot, sequence);
+        return use.Value;
     }
 
     // Puts the user's clipboard back, but only if it is still what ClipBench left: after a successful write that is the
@@ -159,12 +169,17 @@ internal sealed class PasteInjector : IPasteInjector
             return;
         }
 
-        using var session = await ClipboardOpener.OpenAsync(_clipboard, _retry, _time, CancellationToken.None).ConfigureAwait(false);
-        if (session is not null && _clipboard.SequenceNumber == now)
-        {
-            // The restored content is marked as ClipBench's own, so it is not recorded again as a new copy.
-            snapshot.Restore(session, _ownWriteFormat);
-        }
+        await ClipboardOpener.UseAsync(
+            _clipboard,
+            _retry,
+            _time,
+            session =>
+            {
+                // The restored content is marked as ClipBench's own, so it is not recorded again as a new copy.
+                // Checked again now that the clipboard is ours: another program may have copied while we waited to open it.
+                return _clipboard.SequenceNumber == now && snapshot.Restore(session, _ownWriteFormat);
+            },
+            CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<bool> GiveFocusAsync(nint target, CancellationToken cancellationToken)

@@ -261,7 +261,9 @@ internal static class Png
 
             // Too little is damage; so is a single byte more than promised. Reaching the end of the stream is
             // also what makes the decompressor check the stream's own checksum.
-            return output.Length == expected ? output.ToArray() : null;
+            // The stream's own buffer is handed on as it is (it may be longer than the data; the caller reads by offset),
+            // so a picture that unpacks to 144 MB is not copied a second time.
+            return output.Length == expected ? output.GetBuffer() : null;
         }
         catch (InvalidDataException)
         {

@@ -23,7 +23,10 @@ internal sealed class HotkeyService : IHotkeyService
     private readonly IHotkeyApi _api;
     private readonly ConcurrentDictionary<int, Hotkey> _registered = new();
     private readonly EventPump<HotkeyId> _pump;
-    private int _lastId;
+    private readonly Lock _numbers = new();
+    private readonly HashSet<int> _reserved = [];
+    private readonly int _firstId;
+    private int _turn;
     private int _disposed;
 
     /// <summary>Creates a hotkey service.</summary>
@@ -39,7 +42,7 @@ internal sealed class HotkeyService : IHotkeyService
         ArgumentOutOfRangeException.ThrowIfLessThan(firstId, 1);
         _invoker = invoker;
         _api = api;
-        _lastId = firstId - 1;
+        _firstId = firstId;
         _pump = new EventPump<HotkeyId>(id => Subscribers.Raise(Pressed, this, new HotkeyPressedEventArgs(id)));
         source.AddHandler(HotkeyMessage, (wParam, _) =>
         {
@@ -63,25 +66,38 @@ internal sealed class HotkeyService : IHotkeyService
         ArgumentNullException.ThrowIfNull(hotkey);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
-        var id = Interlocked.Increment(ref _lastId);
-        if (id > MaxId)
+        if (Reserve() is not { } id)
         {
             return Result.Failure<HotkeyId>(new ResultError(ErrorCode.PlatformFailure, "ClipBench has used up the shortcut numbers Windows allows."));
         }
 
         // The shortcut is remembered on the window thread, before any press of it can be handled.
-        var error = await _invoker.InvokeAsync(
-            () =>
-            {
-                if (_api.Register(id, ToWindowsModifiers(hotkey.Modifiers) | NoRepeat, (uint)hotkey.VirtualKey, out var failure))
+        int error;
+        try
+        {
+            error = await _invoker.InvokeAsync(
+                () =>
                 {
-                    _registered[id] = hotkey;
-                    return 0;
-                }
+                    if (_api.Register(id, ToWindowsModifiers(hotkey.Modifiers) | NoRepeat, (uint)hotkey.VirtualKey, out var failure))
+                    {
+                        _registered[id] = hotkey;
+                        return 0;
+                    }
 
-                return failure;
-            },
-            cancellationToken).ConfigureAwait(false);
+                    return failure;
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            Release(id);
+            throw;
+        }
+
+        if (error != 0)
+        {
+            Release(id);
+        }
 
         return error switch
         {
@@ -112,6 +128,7 @@ internal sealed class HotkeyService : IHotkeyService
                 }
 
                 _registered.TryRemove(id.Value, out _);
+                Release(id.Value);
                 return Result.Success();
             },
             cancellationToken).ConfigureAwait(false);
@@ -125,27 +142,49 @@ internal sealed class HotkeyService : IHotkeyService
             return;
         }
 
-        try
-        {
-            _invoker.InvokeAsync(
-                () =>
+        _invoker.RunAndWait(
+            () =>
+            {
+                foreach (var id in _registered.Keys)
                 {
-                    foreach (var id in _registered.Keys)
-                    {
-                        _api.Unregister(id);
-                    }
+                    _api.Unregister(id);
+                }
 
-                    _registered.Clear();
-                    return true;
-                },
-                CancellationToken.None).Wait(_stopTimeout);
-        }
-        catch (AggregateException exception) when (exception.InnerException is ObjectDisposedException)
-        {
-            // The window is already gone, and Windows releases its shortcuts with it.
-        }
+                _registered.Clear();
+            },
+            _stopTimeout);
 
         _pump.Dispose();
+    }
+
+    // The next number in turn that is not in use. Handing them out in rotation means releasing and claiming a shortcut over
+    // and over (queue paste does this around every pasted item) never runs out, and a number is not reused until the rest
+    // have been tried: a press of a released shortcut that is still waiting in the queue cannot reach a new shortcut.
+    private int? Reserve()
+    {
+        lock (_numbers)
+        {
+            var count = MaxId - _firstId + 1;
+            for (var step = 0; step < count; step++)
+            {
+                var id = _firstId + ((_turn + step) % count);
+                if (_reserved.Add(id))
+                {
+                    _turn = (id - _firstId + 1) % count;
+                    return id;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    private void Release(int id)
+    {
+        lock (_numbers)
+        {
+            _reserved.Remove(id);
+        }
     }
 
     // The flag values are Windows' own (MOD_ALT 1, MOD_CONTROL 2, MOD_SHIFT 4, MOD_WIN 8); Core's enum uses the same numbers on purpose.

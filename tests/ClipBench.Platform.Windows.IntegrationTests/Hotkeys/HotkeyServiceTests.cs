@@ -115,6 +115,73 @@ public sealed class HotkeyServiceTests : IDisposable
         result.Error.Code.ShouldBe(ErrorCode.PlatformFailure);
     }
 
+    [Fact]
+    public async Task Numbers_are_handed_out_in_turn_so_a_released_one_is_not_reused_at_once()
+    {
+        // A press of a released shortcut can still be waiting in the queue. Giving its number straight to a different
+        // shortcut would send that press to the wrong place.
+        var first = await RegisterAsync("Ctrl+K");
+        await _service.UnregisterAsync(first, Ct);
+
+        var second = await RegisterAsync("Ctrl+L");
+
+        second.ShouldNotBe(first);
+    }
+
+    [Fact]
+    public async Task Released_numbers_come_round_again_so_registering_over_and_over_never_runs_out()
+    {
+        // Queue paste releases and claims Ctrl+V around every pasted item. Only two numbers exist here.
+        using var small = new HotkeyService(_window, _window, _api, firstId: 0xBFFE);
+        var current = (await small.RegisterAsync(Hotkey.Parse("Ctrl+K").Value, Ct)).Value;
+
+        for (var i = 0; i < 200; i++)
+        {
+            (await small.UnregisterAsync(current, Ct)).IsSuccess.ShouldBeTrue();
+            var next = await small.RegisterAsync(Hotkey.Parse("Ctrl+K").Value, Ct);
+            next.IsSuccess.ShouldBeTrue($"round {i}");
+            current = next.Value;
+        }
+    }
+
+    [Fact]
+    public async Task A_number_in_use_is_never_handed_out_again()
+    {
+        using var small = new HotkeyService(_window, _window, _api, firstId: 0xBFFE);
+        var one = (await small.RegisterAsync(Hotkey.Parse("Ctrl+1").Value, Ct)).Value;
+        var two = (await small.RegisterAsync(Hotkey.Parse("Ctrl+2").Value, Ct)).Value;
+        await small.UnregisterAsync(one, Ct);
+
+        var three = (await small.RegisterAsync(Hotkey.Parse("Ctrl+3").Value, Ct)).Value;
+
+        three.ShouldBe(one, "the only free number");
+        three.ShouldNotBe(two);
+    }
+
+    [Fact]
+    public async Task A_number_for_a_registration_that_failed_is_free_again()
+    {
+        using var small = new HotkeyService(_window, _window, _api, firstId: 0xBFFE);
+        _api.FailWith = 1409;
+        (await small.RegisterAsync(Hotkey.Default, Ct)).IsFailure.ShouldBeTrue();
+        _api.FailWith = 0;
+
+        // Both numbers are free: the failed one was not kept.
+        (await small.RegisterAsync(Hotkey.Parse("Ctrl+1").Value, Ct)).IsSuccess.ShouldBeTrue();
+        (await small.RegisterAsync(Hotkey.Parse("Ctrl+2").Value, Ct)).IsSuccess.ShouldBeTrue();
+    }
+    [Fact]
+    public async Task Releasing_a_number_makes_room_again_when_all_of_them_were_in_use()
+    {
+        using var small = new HotkeyService(_window, _window, _api, firstId: 0xBFFE);
+        var one = (await small.RegisterAsync(Hotkey.Parse("Ctrl+1").Value, Ct)).Value;
+        (await small.RegisterAsync(Hotkey.Parse("Ctrl+2").Value, Ct)).IsSuccess.ShouldBeTrue();
+        (await small.RegisterAsync(Hotkey.Parse("Ctrl+3").Value, Ct)).IsFailure.ShouldBeTrue();
+
+        await small.UnregisterAsync(one, Ct);
+
+        (await small.RegisterAsync(Hotkey.Parse("Ctrl+3").Value, Ct)).IsSuccess.ShouldBeTrue();
+    }
     // --- presses ---
 
     [Fact]

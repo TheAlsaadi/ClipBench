@@ -32,24 +32,20 @@ public sealed class RealClipboardFixture : IAsyncLifetime
         Api = new Win32ClipboardApi(Window.Handle);
         ForeignApi = new Win32ClipboardApi(ForeignWindow.Handle);
 
-        using var session = await ClipboardOpener.OpenAsync(ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, CancellationToken.None);
-        if (session is not null)
-        {
-            _saved = ClipboardSnapshot.Take(session, SnapshotLimit);
-        }
+        var saved = await ClipboardOpener.UseAsync(ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, session => ClipboardSnapshot.Take(session, SnapshotLimit), CancellationToken.None);
+
+        // These tests replace the clipboard. If what the user has cannot be saved, they do not run at all.
+        _saved = saved.Value ?? throw new InvalidOperationException(
+            "The real-clipboard tests were not run because your clipboard could not be saved first (it was busy, or holds more than 256 MB), and they replace it. Copy something small and run them again.");
     }
 
     public async ValueTask DisposeAsync()
     {
         if (_saved is not null)
         {
-            using var session = await ClipboardOpener.OpenAsync(ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, CancellationToken.None);
-            if (session is not null)
-            {
-                _saved.Restore(session);
-            }
-
-            _saved.Dispose();
+            var saved = _saved;
+            await ClipboardOpener.UseAsync(ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, session => saved.Restore(session), CancellationToken.None);
+            saved.Dispose();
         }
 
         Window.Dispose();

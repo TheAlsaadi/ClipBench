@@ -28,13 +28,19 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
     // Another program replaces the clipboard: it empties it and sets each format, without ClipBench's marker.
     private async Task PutAsync(params (uint Format, byte[] Data)[] items)
     {
-        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
-        session.ShouldNotBeNull("the clipboard stayed busy");
-        session.Empty().ShouldBeTrue();
-        foreach (var (format, data) in items)
-        {
-            session.Set(format, data).ShouldBeTrue($"format {format}");
-        }
+        await TestClipboard.UseAsync(
+            clipboard.ForeignApi,
+            session =>
+            {
+                session.Empty().ShouldBeTrue();
+                foreach (var (format, data) in items)
+                {
+                    session.Set(format, data).ShouldBeTrue($"format {format}");
+                }
+
+                return 0;
+            },
+            Ct);
     }
 
     private uint Register(string name) => clipboard.ForeignApi.RegisterFormat(name);
@@ -50,14 +56,14 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
 
     private async Task<IReadOnlyList<(uint Id, string? Name, byte[] Data)>> AllFormatsAsync()
     {
-        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
-        session.ShouldNotBeNull();
-
         // Formats that are not blocks of memory (a bitmap object, for instance) cannot be copied and are left out.
-        return [.. session.Formats()
-            .Select(format => (format.Id, format.Name, Data: session.Read(format.Id, 64 * 1024 * 1024)))
-            .Where(entry => entry.Data is not null)
-            .Select(entry => (entry.Id, entry.Name, entry.Data!))];
+        return await TestClipboard.UseAsync<IReadOnlyList<(uint Id, string? Name, byte[] Data)>>(
+            clipboard.ForeignApi,
+            session => [.. session.Formats()
+                .Select(format => (format.Id, format.Name, Data: session.Read(format.Id, 64 * 1024 * 1024)))
+                .Where(entry => entry.Data is not null)
+                .Select(entry => (entry.Id, entry.Name, entry.Data!))],
+            Ct);
     }
 
     private async Task<byte[]?> RawAsync(uint format) => (await AllFormatsAsync()).FirstOrDefault(entry => entry.Id == format).Data;
@@ -333,18 +339,11 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
             (Register(ClipboardFormats.Html), HtmlFormat.Build("<i>snapshot me</i>")),
             (Register(ClipboardFormatNames.ExcludeFromMonitorProcessing), [1, 0, 0, 0]));
         var before = (await AllFormatsAsync()).Where(entry => entry.Id is 13 or >= 0xC000).Select(entry => (entry.Id, entry.Data)).OrderBy(entry => entry.Id).ToList();
-        ClipboardSnapshot? snapshot;
-        using (var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct))
-        {
-            snapshot = ClipboardSnapshot.Take(session!, 1 << 24);
-        }
+        var snapshot = await TestClipboard.UseAsync(clipboard.ForeignApi, session => ClipboardSnapshot.Take(session, 1 << 24), Ct);
 
         snapshot.ShouldNotBeNull();
         await PutAsync((ClipboardFormats.UnicodeText, Text("the paste replaced it")));
-        using (var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct))
-        {
-            snapshot.Restore(session!).ShouldBeTrue();
-        }
+        (await TestClipboard.UseAsync(clipboard.ForeignApi, session => snapshot.Restore(session), Ct)).ShouldBeTrue();
 
         snapshot.Dispose();
         var after = (await AllFormatsAsync()).Where(entry => entry.Id is 13 or >= 0xC000).Select(entry => (entry.Id, entry.Data)).OrderBy(entry => entry.Id).ToList();
@@ -378,12 +377,13 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
         // of memory (GlobalSize, GlobalLock) corrupted the heap and crashed the process.
         var rows = Enumerable.Range(0, 3).Select(_ => new byte[9]).ToList();
         await PutAsync((ClipboardFormats.Dib, DibBuilder.Join(DibBuilder.InfoHeader(3, 3, 24), DibBuilder.Rows(rows))));
-        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
-        session.ShouldNotBeNull();
-        session.Formats().Select(format => format.Id).ShouldContain(2u, "Windows made a bitmap handle from the DIB");
-
-        session.SizeOf(2).ShouldBeNull();
-        session.Read(2, 1 << 20).ShouldBeNull();
+        var (formats, size, data) = await TestClipboard.UseAsync(
+            clipboard.ForeignApi,
+            session => (session.Formats().Select(format => format.Id).ToList(), session.SizeOf(2), session.Read(2, 1 << 20)),
+            Ct);
+        formats.ShouldContain(2u, "Windows made a bitmap handle from the DIB");
+        size.ShouldBeNull();
+        data.ShouldBeNull();
 
         // A damaged heap shows up when memory is allocated and freed. Give it every chance to.
         for (var i = 0; i < 2_000; i++)

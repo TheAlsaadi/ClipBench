@@ -13,8 +13,6 @@ namespace ClipBench.Platform.Windows.Clipboard;
 /// </summary>
 internal sealed class ClipboardWriter : IClipboardWriter
 {
-    // The marker's value does not matter, but a format needs some data.
-    private static readonly byte[] _markerData = [1, 0, 0, 0];
 
     private readonly IClipboardApi _api;
     private readonly TimeProvider _time;
@@ -50,37 +48,40 @@ internal sealed class ClipboardWriter : IClipboardWriter
             return Failure(ErrorCode.ClipboardWriteFailed, "Windows would not prepare the clipboard for ClipBench.");
         }
 
-        var session = await ClipboardOpener.OpenAsync(_api, _retry, _time, cancellationToken).ConfigureAwait(false);
-        if (session is null)
+        // The writing runs inside the opener, in the same stretch as the open and the close.
+        var use = await ClipboardOpener.UseAsync(_api, _retry, _time, session => Put(session, parts.Value, marker), cancellationToken).ConfigureAwait(false);
+        if (!use.Opened)
         {
             return Failure(ErrorCode.ClipboardBusy, "Another program is using the clipboard. Try again in a moment.");
         }
 
-        using (session)
+        return use.Value.IsFailure ? Result.Failure<long>(use.Value.Error) : Result.Success(_api.SequenceNumber);
+    }
+
+    private static Result Put(IClipboardSession session, List<(uint Format, byte[] Data)> parts, uint marker)
+    {
+        if (!session.Empty())
         {
-            if (!session.Empty())
-            {
-                return Failure(ErrorCode.ClipboardWriteFailed, "Windows would not clear the clipboard.");
-            }
+            return Result.Failure(new ResultError(ErrorCode.ClipboardWriteFailed, "Windows would not clear the clipboard."));
+        }
 
-            foreach (var (format, data) in parts.Value)
+        foreach (var (format, data) in parts)
+        {
+            if (!session.Set(format, data))
             {
-                if (!session.Set(format, data))
-                {
-                    // Part of a clip is worse than none: some programs would paste the HTML without its text.
-                    session.Empty();
-                    return Failure(ErrorCode.ClipboardWriteFailed, "Windows would not take the content.");
-                }
-            }
-
-            if (!session.Set(marker, _markerData))
-            {
+                // Part of a clip is worse than none: some programs would paste the HTML without its text.
                 session.Empty();
-                return Failure(ErrorCode.ClipboardWriteFailed, "Windows would not take the content.");
+                return Result.Failure(new ResultError(ErrorCode.ClipboardWriteFailed, "Windows would not take the content."));
             }
         }
 
-        return Result.Success(_api.SequenceNumber);
+        if (!session.Set(marker, ClipboardFormats.OwnWriteMarkerData))
+        {
+            session.Empty();
+            return Result.Failure(new ResultError(ErrorCode.ClipboardWriteFailed, "Windows would not take the content."));
+        }
+
+        return Result.Success();
     }
 
     private Result<List<(uint Format, byte[] Data)>> Prepare(ClipContent content)

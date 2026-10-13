@@ -50,10 +50,15 @@ public sealed class RealListenerTests(RealClipboardFixture clipboard) : IDisposa
 
     private async Task PutAsync(string text)
     {
-        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
-        session.ShouldNotBeNull();
-        session.Empty().ShouldBeTrue();
-        session.Set(ClipboardFormats.UnicodeText, Encoding.Unicode.GetBytes(text + "\0")).ShouldBeTrue();
+        await TestClipboard.UseAsync(
+            clipboard.ForeignApi,
+            session =>
+            {
+                session.Empty().ShouldBeTrue();
+                session.Set(ClipboardFormats.UnicodeText, Encoding.Unicode.GetBytes(text + "\0")).ShouldBeTrue();
+                return 0;
+            },
+            Ct);
     }
 
     private long NextEvent() => _events.TryTake(out var sequence, 10_000, Ct) ? sequence : throw new TimeoutException("no clipboard change was reported");

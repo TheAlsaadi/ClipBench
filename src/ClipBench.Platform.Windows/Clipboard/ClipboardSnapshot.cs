@@ -10,14 +10,9 @@ namespace ClipBench.Platform.Windows.Clipboard;
 /// </summary>
 internal sealed class ClipboardSnapshot : IDisposable
 {
-    private static readonly byte[] _markerData = [1, 0, 0, 0];
-
     private readonly List<(uint Format, byte[] Data)> _entries;
 
     private ClipboardSnapshot(List<(uint Format, byte[] Data)> entries) => _entries = entries;
-
-    /// <summary>The copies, so a test can check they are overwritten on disposal.</summary>
-    internal IReadOnlyList<byte[]> BuffersForTesting => [.. _entries.Select(entry => entry.Data)];
 
     /// <summary>
     /// Copies every format that is plain memory. Formats that are handles to graphics objects are left out
@@ -84,7 +79,7 @@ internal sealed class ClipboardSnapshot : IDisposable
         // The tag only keeps a duplicate out of the history; failing to set it does not make the restore incomplete.
         if (ownWriteMarker is { } marker)
         {
-            session.Set(marker, _markerData);
+            session.Set(marker, ClipboardFormats.OwnWriteMarkerData);
         }
 
         return complete;

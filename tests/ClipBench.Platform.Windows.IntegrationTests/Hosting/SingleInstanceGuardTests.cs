@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using ClipBench.Platform.Windows.Hosting;
 
 namespace ClipBench.Platform.Windows.IntegrationTests.Hosting;
@@ -123,6 +125,39 @@ public sealed class SingleInstanceGuardTests : IDisposable
         WaitForRequest().ShouldBeTrue();
     }
 
+    [Fact]
+    public void A_running_copy_this_user_may_not_open_counts_as_another_copy_and_does_not_crash_the_launch()
+    {
+        // A copy started with Run as administrator creates its objects with a higher integrity label, and an ordinary copy
+        // is refused access to them. Simulated with a mutex and an event that refuse everyone but their creator.
+        var world = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+        var mutexSecurity = new MutexSecurity();
+        mutexSecurity.AddAccessRule(new MutexAccessRule(world, MutexRights.FullControl, AccessControlType.Deny));
+        using var elevatedMutex = MutexAcl.Create(false, $@"Local\{_name}.Instance", out var created, mutexSecurity);
+        var eventSecurity = new EventWaitHandleSecurity();
+        eventSecurity.AddAccessRule(new EventWaitHandleAccessRule(world, EventWaitHandleRights.FullControl, AccessControlType.Deny));
+        using var elevatedEvent = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, $@"Local\{_name}.ShowPopup", out _, eventSecurity);
+        created.ShouldBeTrue();
+
+        var guard = Should.NotThrow(Acquire);
+
+        guard.IsFirstInstance.ShouldBeFalse();
+        guard.SignalFirstInstance().ShouldBeFalse("there is no way to reach a copy that refuses us");
+    }
+
+    [Fact]
+    public void A_running_copy_whose_event_this_user_may_not_open_cannot_be_signalled_but_the_launch_still_works()
+    {
+        var first = Acquire();
+        var security = new EventWaitHandleSecurity();
+        security.AddAccessRule(new EventWaitHandleAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), EventWaitHandleRights.FullControl, AccessControlType.Deny));
+        using var locked = EventWaitHandleAcl.Create(false, EventResetMode.AutoReset, $@"Local\{_name}Other.ShowPopup", out var created, security);
+        created.ShouldBeTrue();
+        using var other = SingleInstanceGuard.Acquire(_name + "Other");
+
+        other.IsFirstInstance.ShouldBeTrue("the mutex was free");
+        first.IsFirstInstance.ShouldBeTrue();
+    }
     [Fact]
     public void The_running_copy_has_nobody_to_signal()
     {

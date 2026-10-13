@@ -130,6 +130,18 @@ public class ClipboardReaderTests
         (await Content()).ShouldBe(new HtmlContent("<p>One</p><p>Two &amp; three</p>", "One\nTwo & three"));
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\r\n")]
+    public async Task HTML_whose_text_alternative_is_blank_is_given_one_by_removing_the_tags(string blankText)
+    {
+        // A blank text would leave the clip with nothing to search or preview.
+        _api.PutText(blankText);
+        _api.PutHtml("<p>Real content</p>");
+
+        (await Content()).ShouldBe(new HtmlContent("<p>Real content</p>", "Real content"));
+    }
     [Fact]
     public async Task Rich_text_with_text_keeps_both()
     {

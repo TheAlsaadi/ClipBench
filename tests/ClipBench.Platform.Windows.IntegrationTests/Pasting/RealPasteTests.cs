@@ -33,16 +33,20 @@ public sealed class RealPasteTests(RealClipboardFixture clipboard)
 
     private async Task PutAsync(string text)
     {
-        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
-        session.ShouldNotBeNull();
-        session.Empty().ShouldBeTrue();
-        session.Set(ClipboardFormats.UnicodeText, Encoding.Unicode.GetBytes(text + "\0")).ShouldBeTrue();
+        await TestClipboard.UseAsync(
+            clipboard.ForeignApi,
+            session =>
+            {
+                session.Empty().ShouldBeTrue();
+                session.Set(ClipboardFormats.UnicodeText, Encoding.Unicode.GetBytes(text + "\0")).ShouldBeTrue();
+                return 0;
+            },
+            Ct);
     }
 
     private async Task<string?> ClipboardTextAsync()
     {
-        using var session = await ClipboardOpener.OpenAsync(clipboard.ForeignApi, ClipboardRetryPolicy.Default, TimeProvider.System, Ct);
-        var bytes = session?.Read(ClipboardFormats.UnicodeText, 1 << 20);
+        var bytes = await TestClipboard.UseAsync(clipboard.ForeignApi, session => session.Read(ClipboardFormats.UnicodeText, 1 << 20), Ct);
         return bytes is null ? null : Encoding.Unicode.GetString(bytes).TrimEnd('\0');
     }
 
