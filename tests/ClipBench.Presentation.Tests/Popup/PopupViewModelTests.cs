@@ -336,6 +336,26 @@ public sealed class PopupViewModelTests : IDisposable
         _vm.Current!.Id.ShouldBe(id);
     }
 
+    [Fact]
+    public async Task The_view_is_told_when_there_is_a_message_to_show_and_when_it_goes_away()
+    {
+        await CopyAsync("one", "two");
+        _vm.Open();
+        List<string?> changed = [];
+        _vm.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+        _vm.HasError.ShouldBeFalse();
+
+        _store.Failure = new ResultError(ErrorCode.StorageFailure, "disk");
+        await _vm.TogglePinCommand.ExecuteAsync(null);
+
+        _vm.HasError.ShouldBeTrue();
+        changed.ShouldContain(nameof(PopupViewModel.HasError));
+
+        _vm.MoveDownCommand.Execute(null);
+
+        _vm.HasError.ShouldBeFalse();
+    }
+
     // --- deleting ---
 
     [Fact]

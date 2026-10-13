@@ -13,6 +13,8 @@
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <!-- The app starts from Program.cs: it must check for a running copy before any XAML runs. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <!-- Views carry no public API; XAML-generated code would otherwise trip CS1591. -->
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
   </PropertyGroup>

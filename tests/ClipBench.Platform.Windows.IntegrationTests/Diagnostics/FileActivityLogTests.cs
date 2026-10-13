@@ -77,13 +77,14 @@ public sealed class FileActivityLogTests : IDisposable
                 Error = ErrorCode.StorageFailure,
                 Format = ClipFormat.Image,
                 Bytes = 2048,
+                Count = 7,
                 Rejection = CaptureRejection.TooLarge,
                 ExceptionType = typeof(InvalidOperationException),
             });
         log.Write(ActivityLevel.Information, ActivityEvent.CaptureStored, new ActivityDetails { Format = ClipFormat.Text, Bytes = 12 });
 
         var lines = Lines();
-        lines[0].ShouldEndWith("StoreFailed error=StorageFailure format=Image bytes=2048 rejection=TooLarge exception=System.InvalidOperationException");
+        lines[0].ShouldEndWith("StoreFailed error=StorageFailure format=Image bytes=2048 count=7 rejection=TooLarge exception=System.InvalidOperationException");
         lines[1].ShouldEndWith("CaptureStored format=Text bytes=12");
     }
 

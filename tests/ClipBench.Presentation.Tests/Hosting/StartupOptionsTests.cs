@@ -18,6 +18,38 @@ public class StartupOptionsTests
     }
 
     [Fact]
+    public void Screen_capture_stays_blocked_unless_the_switch_is_given()
+    {
+        StartupOptions.Parse([]).AllowScreenCapture.ShouldBeFalse();
+        StartupOptions.Parse(["--allow-screen-capture"]).AllowScreenCapture.ShouldBeTrue();
+        StartupOptions.Parse(["--ALLOW-SCREEN-CAPTURE"]).AllowScreenCapture.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_capture_switch_takes_no_value_so_the_next_argument_is_read_on_its_own()
+    {
+        var options = StartupOptions.Parse(["--allow-screen-capture", "--hotkey", "F24"]);
+
+        options.AllowScreenCapture.ShouldBeTrue();
+        options.Hotkey.ShouldBe(Hotkey.Parse("F24").Value);
+        options.Problems.ShouldBeEmpty();
+
+        var stray = StartupOptions.Parse(["--allow-screen-capture", "stray"]);
+
+        stray.AllowScreenCapture.ShouldBeTrue();
+        stray.Problems.ShouldBe(["The argument stray is not known, so it was ignored."]);
+    }
+
+    [Fact]
+    public void A_value_given_to_the_capture_switch_is_ignored_with_a_note()
+    {
+        var options = StartupOptions.Parse(["--allow-screen-capture=yes"]);
+
+        options.AllowScreenCapture.ShouldBeFalse();
+        options.Problems.ShouldBe(["--allow-screen-capture takes no value, so it was ignored."]);
+    }
+
+    [Fact]
     public void The_data_folder_can_be_given_as_a_separate_value_or_after_an_equals_sign()
     {
         StartupOptions.Parse(["--data-dir", _absolute]).DataDirectory.ShouldBe(_absolute);

@@ -71,6 +71,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial string? ErrorMessage { get; set; }
 
+    /// <summary>True while there is an <see cref="ErrorMessage"/> to show.</summary>
+    public bool HasError => ErrorMessage is not null;
+
     /// <summary>The highlighted row, or null.</summary>
     public ClipRowViewModel? Current => SelectedIndex >= 0 && SelectedIndex < Rows.Count ? Rows[SelectedIndex] : null;
 
@@ -171,6 +174,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     }
 
     partial void OnIsConfirmingDeleteChanged(bool value) => OnPropertyChanged(nameof(StatusText));
+
+    partial void OnErrorMessageChanged(string? value) => OnPropertyChanged(nameof(HasError));
 
     [RelayCommand]
     private void MoveDown()

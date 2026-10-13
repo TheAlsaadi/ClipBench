@@ -49,6 +49,27 @@ public enum ActivityEvent
 
     /// <summary>A paste threw an exception that was not expected.</summary>
     PasteFaulted,
+
+    /// <summary>The app started.</summary>
+    AppStarted,
+
+    /// <summary>The app is closing.</summary>
+    AppStopping,
+
+    /// <summary>The saved history was read; the count says how many clips.</summary>
+    HistoryLoaded,
+
+    /// <summary>Some saved clips could not be read and were skipped; the count says how many.</summary>
+    HistorySkipped,
+
+    /// <summary>The saved history could not be used and the user chose to start again.</summary>
+    HistoryReset,
+
+    /// <summary>The popup shortcut is registered.</summary>
+    HotkeyRegistered,
+
+    /// <summary>The popup shortcut could not be registered, with the reason as an error code.</summary>
+    HotkeyFailed,
 }
 
 /// <summary>
@@ -65,6 +86,9 @@ public readonly record struct ActivityDetails
 
     /// <summary>The size of the clip involved, in bytes.</summary>
     public long? Bytes { get; init; }
+
+    /// <summary>How many of something: clips loaded, records skipped.</summary>
+    public int? Count { get; init; }
 
     /// <summary>Why a change was rejected.</summary>
     public CaptureRejection Rejection { get; init; }

@@ -100,6 +100,11 @@ public sealed class FileActivityLog : IActivityLog
             _ = line.Append(" bytes=").Append(bytes.ToString(CultureInfo.InvariantCulture));
         }
 
+        if (details.Count is { } count)
+        {
+            _ = line.Append(" count=").Append(count.ToString(CultureInfo.InvariantCulture));
+        }
+
         if (details.Rejection != CaptureRejection.None)
         {
             _ = line.Append(" rejection=").Append(details.Rejection);

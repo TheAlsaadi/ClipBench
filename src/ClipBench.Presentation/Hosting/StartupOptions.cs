@@ -16,11 +16,17 @@ public sealed record StartupOptions
     /// <summary>The switch that replaces the popup shortcut.</summary>
     public const string HotkeySwitch = "--hotkey";
 
+    /// <summary>The switch that lets other programs capture the popup in screenshots. Only for testing: the popup hides itself from capture otherwise.</summary>
+    public const string AllowScreenCaptureSwitch = "--allow-screen-capture";
+
     /// <summary>The folder for the history, its key and the log, or null for the default.</summary>
     public string? DataDirectory { get; init; }
 
     /// <summary>The popup shortcut, or null for the default.</summary>
     public Hotkey? Hotkey { get; init; }
+
+    /// <summary>True to leave the popup visible to screenshots and screen sharing, which it hides from by default.</summary>
+    public bool AllowScreenCapture { get; init; }
 
     /// <summary>What was wrong with the arguments, in plain words. Wrong arguments are ignored, never fatal.</summary>
     public ImmutableArray<string> Problems { get; init; } = [];
@@ -34,6 +40,7 @@ public sealed record StartupOptions
 
         string? dataDirectory = null;
         Hotkey? hotkey = null;
+        var allowScreenCapture = false;
         var problems = ImmutableArray.CreateBuilder<string>();
 
         for (var i = 0; i < args.Count; i++)
@@ -43,6 +50,20 @@ public sealed record StartupOptions
             var name = equals < 0 ? argument : argument[..equals];
             var isDataDirectory = name.Equals(DataDirectorySwitch, StringComparison.OrdinalIgnoreCase);
             var isHotkey = name.Equals(HotkeySwitch, StringComparison.OrdinalIgnoreCase);
+
+            if (name.Equals(AllowScreenCaptureSwitch, StringComparison.OrdinalIgnoreCase))
+            {
+                if (equals >= 0)
+                {
+                    problems.Add($"{AllowScreenCaptureSwitch} takes no value, so it was ignored.");
+                }
+                else
+                {
+                    allowScreenCapture = true;
+                }
+
+                continue;
+            }
 
             if (!isDataDirectory && !isHotkey)
             {
@@ -94,6 +115,6 @@ public sealed record StartupOptions
             }
         }
 
-        return new StartupOptions { DataDirectory = dataDirectory, Hotkey = hotkey, Problems = problems.ToImmutable() };
+        return new StartupOptions { DataDirectory = dataDirectory, Hotkey = hotkey, AllowScreenCapture = allowScreenCapture, Problems = problems.ToImmutable() };
     }
 }
