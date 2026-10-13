@@ -188,6 +188,28 @@ public sealed class ClipRepositoryTamperTests : RepositoryTestBase
         loaded.IsPinned.ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData(-1L)]
+    [InlineData(long.MaxValue)]
+    [InlineData(long.MinValue)]
+    [InlineData(3155378975999999999L + 1)]
+    public async Task A_capture_time_that_is_not_a_date_makes_that_clip_unreadable_and_nothing_throws(long ticks)
+    {
+        // The time is a plain column, so it can hold any number. A number that is not a date must not crash a load.
+        await using var repository = await OpenWithThreeAsync();
+        RawSet("captured_at", _second.Id, ticks);
+
+        var one = await repository.GetAsync(_second.Id, Ct);
+        var all = (await repository.LoadAllAsync(Ct)).Value;
+        var summaries = (await repository.LoadSummariesAsync(Ct)).Value;
+
+        one.IsFailure.ShouldBeTrue();
+        all.UnreadableCount.ShouldBe(1);
+        all.Items.Select(clip => clip.Id).ShouldBe([_third.Id, _first.Id]);
+        summaries.UnreadableCount.ShouldBe(1);
+        summaries.Items.Length.ShouldBe(2);
+    }
+
     // --- failures are recoverable ---
 
     [Fact]

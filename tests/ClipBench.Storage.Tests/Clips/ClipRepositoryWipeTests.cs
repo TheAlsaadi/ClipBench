@@ -127,6 +127,49 @@ public sealed class ClipRepositoryWipeTests : RepositoryTestBase
     }
 
     [Fact]
+    public async Task Deleting_a_clip_overwrites_its_value_on_disk_even_while_the_database_is_open()
+    {
+        // Closing the database empties its log, which would hide a value still sitting in it.
+        var clip = TestClips.Text("delete me while running");
+        await using var repository = await OpenAsync();
+        await SaveAll(repository, clip, TestClips.Text("keeps the page in use"));
+        var content = Fingerprint(RawBlob("content", clip.Id));
+        AppearsOnDisk(content).ShouldBeTrue("control: the value is on disk before the delete");
+
+        await repository.DeleteAsync([clip.Id], Ct);
+
+        AppearsOnDisk(content).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Retention_that_evicts_a_clip_overwrites_its_value_on_disk_even_while_the_database_is_open()
+    {
+        var old = TestClips.Text("evicted while running", FakeTimeProvider.Start.AddDays(-90));
+        await using var repository = await OpenAsync();
+        await SaveAll(repository, old, TestClips.Text("recent"));
+        var content = Fingerprint(RawBlob("content", old.Id));
+
+        await repository.RetainAsync(new HistoryOptions(), Ct);
+
+        AppearsOnDisk(content).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Sweeping_an_expired_clip_overwrites_its_value_on_disk_even_while_the_database_is_open()
+    {
+        var expiring = TestClips.Text("expires while running");
+        await using var repository = await OpenAsync();
+        await repository.SaveAsync(expiring, FakeTimeProvider.Start.AddMinutes(1), Ct);
+        await SaveAll(repository, TestClips.Text("stays"));
+        var content = Fingerprint(RawBlob("content", expiring.Id));
+        Clock.Advance(TimeSpan.FromMinutes(2));
+
+        await repository.SweepExpiredAsync(Ct);
+
+        AppearsOnDisk(content).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Retention_that_evicts_a_clip_overwrites_its_value_on_disk()
     {
         var old = TestClips.Text("evicted by age", FakeTimeProvider.Start.AddDays(-90));

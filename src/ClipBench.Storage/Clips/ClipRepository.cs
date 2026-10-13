@@ -207,7 +207,7 @@ public sealed class ClipRepository : IAsyncDisposable
                     return Result.Failure<Clip>(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."));
                 }
 
-                return ReadClip(id, (ClipFormat)reader.GetInt64(0), Time(reader.GetInt64(1)), reader.GetInt64(2) != 0, reader.GetFieldValue<byte[]>(3), SourceOrNull(reader, 4));
+                return ReadClip(id, (ClipFormat)reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2) != 0, reader.GetFieldValue<byte[]>(3), SourceOrNull(reader, 4));
             },
             cancellationToken);
 
@@ -227,7 +227,7 @@ public sealed class ClipRepository : IAsyncDisposable
                 while (reader.Read())
                 {
                     var id = IdFrom(reader, 0);
-                    var clip = ReadClip(id, (ClipFormat)reader.GetInt64(1), Time(reader.GetInt64(2)), reader.GetInt64(3) != 0, reader.GetFieldValue<byte[]>(4), SourceOrNull(reader, 5));
+                    var clip = ReadClip(id, (ClipFormat)reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetFieldValue<byte[]>(4), SourceOrNull(reader, 5));
                     if (clip.IsSuccess)
                     {
                         clips.Add(clip.Value);
@@ -298,7 +298,11 @@ public sealed class ClipRepository : IAsyncDisposable
         return outcome.IsSuccess ? Result.Success() : Result.Failure(outcome.Error);
     }
 
-    /// <summary>Deletes clips, pinned or not. A deleted value is overwritten on disk, not just marked free.</summary>
+    /// <summary>
+    /// Deletes clips, pinned or not. A deleted value is overwritten on disk, not just marked free, and the write-ahead
+    /// log is emptied so that the copy written when the clip was saved does not stay in it. Emptying the log has to wait
+    /// for any other connection that is reading the database, so it is best effort while another process has it open.
+    /// </summary>
     /// <param name="ids">The clips to delete. Ids that are not stored are ignored.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>How many clips were deleted.</returns>
@@ -322,20 +326,40 @@ public sealed class ClipRepository : IAsyncDisposable
                 }
 
                 transaction.Commit();
+                if (removed > 0)
+                {
+                    Execute(connection, CheckpointTruncate);
+                }
+
                 return Result.Success(removed);
             },
             cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Deletes every clip whose expiry has arrived, pinned or not: an expiry is asked for explicitly.</summary>
+    /// <summary>
+    /// Deletes every clip whose expiry has arrived, pinned or not: an expiry is asked for explicitly. Removed values are
+    /// scrubbed from the write-ahead log as in <see cref="DeleteAsync"/>.
+    /// </summary>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>The ids that were deleted, so the in-memory history can drop them too.</returns>
     public Task<Result<ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken) =>
-        RunAsync(connection => Result.Success(RemoveExpired(connection, transaction: null)), cancellationToken);
+        RunAsync(
+            connection =>
+            {
+                var removed = RemoveExpired(connection, transaction: null);
+                if (!removed.IsEmpty)
+                {
+                    Execute(connection, CheckpointTruncate);
+                }
+
+                return Result.Success(removed);
+            },
+            cancellationToken);
 
     /// <summary>
     /// Applies the history limits to the stored clips, by the same rules as <see cref="ClipHistory.Trim"/>: unpinned
-    /// clips only, too old first, then the count, then the size budget. Expired clips are removed as well.
+    /// clips only, too old first, then the count, then the size budget. Expired clips are removed as well, and removed
+    /// values are scrubbed from the write-ahead log as in <see cref="DeleteAsync"/>.
     /// </summary>
     /// <param name="options">The limits.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -359,6 +383,11 @@ public sealed class ClipRepository : IAsyncDisposable
                 removed.AddRange(ReadIds(command));
 
                 transaction.Commit();
+                if (removed.Count > 0)
+                {
+                    Execute(connection, CheckpointTruncate);
+                }
+
                 return Result.Success(removed.ToImmutable());
             },
             cancellationToken).ConfigureAwait(false);
@@ -527,6 +556,8 @@ public sealed class ClipRepository : IAsyncDisposable
         return command.ExecuteScalar() as byte[];
     }
 
+    private static ResultError DamagedRecord { get; } = new(ErrorCode.StorageFailure, "A stored clip could not be read.");
+
     private static Result Unreadable() => Result.Failure(StorageErrors.HistoryUnreadable);
 
     // [ConstantExpected] makes the compiler's analyzers reject any call that passes anything but a literal or a
@@ -593,8 +624,14 @@ public sealed class ClipRepository : IAsyncDisposable
     }
 
     // Opens one stored clip. Anything that is not exactly what was written fails closed.
-    private Result<Clip> ReadClip(ClipId id, ClipFormat format, DateTimeOffset capturedAt, bool pinned, byte[] sealedContent, byte[]? sealedSource)
+    private Result<Clip> ReadClip(ClipId id, ClipFormat format, long capturedTicks, bool pinned, byte[] sealedContent, byte[]? sealedSource)
     {
+        // The time is a plain column, so it can hold any number. One that is not a date is a damaged record.
+        if (!TryTime(capturedTicks, out var capturedAt))
+        {
+            return Result.Failure<Clip>(DamagedRecord);
+        }
+
         // The format is bound into every sealed value, so a format that was never written fails here.
         var plain = _crypto.Decrypt(sealedContent, RecordAad.ForClip(id, "content", format));
         if (plain.IsFailure)
@@ -625,6 +662,11 @@ public sealed class ClipRepository : IAsyncDisposable
     {
         var id = IdFrom(reader, 0);
         var format = (ClipFormat)reader.GetInt64(1);
+        if (!TryTime(reader.GetInt64(2), out var capturedAt))
+        {
+            return Result.Failure<ClipSummary>(DamagedRecord);
+        }
+
         var preview = OpenText(reader.GetFieldValue<byte[]>(5), id, "preview", format);
         var source = OpenText(SourceOrNull(reader, 6), id, "source_app", format);
         if (preview.IsFailure || source.IsFailure)
@@ -635,7 +677,7 @@ public sealed class ClipRepository : IAsyncDisposable
         return Result.Success(new ClipSummary(
             id,
             format,
-            Time(reader.GetInt64(2)),
+            capturedAt,
             reader.GetInt64(3) != 0,
             reader.GetInt64(4),
             preview.Value ?? string.Empty,
@@ -662,7 +704,7 @@ public sealed class ClipRepository : IAsyncDisposable
         }
         catch (ArgumentException)
         {
-            return Result.Failure<string?>(new ResultError(ErrorCode.StorageFailure, "A stored clip could not be read."));
+            return Result.Failure<string?>(DamagedRecord);
         }
         finally
         {
@@ -674,7 +716,17 @@ public sealed class ClipRepository : IAsyncDisposable
 
     private static ClipId IdFrom(SqliteDataReader reader, int ordinal) => new(new Guid(reader.GetFieldValue<byte[]>(ordinal), bigEndian: true));
 
-    private static DateTimeOffset Time(long ticks) => new(ticks, TimeSpan.Zero);
+    private static bool TryTime(long ticks, out DateTimeOffset time)
+    {
+        if (ticks is < 0 or > 3155378975999999999L)
+        {
+            time = default;
+            return false;
+        }
+
+        time = new DateTimeOffset(ticks, TimeSpan.Zero);
+        return true;
+    }
 
     private static byte[]? SourceOrNull(SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetFieldValue<byte[]>(ordinal);
 
