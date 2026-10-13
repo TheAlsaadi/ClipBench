@@ -17,3 +17,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: 'ci(deps)'
+    groups:
+      # The init, analyze and upload-sarif steps must all run the same version of the CodeQL action,
+      # so they are updated together in one pull request instead of one each.
+      codeql-action:
+        patterns:
+          - 'github/codeql-action*'

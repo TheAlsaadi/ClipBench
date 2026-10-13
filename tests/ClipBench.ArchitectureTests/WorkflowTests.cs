@@ -102,6 +102,22 @@ public partial class WorkflowTests
         withTimeout.ShouldBe(jobs, "each job needs timeout-minutes so a hung job cannot run for six hours");
     }
 
+    [GeneratedRegex(@"uses:\s*github/codeql-action/[a-z-]+@(?<sha>[0-9a-f]{40})")]
+    private static partial Regex CodeQlActionStep();
+
+    [Fact]
+    public void Every_CodeQL_action_step_runs_the_same_version()
+    {
+        // The CodeQL action refuses to run when its steps come from different versions, even across the init and
+        // analyze steps of one workflow, so a partial update breaks the scan.
+        var versions = ListWorkflows()
+            .SelectMany(workflow => CodeQlActionStep().Matches(Read(workflow)).Select(match => match.Groups["sha"].Value))
+            .Distinct()
+            .ToList();
+
+        versions.Count.ShouldBe(1, "all github/codeql-action steps must be pinned to the same commit");
+    }
+
     [Fact]
     public void Ci_workflow_defines_the_required_status_checks()
     {
