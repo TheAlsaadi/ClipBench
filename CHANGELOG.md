@@ -34,5 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and pull request titles and bodies.
 - Community files: security policy, contributing guide, code of conduct, issue forms
   and a pull request template.
-- Architecture decision records 0001 to 0006, a glossary, a roadmap and a first
+- Architecture decision records 0001 to 0007, a glossary, a roadmap and a first
   draft of the threat model.
+
+### Changed
+
+- Dependabot now updates the three CodeQL action steps together in one pull request, because
+  the action fails when its steps run different versions. All of them are on 4.38.3, and a test
+  keeps it that way.
