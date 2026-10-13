@@ -1,3 +1,4 @@
+using System.Globalization;
 using ClipBench.Core.Privacy;
 
 namespace ClipBench.Core.Tests.Privacy;
@@ -331,6 +332,169 @@ public class SensitiveDetectorTests
     public void A_commit_hash_inside_a_sentence_is_not_flagged()
     {
         Detect("fixed in 3b18e512dba79e4c8300dd08aeb37f8e728b8dad, see the PR").ShouldBe(SensitiveKind.None);
+    }
+
+    // --- card brands: the prefix and length ranges ---
+
+    [Theory]
+    [InlineData("510000000000000", true)]       // Mastercard 51
+    [InlineData("550000000000000", true)]       // Mastercard 55
+    [InlineData("500000000000000", false)]      // 50 is not Mastercard
+    [InlineData("560000000000000", false)]      // 56 is not Mastercard
+    [InlineData("222100000000000", true)]       // Mastercard 2221
+    [InlineData("272000000000000", true)]       // Mastercard 2720
+    [InlineData("222000000000000", false)]      // just below 2221
+    [InlineData("272100000000000", false)]      // just above 2720
+    [InlineData("601100000000000", true)]       // Discover 6011
+    [InlineData("650000000000000", true)]       // Discover 65
+    [InlineData("644000000000000", true)]       // Discover 644
+    [InlineData("649000000000000", true)]       // Discover 649
+    [InlineData("643000000000000", false)]      // just below 644
+    [InlineData("660000000000000", false)]
+    [InlineData("352800000000000", true)]       // JCB 3528
+    [InlineData("358900000000000", true)]       // JCB 3589
+    [InlineData("352700000000000", false)]
+    [InlineData("359000000000000", false)]
+    [InlineData("300000000000000", true)]       // Diners Club 300
+    [InlineData("305000000000000", true)]       // Diners Club 305
+    [InlineData("306000000000000", false)]
+    [InlineData("360000000000000", true)]       // Diners Club 36
+    [InlineData("380000000000000", true)]       // Diners Club 38
+    [InlineData("390000000000000", true)]       // Diners Club 39
+    [InlineData("370000000000000", false)]      // 37 is American Express, which has 15 digits, not 16
+    [InlineData("620000000000000", true)]       // UnionPay 62
+    [InlineData("630000000000000", false)]
+    public void Only_numbers_with_a_known_brand_prefix_are_flagged(string prefixWithoutCheckDigit, bool isCard)
+    {
+        var number = WithLuhnCheckDigit(prefixWithoutCheckDigit);
+
+        number.Length.ShouldBe(16);
+        Detect(number).ShouldBe(isCard ? SensitiveKind.CardNumber : SensitiveKind.None);
+    }
+
+    [Theory]
+    [InlineData("4", 13, true)]         // Visa
+    [InlineData("4", 14, false)]
+    [InlineData("4", 15, false)]
+    [InlineData("4", 16, true)]
+    [InlineData("4", 17, false)]
+    [InlineData("4", 18, false)]
+    [InlineData("4", 19, true)]
+    [InlineData("34", 14, false)]       // American Express
+    [InlineData("34", 15, true)]
+    [InlineData("34", 16, false)]
+    [InlineData("36", 13, false)]       // Diners Club
+    [InlineData("36", 14, true)]
+    [InlineData("6011", 15, false)]     // Discover
+    [InlineData("6011", 16, true)]
+    [InlineData("6011", 17, true)]
+    [InlineData("6011", 18, true)]
+    [InlineData("6011", 19, true)]
+    public void A_brand_must_also_have_one_of_its_lengths(string prefix, int totalDigits, bool isCard)
+    {
+        // The prefix, zeros, and a Luhn check digit as the last of totalDigits digits.
+        var number = WithLuhnCheckDigit(prefix + new string('0', totalDigits - 1 - prefix.Length));
+
+        number.Length.ShouldBe(totalDigits);
+        Detect(number).ShouldBe(isCard ? SensitiveKind.CardNumber : SensitiveKind.None);
+    }
+
+    [Fact]
+    public void The_last_group_of_a_card_number_has_at_most_four_digits()
+    {
+        // A Discover number with 17 digits, written three ways.
+        var digits = WithLuhnCheckDigit("6011000000000000");
+        digits.Length.ShouldBe(17);
+
+        Detect(digits).ShouldBe(SensitiveKind.CardNumber);
+        Detect($"{digits[..4]} {digits[4..8]} {digits[8..12]} {digits[12..16]} {digits[16..]}").ShouldBe(SensitiveKind.CardNumber);
+        Detect($"{digits[..4]} {digits[4..8]} {digits[8..12]} {digits[12..]}").ShouldBe(SensitiveKind.None);
+    }
+
+    // --- IBAN: the length and check digit limits ---
+
+    /// <summary>The ISO 7064 remainder, computed independently of the detector so the test is a real cross-check.</summary>
+    private static int Mod97(string iban)
+    {
+        var remainder = 0;
+        foreach (var c in iban[4..] + iban[..4])
+        {
+            var value = char.IsDigit(c) ? c - '0' : char.ToUpperInvariant(c) - 'A' + 10;
+            remainder = ((remainder * (value >= 10 ? 100 : 10)) + value) % 97;
+        }
+
+        return remainder;
+    }
+
+    /// <summary>An IBAN-shaped string of the given length with correctly calculated check digits.</summary>
+    private static string ValidIban(int length)
+    {
+        var bban = string.Concat(Enumerable.Range(0, length - 4).Select(i => (char)('1' + (i % 9))));
+        var check = 98 - Mod97("DE00" + bban);
+        return "DE" + check.ToString("D2", CultureInfo.InvariantCulture) + bban;
+    }
+
+    [Theory]
+    [InlineData(14, false)]
+    [InlineData(15, true)]
+    [InlineData(16, true)]
+    [InlineData(33, true)]
+    [InlineData(34, true)]
+    [InlineData(35, false)]
+    [InlineData(36, false)]
+    public void An_IBAN_has_between_15_and_34_characters(int length, bool isIban)
+    {
+        var iban = ValidIban(length);
+
+        Mod97(iban).ShouldBe(1, "the generator must produce a correct checksum for the test to mean anything");
+        Detect(iban).ShouldBe(isIban ? SensitiveKind.Iban : SensitiveKind.None);
+        Detect(string.Join(' ', Enumerable.Range(0, (length + 3) / 4).Select(i => iban.Substring(i * 4, Math.Min(4, length - (i * 4))))))
+            .ShouldBe(isIban ? SensitiveKind.Iban : SensitiveKind.None);
+    }
+
+    [Theory]
+    [InlineData("00")]
+    [InlineData("01")]
+    [InlineData("99")]
+    public void Check_digits_of_00_01_and_99_are_never_valid_even_when_the_remainder_works_out(string checkDigits)
+    {
+        // The remainder test alone would accept these, because 00, 01 and 99 are congruent to valid values.
+        var candidate = Enumerable.Range(0, 10_000)
+            .Select(i => "DE" + checkDigits + "37040044053201" + i.ToString("D4", CultureInfo.InvariantCulture))
+            .First(text => Mod97(text) == 1);
+
+        Detect(candidate).ShouldBe(SensitiveKind.None);
+    }
+
+    // --- JWT: the minimum size of each part ---
+
+    [Theory]
+    [InlineData("eyJhbGciO", "eyJhIjoxfQ", "SflKxwRJSMeK", false)]      // header of 9 characters
+    [InlineData("eyJhbGciOi", "eyJhIjoxfQ", "SflKxwRJSMeK", true)]      // header of 10 characters
+    [InlineData("eyJhbGciOiJIUzI1NiJ9", "e", "SflKxwRJSMeK", false)]    // payload of 1 character
+    [InlineData("eyJhbGciOiJIUzI1NiJ9", "e3", "SflKxwRJSMeK", true)]    // payload of 2 characters
+    [InlineData("eyJhbGciOiJIUzI1NiJ9", "eyJhIjoxfQ", "", false)]       // no signature
+    [InlineData("eyJhbGciOiJIUzI1NiJ9", "eyJhIjoxfQ", "SflKxwR", false)]    // signature of 7 characters
+    [InlineData("eyJhbGciOiJIUzI1NiJ9", "eyJhIjoxfQ", "SflKxwRJ", true)]    // signature of 8 characters
+    public void A_token_needs_a_header_a_payload_and_a_signature_of_a_sensible_size(string header, string payload, string signature, bool isJwt)
+    {
+        Detect($"{header}.{payload}.{signature}").ShouldBe(isJwt ? SensitiveKind.Jwt : SensitiveKind.None);
+    }
+
+    // --- tokens: slashes and the need for digits ---
+
+    [Fact]
+    public void A_token_may_have_a_few_slashes_but_a_path_may_not()
+    {
+        Detect("k3J9xQ2m/T7vB5nZ8/pL4wR6yH1/cD0fGsA").ShouldBe(SensitiveKind.Token);                 // three
+        Detect("k3J9xQ2m/T7vB5nZ8/pL4wR6yH1/cD0fG/sA").ShouldBe(SensitiveKind.None);               // four
+    }
+
+    [Fact]
+    public void A_long_string_of_letters_with_no_digit_is_a_word_not_a_token()
+    {
+        Detect("kJxQmTvBnZpLwRyHcDfGsAeUoViNbXqE").ShouldBe(SensitiveKind.None);
+        Detect("kJxQmTvBnZpLwRyHcDfGsAeUoViNbXq1").ShouldBe(SensitiveKind.Token);
     }
 
     // --- priority and limits ---
