@@ -45,6 +45,10 @@ mitigation is built; "Evidence" is how it is checked.
 | I | Recording content an app marked private (password managers) | Never capture the three privacy markers; never capture from excluded apps; Incognito stops capture | 1, 3, 7 | CaptureFilter and integration tests |
 | I | Secrets stay in History | Sensitive clips are masked and expire in minutes | 1, 7 | SensitiveDetector and expiry tests |
 | T | Malformed or oversized formats crash a parser or exhaust memory | Size cap on every parser; defaults 2 MB text and 20 MB image; no unbounded recursion | 1, 3, 9 | Unit and property tests |
+| I | A privacy flag is present but cannot be read, so it is ignored | `CanIncludeInClipboardHistory` present with an unreadable value counts as "do not record" (fail closed) | 1 | CaptureFilter tests (done) |
+| I | A clip, its content or a result is printed into a log by accident | `ToString` of clips, contents and results shows the kind, size and error code only, never content or the source app | 1 | Unit tests (done) |
+| D | Hostile text makes a secret scan, a search or a preview slow | Hand-written linear scanners with no backtracking regular expressions; only the first 1,000,000 characters are scanned and 20,000 indexed; previews read only what they show | 1 | Hostile input tests (done) |
+| I | A secret is not recognised, so it is kept as an ordinary clip | Residual risk: the detector favours few false alarms, so it misses short keys (under 32 characters, such as AWS access key ids), hex keys and any key with no letter and digit mix. Phase 7 reviews the list of patterns with the owner | 1, 7 | SensitiveDetector tests state what is and is not flagged |
 | D | Another process holds the clipboard open, or floods it | Retry with backoff, then give up; one event per change by sequence number | 3 | Fake-surface tests |
 | S | A process impersonates another to dodge the exclusion list | Exclusion matches the owning process's executable name; the source name is advisory | 3 | Integration tests |
 | E | Capture needs elevation | None: `asInvoker`, never elevate | 0 | Manifest test (done) |
