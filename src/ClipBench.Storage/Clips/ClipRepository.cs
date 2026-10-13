@@ -527,8 +527,7 @@ public sealed class ClipRepository : IAsyncDisposable
         return command.ExecuteScalar() as byte[];
     }
 
-    private static Result Unreadable() =>
-        Result.Failure(new ResultError(ErrorCode.HistoryUnreadable, "The saved history can't be decrypted. You can start with an empty history."));
+    private static Result Unreadable() => Result.Failure(StorageErrors.HistoryUnreadable);
 
     // [ConstantExpected] makes the compiler's analyzers reject any call that passes anything but a literal or a
     // constant, so the one place that assigns a variable to CommandText can only ever receive constant SQL.

@@ -99,10 +99,7 @@ public sealed class MasterKeyStore
     private static ResultError DiskError() =>
         new(ErrorCode.StorageFailure, "The encryption key file could not be read or written.");
 
-    private static Result<MasterKey> Unreadable() =>
-        Result.Failure<MasterKey>(new ResultError(
-            ErrorCode.HistoryUnreadable,
-            "The saved history can't be decrypted. You can start with an empty history."));
+    private static Result<MasterKey> Unreadable() => Result.Failure<MasterKey>(StorageErrors.HistoryUnreadable);
 
     private static Result<MasterKey> NotProtected() =>
         Result.Failure<MasterKey>(new ResultError(
