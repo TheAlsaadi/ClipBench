@@ -14,4 +14,13 @@ public enum ErrorCode
 
     /// <summary>No clip with the given id is in the history.</summary>
     ClipNotFound,
+
+    /// <summary>The selection contains an image, and images cannot be joined into text.</summary>
+    ImageNotJoinable,
+
+    /// <summary>The text to paste would be larger than the allowed size.</summary>
+    OutputTooLarge,
+
+    /// <summary>A custom separator is too long or has an unknown escape sequence.</summary>
+    InvalidSeparator,
 }
