@@ -8,6 +8,4 @@ internal static class Ascii
     public static bool IsDigit(char c) => c is >= '0' and <= '9';
 
     public static bool IsLetterOrDigit(char c) => IsLetter(c) || IsDigit(c);
-
-    public static bool IsHexDigit(char c) => IsDigit(c) || c is >= 'a' and <= 'f' or >= 'A' and <= 'F';
 }
