@@ -34,7 +34,6 @@
   <ItemGroup Label="Application framework (ADR 0012)">
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.13" />
   </ItemGroup>
 
 </Project>

@@ -14,6 +14,9 @@ internal sealed class ManualTimeProvider : TimeProvider
 
     public override DateTimeOffset GetUtcNow() => _now;
 
+    /// <summary>Moves the clock forward without firing any timer.</summary>
+    public void Advance(TimeSpan by) => _now += by;
+
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
         var timer = new ManualTimer(this, callback, state);

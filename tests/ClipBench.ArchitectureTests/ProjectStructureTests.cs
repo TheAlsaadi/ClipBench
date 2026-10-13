@@ -18,7 +18,7 @@ public class ProjectStructureTests
         ["ClipBench.Presentation"] = (["ClipBench.Core"], ["CommunityToolkit.Mvvm"], "net10.0"),
         ["ClipBench.App"] = (
             ["ClipBench.Platform.Windows", "ClipBench.Presentation", "ClipBench.Storage"],
-            ["Microsoft.Extensions.DependencyInjection", "Microsoft.Extensions.Logging", "Microsoft.WindowsAppSDK"],
+            ["Microsoft.Extensions.DependencyInjection", "Microsoft.WindowsAppSDK"],
             WindowsFramework),
     };
 
