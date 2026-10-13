@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ClipBench.Core\ClipBench.Core.csproj" />
   </ItemGroup>
 

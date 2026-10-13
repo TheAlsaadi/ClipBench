@@ -15,10 +15,10 @@ public class ProjectStructureTests
         ["ClipBench.Core"] = ([], [], "net10.0"),
         ["ClipBench.Storage"] = (["ClipBench.Core"], ["Microsoft.Data.Sqlite"], "net10.0"),
         ["ClipBench.Platform.Windows"] = (["ClipBench.Core"], ["Microsoft.Windows.CsWin32"], WindowsFramework),
-        ["ClipBench.Presentation"] = (["ClipBench.Core"], [], "net10.0"),
+        ["ClipBench.Presentation"] = (["ClipBench.Core"], ["CommunityToolkit.Mvvm"], "net10.0"),
         ["ClipBench.App"] = (
             ["ClipBench.Platform.Windows", "ClipBench.Presentation", "ClipBench.Storage"],
-            ["Microsoft.WindowsAppSDK"],
+            ["Microsoft.Extensions.DependencyInjection", "Microsoft.Extensions.Logging", "Microsoft.WindowsAppSDK"],
             WindowsFramework),
     };
 
