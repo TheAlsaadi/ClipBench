@@ -7,12 +7,14 @@ using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
 using ClipBench.Core.Screen;
 using ClipBench.Core.Security;
+using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows.Clipboard;
 using ClipBench.Platform.Windows.Hosting;
 using ClipBench.Platform.Windows.Hotkeys;
 using ClipBench.Platform.Windows.Pasting;
 using ClipBench.Platform.Windows.Screen;
 using ClipBench.Platform.Windows.Security;
+using ClipBench.Platform.Windows.Tray;
 using ClipBench.Platform.Windows.Windowing;
 
 namespace ClipBench.Platform.Windows;
@@ -131,6 +133,26 @@ public sealed class WindowsPlatform : IDisposable
     /// <summary>The key protector that wraps the history key with the current user's Windows account.</summary>
     /// <returns>The protector.</returns>
     public static IKeyProtector CreateKeyProtector() => DpapiKeyProtector.ForClipBench();
+
+    /// <summary>
+    /// Creates the icon in the notification area. It runs on a hidden top-level window of its own, because only
+    /// top-level windows hear that the taskbar was created again, and it removes itself when disposed.
+    /// </summary>
+    /// <param name="iconPath">The .ico file that holds the picture.</param>
+    /// <returns>The icon, not yet shown, or <see cref="ErrorCode.PlatformFailure"/> when Windows would not create its window.</returns>
+    public static Result<ITrayIcon> CreateTray(string iconPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(iconPath);
+
+        var created = MessageWindow.Create(messageOnly: false);
+        if (created.IsFailure)
+        {
+            return Result.Failure<ITrayIcon>(created.Error);
+        }
+
+        var window = created.Value;
+        return Result.Success<ITrayIcon>(new TrayIcon(window, window, window.Handle, new Win32TrayApi(), new Win32TrayMenu(), iconPath, window));
+    }
 
     /// <summary>Stops every service and destroys the background window.</summary>
     public void Dispose()

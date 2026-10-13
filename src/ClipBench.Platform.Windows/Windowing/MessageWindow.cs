@@ -43,8 +43,11 @@ internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDi
     private ResultError? _startFailure;
     private int _disposed;
 
-    private MessageWindow()
+    private readonly bool _messageOnly;
+
+    private MessageWindow(bool messageOnly)
     {
+        _messageOnly = messageOnly;
         _windowProcedure = WindowProcedure;
         _thread = new Thread(Run) { IsBackground = true, Name = "ClipBench message window" };
     }
@@ -59,10 +62,14 @@ internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDi
     public bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     /// <summary>Starts the thread and creates the window.</summary>
+    /// <param name="messageOnly">
+    /// True for an invisible window that only receives messages sent to it. False for an invisible top-level window,
+    /// which also receives broadcasts: a tray icon needs that to hear that the taskbar was created again.
+    /// </param>
     /// <returns>The window, or <see cref="ErrorCode.PlatformFailure"/> when Windows would not create it.</returns>
-    public static Result<MessageWindow> Create()
+    public static Result<MessageWindow> Create(bool messageOnly = true)
     {
-        var window = new MessageWindow();
+        var window = new MessageWindow(messageOnly);
         window._thread.Start();
         if (!window._ready.Wait(_startTimeout))
         {
@@ -163,7 +170,7 @@ internal sealed unsafe class MessageWindow : IThreadInvoker, IMessageSource, IDi
                 registered = PInvoke.RegisterClassEx(in windowClass) != 0;
                 if (registered)
                 {
-                    _handle = PInvoke.CreateWindowEx(0, className, null, 0, 0, 0, 0, 0, HWND.HWND_MESSAGE, HMENU.Null, instance, null);
+                    _handle = PInvoke.CreateWindowEx(0, className, null, 0, 0, 0, 0, 0, _messageOnly ? HWND.HWND_MESSAGE : HWND.Null, HMENU.Null, instance, null);
                 }
             }
 

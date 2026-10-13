@@ -85,3 +85,17 @@ SetWindowDisplayAffinity
 GetWindowDisplayAffinity
 DwmSetWindowAttribute
 DWM_WINDOW_CORNER_PREFERENCE
+
+// The tray icon: the notification area, its menu, and the broadcast that says the taskbar was created again
+Shell_NotifyIcon
+RegisterWindowMessage
+LoadImage
+DestroyIcon
+GetSystemMetrics
+CreatePopupMenu
+AppendMenu
+SetMenuDefaultItem
+TrackPopupMenuEx
+TRACK_POPUP_MENU_FLAGS
+DestroyMenu
+WM_NULL
