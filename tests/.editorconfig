@@ -1,0 +1,5 @@
+# Test-only relaxations. Production code under src/ keeps the strict defaults.
+
+[*.cs]
+# Test names use Method_scenario_expectation, which CA1707 rejects.
+dotnet_diagnostic.CA1707.severity = none
