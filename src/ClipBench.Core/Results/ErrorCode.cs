@@ -29,4 +29,7 @@ public enum ErrorCode
 
     /// <summary>A custom separator is too long or has an unknown escape sequence.</summary>
     InvalidSeparator,
+
+    /// <summary>Stored data failed its integrity check: it was altered, or it belongs to another key or place.</summary>
+    DecryptionFailed,
 }
