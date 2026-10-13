@@ -7,3 +7,20 @@ CryptProtectData
 CryptUnprotectData
 CRYPTPROTECT_UI_FORBIDDEN
 LocalFree
+
+// A message-only window on its own thread
+RegisterClassEx
+UnregisterClass
+CreateWindowEx
+DestroyWindow
+DefWindowProc
+GetMessage
+DispatchMessage
+PostMessage
+PostQuitMessage
+GetModuleHandle
+IsWindow
+HWND_MESSAGE
+WM_CLOSE
+WM_DESTROY
+WM_APP
