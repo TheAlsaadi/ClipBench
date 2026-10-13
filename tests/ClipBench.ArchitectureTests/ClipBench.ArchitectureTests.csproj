@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="TngTech.ArchUnitNET" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\ClipBench.Core\ClipBench.Core.csproj" />
     <ProjectReference Include="..\..\src\ClipBench.Storage\ClipBench.Storage.csproj" />
     <ProjectReference Include="..\..\src\ClipBench.Platform.Windows\ClipBench.Platform.Windows.csproj" />
