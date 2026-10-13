@@ -11,7 +11,7 @@ namespace ClipBench.Core.Capture;
 /// what the filter accepts to the library. Changes are handled one at a time, in order. Pausing sets the filter's
 /// incognito rule, so a paused service never reads any content.
 /// </summary>
-public sealed class CaptureService : IDisposable
+public sealed class CaptureService : ICaptureControl, IDisposable
 {
     private static readonly TimeSpan _stopTimeout = TimeSpan.FromSeconds(2);
 
@@ -68,11 +68,10 @@ public sealed class CaptureService : IDisposable
         }
     }
 
-    /// <summary>True while capture is paused: the filter then rejects every change before any content is read.</summary>
+    /// <inheritdoc/>
     public bool IsPaused => Filter.Incognito;
 
-    /// <summary>Pauses or resumes recording.</summary>
-    /// <param name="paused">True to pause.</param>
+    /// <inheritdoc/>
     public void SetPaused(bool paused) => UpdateFilter(filter => filter with { Incognito = paused });
 
     /// <summary>Changes the rules. The next read uses the new ones.</summary>
