@@ -116,6 +116,24 @@ public class PasteComposerTableTests
         composer.ComposeTable(Texts("12345", "67890"), TableLayout.Column).Error.Code.ShouldBe(ErrorCode.OutputTooLarge);
     }
 
+    [Theory]
+    [InlineData(TableLayout.Column, 12)]
+    [InlineData(TableLayout.Row, 11)]
+    public void A_table_exactly_at_the_limit_is_allowed_and_one_character_more_is_not(TableLayout layout, int length)
+    {
+        var clips = Texts("12345", "67890");
+
+        new PasteComposer(maxOutputCharacters: length).ComposeTable(clips, layout).IsSuccess.ShouldBeTrue();
+        new PasteComposer(maxOutputCharacters: length - 1).ComposeTable(clips, layout).Error.Code.ShouldBe(ErrorCode.OutputTooLarge);
+    }
+
+    [Fact]
+    public void A_table_whose_quoting_brings_it_exactly_to_the_limit_is_allowed()
+    {
+        // Two quote marks become four plus the two wrapping quotes: 6 characters.
+        new PasteComposer(maxOutputCharacters: 6).ComposeTable(Texts("\"\""), TableLayout.Row).Value.ShouldBe("\"\"\"\"\"\"");
+    }
+
     [Fact]
     public void Quoting_that_pushes_the_table_over_the_limit_is_rejected_too()
     {

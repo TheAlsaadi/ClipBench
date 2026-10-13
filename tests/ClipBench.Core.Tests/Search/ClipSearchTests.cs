@@ -152,6 +152,38 @@ public class ClipSearchTests
     }
 
     [Fact]
+    public void A_three_letter_query_may_be_spread_over_twelve_characters_but_not_thirteen()
+    {
+        // a, b and c are 12 characters apart at most: "a", nine fillers, "b", "c".
+        var twelve = "a" + new string('x', 9) + "bc";
+        var thirteen = "a" + new string('x', 10) + "bc";
+
+        Find("abc", TestClips.Text(twelve)).ShouldBe([twelve]);
+        Find("abc", TestClips.Text(thirteen)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_two_letter_query_may_be_spread_over_ten_characters_but_not_eleven()
+    {
+        var ten = "a" + new string('x', 8) + "b";
+        var eleven = "a" + new string('x', 9) + "b";
+
+        Find("ab", TestClips.Text(ten)).ShouldBe([ten]);
+        Find("ab", TestClips.Text(eleven)).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Fuzzy_matching_only_looks_near_the_start_of_a_long_text()
+    {
+        // The letters are close together, but they begin after the first 256 characters.
+        var late = new string('x', 300) + "a1b1c";
+        var early = new string('x', 100) + "a1b1c";
+
+        Find("abc", TestClips.Text(late)).ShouldBeEmpty();
+        Find("abc", TestClips.Text(early)).ShouldBe([early]);
+    }
+
+    [Fact]
     public void A_long_query_is_matched_as_text_only()
     {
         var query = new string('a', 40);

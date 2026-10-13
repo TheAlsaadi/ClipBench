@@ -109,6 +109,16 @@ public class PasteComposerBatchTests
     }
 
     [Fact]
+    public void A_result_exactly_at_the_limit_is_allowed_and_one_character_more_is_not()
+    {
+        // "12345" + "," + "67890" is 11 characters.
+        var clips = Texts("12345", "67890");
+
+        new PasteComposer(maxOutputCharacters: 11).ComposeBatch(clips, Separator.Comma).Value.ShouldBe("12345,67890");
+        new PasteComposer(maxOutputCharacters: 10).ComposeBatch(clips, Separator.Comma).Error.Code.ShouldBe(ErrorCode.OutputTooLarge);
+    }
+
+    [Fact]
     public void The_default_limit_allows_ten_million_characters()
     {
         PasteComposer.DefaultMaxOutputCharacters.ShouldBe(10_000_000);

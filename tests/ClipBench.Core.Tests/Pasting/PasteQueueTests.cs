@@ -104,13 +104,15 @@ public class PasteQueueTests
         var queue = Armed(clips);
         var seen = new List<Clip>();
 
-        while (queue.State != QueueState.Exhausted)
+        // Bounded, so a faulty queue fails this test instead of looping forever.
+        for (var step = 0; step <= clips.Length && queue.State != QueueState.Exhausted; step++)
         {
             seen.Add(queue.Next().Value);
             queue.Complete();
         }
 
         seen.ShouldBe(clips);
+        queue.State.ShouldBe(QueueState.Exhausted);
     }
 
     [Fact]
@@ -324,9 +326,12 @@ public class PasteQueueTests
         var queue = Armed(clips);
         var handedOut = new List<Clip>();
 
+        // A deadline, so a faulty queue fails this test instead of keeping eight threads spinning forever.
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
         await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => Task.Run(() =>
         {
-            while (queue.State is not (QueueState.Exhausted or QueueState.Cancelled))
+            while (!deadline.IsCancellationRequested && queue.State is not (QueueState.Exhausted or QueueState.Cancelled))
             {
                 var next = queue.Next();
                 if (next.IsSuccess)

@@ -117,7 +117,8 @@ public sealed class ClipSearch
 
     private static int FuzzyMatch(string text, string needle)
     {
-        if (needle.Length < 2 || needle.Length > MaxFuzzyQueryLength)
+        // A single letter that is not a substring is not in the text at all, so only longer queries get here usefully.
+        if (needle.Length > MaxFuzzyQueryLength)
         {
             return 0;
         }
