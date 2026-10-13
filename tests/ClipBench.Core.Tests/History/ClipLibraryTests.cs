@@ -364,8 +364,12 @@ public class ClipLibraryTests
     }
 
     [Fact]
-    public void A_file_list_is_scanned_by_its_paths()
+    public void A_file_list_is_never_reported_as_a_secret_even_when_a_folder_name_looks_like_a_key()
     {
-        Create().GetSensitivity(TestClips.Files(paths: [@"C:\Users\someone\notes.txt"])).ShouldBe(SensitiveKind.None);
+        // A temporary folder named after a GUID looks like a long random token to the detector. A path is not a secret.
+        var folder = @"C:\Users\someone\AppData\Local\Temp\clipbench-visual2-files-7c4e1d9a3b6f4f2e8a15d0c9b7e3a621";
+        var files = TestClips.Files(paths: [folder + @"\quarterly-report.xlsx", folder + @"\notes.txt", folder + @"\photo.jpg"]);
+
+        Create().GetSensitivity(files).ShouldBe(SensitiveKind.None);
     }
 }

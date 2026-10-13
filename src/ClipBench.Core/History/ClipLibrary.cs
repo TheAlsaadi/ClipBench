@@ -181,13 +181,13 @@ public sealed class ClipLibrary : IDisposable
 
     /// <summary>Tells whether a clip looks like a secret. The scan runs once per clip, the first time it is asked.</summary>
     /// <param name="clip">The clip.</param>
-    /// <returns>The kind of secret, or none. Images are never reported.</returns>
+    /// <returns>The kind of secret, or none. Images and file lists are never reported: a path is not a secret, and a folder named after a GUID would look like a key.</returns>
     public SensitiveKind GetSensitivity(Clip clip)
     {
         ArgumentNullException.ThrowIfNull(clip);
         return _sensitivity.GetOrAdd(
             clip.Id,
-            static (_, content) => content.PlainText is { } text ? SensitiveDetector.Detect(text) : SensitiveKind.None,
+            static (_, content) => content is not FilesContent && content.PlainText is { } text ? SensitiveDetector.Detect(text) : SensitiveKind.None,
             clip.Content);
     }
 
