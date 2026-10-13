@@ -27,7 +27,14 @@ internal static class OwnerProcess
             return null;
         }
 
-        var path = lookup.GetProcessImagePath(process);
+        return FileNameOf(lookup.GetProcessImagePath(process));
+    }
+
+    /// <summary>The file name of a program's path, which is all ClipBench ever keeps of it.</summary>
+    /// <param name="path">The path, or null.</param>
+    /// <returns>For example <c>KeePass.exe</c>; null when there is no usable name.</returns>
+    public static string? FileNameOf(string? path)
+    {
         if (string.IsNullOrWhiteSpace(path))
         {
             return null;

@@ -10,6 +10,8 @@ namespace ClipBench.Platform.Windows.Clipboard;
 /// </summary>
 internal sealed class ClipboardSnapshot : IDisposable
 {
+    private static readonly byte[] _markerData = [1, 0, 0, 0];
+
     private readonly List<(uint Format, byte[] Data)> _entries;
 
     private ClipboardSnapshot(List<(uint Format, byte[] Data)> entries) => _entries = entries;
@@ -62,8 +64,9 @@ internal sealed class ClipboardSnapshot : IDisposable
 
     /// <summary>Empties the clipboard and puts the copied formats back, in their original order.</summary>
     /// <param name="session">The open clipboard.</param>
+    /// <param name="ownWriteMarker">The format number of ClipBench's own-write marker, to tag the restored clipboard so ClipBench does not record it again; null for no tag.</param>
     /// <returns>True when everything was put back. False when Windows refused to empty the clipboard (nothing was changed) or refused a format (the others were still restored).</returns>
-    public bool Restore(IClipboardSession session)
+    public bool Restore(IClipboardSession session, uint? ownWriteMarker = null)
     {
         ArgumentNullException.ThrowIfNull(session);
 
@@ -76,6 +79,12 @@ internal sealed class ClipboardSnapshot : IDisposable
         foreach (var (format, data) in _entries)
         {
             complete &= session.Set(format, data);
+        }
+
+        // The tag only keeps a duplicate out of the history; failing to set it does not make the restore incomplete.
+        if (ownWriteMarker is { } marker)
+        {
+            session.Set(marker, _markerData);
         }
 
         return complete;

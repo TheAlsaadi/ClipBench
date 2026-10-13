@@ -35,9 +35,11 @@ public class EventPumpTests
         var delivered = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var pump = new EventPump<int>(_ => delivered.TrySetResult(Environment.CurrentManagedThreadId));
 
+        // The poster is the thread that calls Post. Read it here: after the await the test may resume on any pool thread.
+        var poster = Environment.CurrentManagedThreadId;
         pump.Post(1);
 
-        (await delivered.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct)).ShouldNotBe(Environment.CurrentManagedThreadId);
+        (await delivered.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct)).ShouldNotBe(poster);
     }
 
     [Fact]

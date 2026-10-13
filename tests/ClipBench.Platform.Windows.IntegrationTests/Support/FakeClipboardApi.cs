@@ -49,6 +49,8 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
     public bool Has(string name) => _registered.TryGetValue(name, out var id) && _data.ContainsKey(id);
 
+    public bool Has(uint format) => _data.ContainsKey(format);
+
     public uint IdOf(string name) => RegisterFormat(name);
 
     public IClipboardSession? TryOpen()

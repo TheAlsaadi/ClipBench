@@ -60,3 +60,14 @@ UnregisterHotKey
 
 // Sending keystrokes (Ctrl+V to paste; tests press F24)
 SendInput
+
+// Where a paste goes, and whether Windows will let keystrokes reach it
+GetForegroundWindow
+SetForegroundWindow
+GetAsyncKeyState
+OpenProcessToken
+GetTokenInformation
+GetCurrentProcess
+GetSidSubAuthority
+GetSidSubAuthorityCount
+TOKEN_MANDATORY_LABEL

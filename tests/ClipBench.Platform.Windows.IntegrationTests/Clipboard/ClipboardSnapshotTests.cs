@@ -60,6 +60,44 @@ public class ClipboardSnapshotTests
     }
 
     [Fact]
+    public void A_restore_can_tag_the_clipboard_as_ClipBenchs_own_and_does_not_by_default()
+    {
+        _api.PutText("original");
+        using var snapshot = Take()!;
+        _api.Clear();
+
+        using (var session = _api.TryOpen()!)
+        {
+            snapshot.Restore(session).ShouldBeTrue();
+        }
+
+        _api.Has(ClipboardFormatNames.OwnWrite).ShouldBeFalse();
+
+        _api.Clear();
+        using (var session = _api.TryOpen()!)
+        {
+            snapshot.Restore(session, _api.IdOf(ClipboardFormatNames.OwnWrite)).ShouldBeTrue();
+        }
+
+        _api.Has(ClipboardFormatNames.OwnWrite).ShouldBeTrue();
+        _api.DataOf(ClipboardFormats.UnicodeText).ShouldBe(Encoding.Unicode.GetBytes("original\0"));
+    }
+
+    [Fact]
+    public void A_tag_that_Windows_refuses_does_not_make_the_restore_incomplete()
+    {
+        _api.PutText("original");
+        using var snapshot = Take()!;
+        _api.Clear();
+        var marker = _api.IdOf(ClipboardFormatNames.OwnWrite);
+        _api.RefusedFormats.Add(marker);
+
+        using var session = _api.TryOpen()!;
+
+        snapshot.Restore(session, marker).ShouldBeTrue();
+    }
+
+    [Fact]
     public void An_empty_clipboard_is_restored_as_an_empty_clipboard()
     {
         using var snapshot = Take()!;
