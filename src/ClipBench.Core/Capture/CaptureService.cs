@@ -25,6 +25,7 @@ public sealed class CaptureService : ICaptureControl, IDisposable
     private readonly CancellationTokenSource _stopping = new();
     private CaptureFilter _filter;
     private Task? _consumer;
+    private bool _started;
     private long _lastRead;
     private bool _disposed;
 
@@ -93,18 +94,26 @@ public sealed class CaptureService : ICaptureControl, IDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_consumer is not null)
+            if (_started)
             {
                 return Result.Success();
             }
 
+            _started = true;
             _listener.Changed += OnChanged;
-            _consumer = Task.Run(() => ConsumeAsync(_stopping.Token), CancellationToken.None);
+            _consumer ??= Task.Run(() => ConsumeAsync(_stopping.Token), CancellationToken.None);
         }
 
         var started = await _listener.StartAsync(cancellationToken).ConfigureAwait(false);
         if (started.IsFailure)
         {
+            // Not listening after all: let go of the listener, so that a later start begins again.
+            lock (_gate)
+            {
+                _listener.Changed -= OnChanged;
+                _started = false;
+            }
+
             _log.Write(ActivityLevel.Error, ActivityEvent.CaptureListenFailed, new ActivityDetails { Error = started.Error.Code });
             return started;
         }

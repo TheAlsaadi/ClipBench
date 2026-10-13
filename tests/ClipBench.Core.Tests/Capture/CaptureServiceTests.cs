@@ -75,6 +75,23 @@ public sealed class CaptureServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_start_that_failed_can_be_tried_again_and_then_works()
+    {
+        _listener.StartResult = Result.Failure(new ResultError(ErrorCode.PlatformFailure, "not yet"));
+        (await _service.StartAsync(Ct)).IsFailure.ShouldBeTrue();
+        _listener.HasSubscribers.ShouldBeFalse("a service that is not listening must not hold the listener");
+
+        _listener.StartResult = Result.Success();
+        (await _service.StartAsync(Ct)).IsSuccess.ShouldBeTrue();
+        _reader.Returns(Copied(1, "after the retry"));
+        _listener.Raise(1);
+        await _log.WaitForCountAsync(3, Ct);
+
+        _listener.StartCalls.ShouldBe(2);
+        Texts(_library).ShouldBe(["after the retry"]);
+    }
+
+    [Fact]
     public async Task Starting_twice_listens_once()
     {
         await StartAsync();
