@@ -35,6 +35,10 @@ public sealed record CaptureRequest
     /// <summary>True when ClipBench itself put this content on the clipboard.</summary>
     public bool IsOwnWrite => HasFormat(ClipboardFormatNames.OwnWrite);
 
+    /// <summary>Printing never includes the source process or the format names: requests end up in logs by accident.</summary>
+    /// <returns>The kind and size of the content.</returns>
+    public override string ToString() => $"Capture request ({Format}, {SizeInBytes} bytes)";
+
     /// <summary>Whether the clipboard carries a format with this name. Format names are not case sensitive.</summary>
     /// <param name="name">The format name.</param>
     /// <returns>True when the format is present.</returns>

@@ -305,6 +305,18 @@ public class CaptureFilterTests
     }
 
     [Fact]
+    public void Printing_a_request_never_reveals_the_source_process()
+    {
+        // The source application is protected data like the clip itself, and requests end up in log calls by accident.
+        var request = Request(process: @"C:\Program Files\source-marker\source-marker.exe", formats: ["CF_UNICODETEXT", "format-marker"]);
+
+        request.ToString().ShouldNotContain("source-marker");
+        request.ToString().ShouldNotContain("format-marker");
+        request.ToString().ShouldContain("Text");
+        request.ToString().ShouldContain("100");
+    }
+
+    [Fact]
     public void A_missing_request_is_a_bug()
     {
         Should.Throw<ArgumentNullException>(() => new CaptureFilter().Evaluate(null!));

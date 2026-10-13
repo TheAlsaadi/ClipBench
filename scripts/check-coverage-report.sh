@@ -30,7 +30,8 @@ if ((floor == 0)); then
   exit 0
 fi
 
-report=$(find "$directory" -name 'coverage.cobertura*.xml' 2>/dev/null | sort | head -n 1 || true)
+# The newest report counts: coverlet puts the time in the file name, and an older run may still be in the folder.
+report=$(find "$directory" -name 'coverage.cobertura*.xml' 2>/dev/null | sort | tail -n 1 || true)
 if [[ -z $report ]]; then
   echo "No Cobertura report was found in $directory." >&2
   exit 1

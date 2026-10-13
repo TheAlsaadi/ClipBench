@@ -22,6 +22,7 @@ Phase 1 builds the pure C# domain in `ClipBench.Core`. The owner delegated the d
 - The Windows interfaces (`IClipboardReader`, `IClipboardWriter`, `IPasteInjector`, `IHotkeyService`) are added in Phase 3, and `IKeyProtector` in Phase 2, when their first user exists. An interface with no caller cannot be tested.
 - Whether a clip is sensitive is not stored on the clip yet. Phase 7 adds the flag and the short expiry together with the schema change.
 - The transform pipeline and snippets are Phase 6.
+- The history has no total byte budget. It caps the number of unpinned clips (1,000), and one image may be 20 MiB, so a history full of large images could hold gigabytes in memory. Phase 2 decides whether the in-memory history keeps image bytes at all, or only a reference to the encrypted stored copy, and adds a byte budget if it keeps them.
 
 ## Consequences
 

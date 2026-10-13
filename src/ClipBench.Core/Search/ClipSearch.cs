@@ -157,11 +157,16 @@ public sealed class ClipSearch
 
     private string? TextOf(Clip clip)
     {
-        if (clip.Content.PlainText is null)
+        var content = clip.Content;
+
+        // Look in the index first: PlainText of a file list joins its paths, which is wasted work on every search.
+        if (_index.TryGetValue(content, out var indexed))
         {
-            return null;
+            return indexed;
         }
 
-        return _index.GetValue(clip.Content, content => SearchText.Normalize(content.PlainText!, MaxIndexedCharacters));
+        return content.PlainText is { } text
+            ? _index.GetValue(content, _ => SearchText.Normalize(text, MaxIndexedCharacters))
+            : null;
     }
 }

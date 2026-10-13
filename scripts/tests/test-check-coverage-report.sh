@@ -49,6 +49,22 @@ run_case 'lines-valid=100 is not mistaken for zero' 0 "$tmp/hundred" 90
 report "$tmp/nested/deeper" 'lines-valid="40"'
 run_case 'report in a sub folder' 0 "$tmp/nested" 90
 
+# --- more than one report in the folder: the newest one counts ---------------------------------
+
+# coverlet puts the time in the file name, so a later run sorts after an earlier one.
+report_named() {
+  mkdir -p "$1"
+  printf '<?xml version="1.0"?>\n<coverage lines-valid="%s" version="1.9">\n</coverage>\n' "$3" > "$1/$2"
+}
+
+report_named "$tmp/stale_then_good" 'coverage.cobertura.131026100000000.xml' 0
+report_named "$tmp/stale_then_good" 'coverage.cobertura.131026200000000.xml' 731
+run_case 'old empty report, newer good report' 0 "$tmp/stale_then_good" 90
+
+report_named "$tmp/good_then_empty" 'coverage.cobertura.131026100000000.xml' 731
+report_named "$tmp/good_then_empty" 'coverage.cobertura.131026200000000.xml' 0
+run_case 'old good report, newer empty report' 1 "$tmp/good_then_empty" 90
+
 # --- reports that measured nothing ------------------------------------------------------------
 
 report "$tmp/empty" 'line-rate="1" branch-rate="1" lines-covered="0" lines-valid="0"'
