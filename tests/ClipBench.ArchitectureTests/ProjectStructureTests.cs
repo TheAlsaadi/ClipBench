@@ -14,7 +14,7 @@ public class ProjectStructureTests
     {
         ["ClipBench.Core"] = ([], [], "net10.0"),
         ["ClipBench.Storage"] = (["ClipBench.Core"], ["Microsoft.Data.Sqlite"], "net10.0"),
-        ["ClipBench.Platform.Windows"] = (["ClipBench.Core"], [], WindowsFramework),
+        ["ClipBench.Platform.Windows"] = (["ClipBench.Core"], ["Microsoft.Windows.CsWin32"], WindowsFramework),
         ["ClipBench.Presentation"] = (["ClipBench.Core"], [], "net10.0"),
         ["ClipBench.App"] = (
             ["ClipBench.Platform.Windows", "ClipBench.Presentation", "ClipBench.Storage"],
@@ -58,6 +58,15 @@ public class ProjectStructureTests
         // Core, Storage and Presentation must stay free of Windows and UI types, so they
         // must never gain a -windows target framework.
         ProjectFile.Load("src", name).TargetFramework.ShouldBe(_architecture[name].Framework);
+    }
+
+    [Fact]
+    public void The_Win32_generator_and_its_metadata_are_build_time_only()
+    {
+        // ADR 0010: CsWin32 and the three metadata packages it pulls in are not under an OSI license.
+        // PrivateAssets=all keeps them from flowing to any project that references the Platform library.
+        ProjectFile.Load("src", "ClipBench.Platform.Windows").PrivateAssetsOf("Microsoft.Windows.CsWin32")
+            .ShouldBe("all");
     }
 
     [Fact]

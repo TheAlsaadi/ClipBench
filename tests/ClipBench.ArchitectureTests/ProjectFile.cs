@@ -40,6 +40,19 @@ internal sealed class ProjectFile
         .Select(element => (string?)element.Attribute("Include") ?? "?")
         .ToList();
 
+    /// <summary>Gets the PrivateAssets value of a package reference (attribute or child element), or null when it has none.</summary>
+    /// <param name="package">The package id.</param>
+    public string? PrivateAssetsOf(string package)
+    {
+        var reference = _document.Descendants("PackageReference")
+            .Single(element => (string?)element.Attribute("Include") == package);
+
+        return (string?)reference.Attribute("PrivateAssets") ?? reference.Element("PrivateAssets")?.Value;
+    }
+
+    /// <summary>Gets whether the project allows unsafe code (AllowUnsafeBlocks).</summary>
+    public bool AllowsUnsafeCode => string.Equals(_document.Descendants("AllowUnsafeBlocks").Select(element => element.Value.Trim()).LastOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Gets the ids of the FrameworkReference items.</summary>
     public IReadOnlyList<string> FrameworkReferences => Includes("FrameworkReference")
         .Order(StringComparer.Ordinal)

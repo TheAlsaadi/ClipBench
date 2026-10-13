@@ -23,6 +23,10 @@
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
+  <ItemGroup Label="Win32 interop (ADR 0010)">
+    <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.360" />
+  </ItemGroup>
+
   <ItemGroup Label="UI platform (ADR 0001)">
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
   </ItemGroup>

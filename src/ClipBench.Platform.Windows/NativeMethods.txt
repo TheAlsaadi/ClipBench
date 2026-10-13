@@ -1,0 +1,73 @@
+// The Win32 APIs ClipBench calls, and nothing else (ADR 0010). CsWin32 generates internal declarations
+// for exactly these names. A test fails the build if this list names a hook, a shell-execute or a
+// process-creation API. Add a name here in the same commit as the code that uses it.
+
+// Key protection (DPAPI)
+CryptProtectData
+CryptUnprotectData
+CRYPTPROTECT_UI_FORBIDDEN
+LocalFree
+
+// A message-only window on its own thread
+RegisterClassEx
+UnregisterClass
+CreateWindowEx
+DefWindowProc
+GetMessage
+DispatchMessage
+PostMessage
+PostQuitMessage
+GetModuleHandle
+IsWindow
+HWND_MESSAGE
+WM_CLOSE
+WM_DESTROY
+WM_APP
+
+// The clipboard
+OpenClipboard
+CloseClipboard
+EmptyClipboard
+EnumClipboardFormats
+GetClipboardFormatName
+RegisterClipboardFormat
+GetClipboardData
+SetClipboardData
+GetClipboardSequenceNumber
+GetClipboardOwner
+IsClipboardFormatAvailable
+AddClipboardFormatListener
+RemoveClipboardFormatListener
+WM_CLIPBOARDUPDATE
+
+// Memory blocks handed to and taken from the clipboard
+GlobalAlloc
+GlobalLock
+GlobalUnlock
+GlobalSize
+GlobalFree
+
+// Which program owns the clipboard content (query rights only; never anything more)
+GetWindowThreadProcessId
+OpenProcess
+QueryFullProcessImageName
+CloseHandle
+
+// Global shortcuts (RegisterHotKey; no keyboard hook is ever installed)
+RegisterHotKey
+UnregisterHotKey
+WM_HOTKEY
+
+// Sending keystrokes (Ctrl+V to paste; tests press F24)
+SendInput
+
+// Where a paste goes, and whether Windows will let keystrokes reach it
+GetForegroundWindow
+SetForegroundWindow
+GetAsyncKeyState
+OpenProcessToken
+GetTokenInformation
+GetCurrentProcess
+GetSidSubAuthority
+GetSidSubAuthorityCount
+TOKEN_MANDATORY_LABEL

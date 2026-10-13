@@ -47,4 +47,43 @@ public enum ErrorCode
 
     /// <summary>The saved history was written by a newer version of the app. It is left untouched, and starting fresh would destroy it.</summary>
     HistoryTooNew,
+
+    /// <summary>The clipboard holds nothing ClipBench keeps: it is empty, or it holds only formats ClipBench does not read.</summary>
+    ClipboardEmpty,
+
+    /// <summary>Another program kept the clipboard open for the whole time ClipBench was willing to wait. Trying again later may work.</summary>
+    ClipboardBusy,
+
+    /// <summary>The clipboard content is damaged, larger than the safety limit, or in a form ClipBench cannot read.</summary>
+    ClipboardUnreadable,
+
+    /// <summary>Windows refused to take the content that ClipBench tried to put on the clipboard.</summary>
+    ClipboardWriteFailed,
+
+    /// <summary>A keyboard shortcut is not valid: unknown key, no key, or a key that would stop people typing.</summary>
+    HotkeyInvalid,
+
+    /// <summary>Another program already uses the keyboard shortcut, or Windows reserves it.</summary>
+    HotkeyUnavailable,
+
+    /// <summary>The keyboard shortcut is not registered, so there is nothing to release.</summary>
+    HotkeyNotRegistered,
+
+    /// <summary>The window to paste into no longer exists.</summary>
+    TargetNotFound,
+
+    /// <summary>The window to paste into runs with more rights than ClipBench, so Windows would block the keystrokes. ClipBench never elevates.</summary>
+    TargetElevated,
+
+    /// <summary>Focus could not be given back to the window to paste into, so no keystrokes were sent.</summary>
+    FocusNotRestored,
+
+    /// <summary>Another program changed the clipboard between ClipBench writing it and pasting, so the paste was cancelled.</summary>
+    ClipboardChangedBeforePaste,
+
+    /// <summary>Windows did not accept the keystrokes.</summary>
+    InputBlocked,
+
+    /// <summary>A Windows service ClipBench needs (a window, a message loop, a lock) could not be set up.</summary>
+    PlatformFailure,
 }

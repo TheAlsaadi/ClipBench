@@ -2,10 +2,21 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <!-- The generated Win32 declarations use pointers (ADR 0010). Only this project allows unsafe code. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ClipBench.Core\ClipBench.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Build time only: PrivateAssets keeps the generator and its metadata packages (ADR 0010) from reaching other projects. -->
+    <PackageReference Include="Microsoft.Windows.CsWin32" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClipBench.Platform.Windows.IntegrationTests" />
   </ItemGroup>
 
 </Project>

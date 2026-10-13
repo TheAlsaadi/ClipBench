@@ -111,3 +111,37 @@ _Avoid_: cleanup, eviction
 **Start fresh**:
 Throwing away a History that can no longer be decrypted, together with its key, and beginning an empty one. ClipBench offers it and never does it without the user's agreement.
 _Avoid_: reset, repair
+
+### Windows
+
+**Message window**:
+The invisible window that runs on a thread of its own and does every call Windows ties to a window thread: registering shortcuts, hearing clipboard changes and owning the clipboard.
+_Avoid_: hidden window, helper window
+
+**Sequence number**:
+The counter Windows increases every time any program changes the clipboard. ClipBench uses it to tell one change from another, and to notice that the clipboard changed between a write and a paste.
+_Avoid_: change count, version
+
+**Own write**:
+Content that ClipBench itself put on the clipboard, tagged with a private format so it is not recorded again. A restored clipboard is tagged too.
+_Avoid_: internal copy, echo
+
+**Snapshot**:
+A raw copy of everything on the clipboard, privacy markers included, taken before a paste so the user's clipboard can be put back exactly as it was.
+_Avoid_: backup, save
+
+**Foreground target**:
+The window that had focus when a paste was prepared, with its process and whether Windows would block keystrokes sent to it.
+_Avoid_: active window, destination
+
+**Integrity level**:
+How much trust Windows gives a program. Windows drops keystrokes sent to a program with a higher level than the sender (User Interface Privilege Isolation), so a paste into an administrator's program fails silently unless ClipBench checks first.
+_Avoid_: elevation, privilege
+
+**Shortcut**:
+A global key combination registered with Windows, such as Win+Alt+V. The default opens the Popup.
+_Avoid_: hotkey, key binding
+
+**Running copy**:
+The one ClipBench process that is active for the signed-in user. A second launch asks it to open the Popup and exits.
+_Avoid_: instance, main process
