@@ -41,4 +41,7 @@ public enum ErrorCode
 
     /// <summary>The disk or the database refused an operation. The data on disk is unchanged unless the operation says otherwise.</summary>
     StorageFailure,
+
+    /// <summary>A clip is larger than storage accepts, so it was not saved.</summary>
+    ContentTooLarge,
 }
