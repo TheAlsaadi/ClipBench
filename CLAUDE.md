@@ -24,14 +24,17 @@ Standing instructions for every session in this repository. Read this file fully
 ```
 dotnet restore --locked-mode
 dotnet build -c Release -warnaserror
-dotnet test -c Release --collect:"XPlat Code Coverage"
+dotnet test --solution ClipBench.slnx -c Release --filter-not-trait "Category=Integration"
+dotnet test --project tests/ClipBench.Core.Tests -c Release --coverlet --coverlet-output-format cobertura --coverlet-include "[ClipBench.Core]*" --coverlet-threshold 90 --coverlet-threshold-type line
 dotnet format --verify-no-changes
 dotnet list package --vulnerable --include-transitive
 ```
 
-Integration tests that touch the real clipboard are tagged `[Trait("Category","Integration")]`. Run them locally with `dotnet test --filter Category=Integration`.
+Tests run on xUnit v3 over Microsoft.Testing.Platform, enabled for `dotnet test` by `global.json` (ADR 0006). The VSTest switches `--collect:"XPlat Code Coverage"` and `--filter` do not apply. Coverage comes from `coverlet.MTP`: run it once per test project with `--coverlet-include` set to that project's assembly, so each coverage floor measures only its own assembly. Reports are written as Cobertura XML to `--results-directory` (default `TestResults/`).
 
-In Phase 0, confirm the exact test and coverage commands for the test platform you set up (VSTest vs Microsoft.Testing.Platform in .NET 10 use different coverage switches), then update this section so it stays accurate.
+Integration tests that touch the real clipboard are tagged `[Trait("Category","Integration")]`. Run them locally with `dotnet test --project tests/ClipBench.Platform.Windows.IntegrationTests -c Release --filter-trait "Category=Integration"`. Point it at one project: a run in which no test matches the filter exits with code 8.
+
+The test runner sends usage data to Microsoft unless you opt out. Set `TESTINGPLATFORM_TELEMETRY_OPTOUT=1` and `DOTNET_CLI_TELEMETRY_OPTOUT=1` in your shell; CI sets both.
 
 ---
 
