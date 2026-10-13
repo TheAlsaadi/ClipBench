@@ -11,4 +11,7 @@ public enum ErrorCode
 
     /// <summary>The paste queue is not armed, so there is nothing to paste.</summary>
     QueueNotArmed,
+
+    /// <summary>No clip with the given id is in the history.</summary>
+    ClipNotFound,
 }
