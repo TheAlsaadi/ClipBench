@@ -155,6 +155,20 @@ commit "$repo" 'feat: clean branch commit'
 head=$(git -C "$repo" rev-parse HEAD)
 range_case 'new branch: attribution already on origin/main is ignored' 0 "$repo" "$zeros" "$head"
 
+# After a force push the "before" sha is no longer in the clone. Scan everything that is not
+# on origin/main instead: that can only scan more commits, never fewer.
+unknown=1111111111111111111111111111111111111111
+repo="$tmp/unknown-base"
+new_repo "$repo"
+commit "$repo" 'chore: base'
+git -C "$repo" update-ref refs/remotes/origin/main HEAD
+commit "$repo" 'feat: clean branch commit'
+head=$(git -C "$repo" rev-parse HEAD)
+range_case 'unknown base sha: clean commits' 0 "$repo" "$unknown" "$head"
+commit "$repo" $'feat: tainted\n\nGenerated with [Claude Code](https://example.invalid)'
+head=$(git -C "$repo" rev-parse HEAD)
+range_case 'unknown base sha: attribution in a branch commit' 1 "$repo" "$unknown" "$head"
+
 # --- combined: clean commits but tainted pull request text ---------------------------------
 
 repo="$tmp/combined"

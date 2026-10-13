@@ -6,9 +6,10 @@
 # sole author; see the contributing guide.
 #
 # Usage: attribution-guard.sh [BASE [HEAD]]
-#   BASE  Commits in BASE..HEAD are scanned. An all-zero BASE (a push that creates a branch)
-#         scans the commits that are not on origin/main. Omit BASE to scan only the pull
-#         request text.
+#   BASE  Commits in BASE..HEAD are scanned. An all-zero BASE (a push that creates a branch), or
+#         a BASE that is not in the clone (after a force push), scans every commit that is not
+#         on origin/main instead: that can only scan more commits, never fewer. Omit BASE to
+#         scan only the pull request text.
 #   HEAD  Defaults to HEAD.
 #
 # Environment: PR_TITLE and PR_BODY hold the pull request text. They arrive through the
@@ -61,7 +62,7 @@ base=${1:-}
 head=${2:-HEAD}
 
 if [[ -n $base ]]; then
-  if [[ $base =~ ^0+$ ]]; then
+  if [[ $base =~ ^0+$ ]] || ! git cat-file -e "${base}^{commit}" 2> /dev/null; then
     if git rev-parse --verify --quiet refs/remotes/origin/main > /dev/null; then
       range=("$head" --not refs/remotes/origin/main)
     else
