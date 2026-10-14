@@ -2,6 +2,20 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <!-- A small window with a text box stands in for the program the user pastes into. -->
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.Core" />
+    <PackageReference Include="FlaUI.UIA3" />
+  </ItemGroup>
+
+  <!-- The tests start the built app and save clips into a throwaway history before it starts. They need no XAML. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ClipBench.Core\ClipBench.Core.csproj" />
+    <ProjectReference Include="..\..\src\ClipBench.Storage\ClipBench.Storage.csproj" />
+    <ProjectReference Include="..\..\src\ClipBench.Platform.Windows\ClipBench.Platform.Windows.csproj" />
+  </ItemGroup>
 
 </Project>

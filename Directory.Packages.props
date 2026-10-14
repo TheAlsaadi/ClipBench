@@ -31,4 +31,14 @@
     <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
   </ItemGroup>
 
+  <ItemGroup Label="UI smoke test (ADR 0013)">
+    <PackageVersion Include="FlaUI.Core" Version="5.0.0" />
+    <PackageVersion Include="FlaUI.UIA3" Version="5.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Application framework (ADR 0012)">
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+  </ItemGroup>
+
 </Project>

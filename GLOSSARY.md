@@ -145,3 +145,30 @@ _Avoid_: hotkey, key binding
 **Running copy**:
 The one ClipBench process that is active for the signed-in user. A second launch asks it to open the Popup and exits.
 _Avoid_: instance, main process
+
+### The app
+
+**Popup**:
+The compact window that opens with the shortcut: a search box, the list of clips and the key hints. It opens next to the text cursor, or the mouse pointer when the program shows no text cursor, and it hides when it loses focus.
+_Avoid_: panel, flyout, window (when the popup is meant)
+
+**Library**:
+The clips as the app uses them: held in memory so they can be searched, and kept in step with the encrypted history. A change is made in memory first and then stored.
+_Avoid_: cache, database
+
+**Mask**:
+The row of dots a clip that looks like a secret shows instead of its text, until the user reveals it. Its length never depends on the clip.
+_Avoid_: blur, redaction
+
+**Mark**:
+The tick a user puts on a clip with Space to choose several clips for one paste. Marks arrive with the multi-paste of a later phase.
+_Avoid_: check, selection (a selection is the highlighted row)
+
+**Notice**:
+A short message shown next to the tray icon when something that happened in the background did not work, such as a shortcut another program already uses. Its text is always written by the app, never taken from a clip.
+_Avoid_: toast, alert, notification
+
+**Activity log**:
+The small file of what the app did: event names, kinds, sizes and error codes. It cannot hold a copied text, a file name or a program name.
+_Avoid_: debug log, trace
+

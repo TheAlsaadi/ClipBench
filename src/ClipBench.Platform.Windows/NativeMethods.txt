@@ -71,3 +71,31 @@ GetCurrentProcess
 GetSidSubAuthority
 GetSidSubAuthorityCount
 TOKEN_MANDATORY_LABEL
+
+// Where the popup goes: the text caret, the pointer, and the monitor they are on
+GetGUIThreadInfo
+ClientToScreen
+GetCursorPos
+MonitorFromPoint
+GetMonitorInfo
+GetDpiForMonitor
+
+// Window effects: hidden from screenshots and screen sharing, rounded corners
+SetWindowDisplayAffinity
+GetWindowDisplayAffinity
+DwmSetWindowAttribute
+DWM_WINDOW_CORNER_PREFERENCE
+
+// The tray icon: the notification area, its menu, and the broadcast that says the taskbar was created again
+Shell_NotifyIcon
+RegisterWindowMessage
+LoadImage
+DestroyIcon
+GetSystemMetrics
+CreatePopupMenu
+AppendMenu
+SetMenuDefaultItem
+TrackPopupMenuEx
+TRACK_POPUP_MENU_FLAGS
+DestroyMenu
+WM_NULL

@@ -10,6 +10,42 @@ public class MessageWindowTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
+    public async Task A_hidden_top_level_window_hears_a_broadcast_and_a_message_only_window_does_not()
+    {
+        // The taskbar tells every top-level window when it is created again (so a tray icon can come back), but it
+        // does not tell message-only windows. A tray icon therefore needs the first kind.
+        var message = PInvoke.RegisterWindowMessage("ClipBench.Test.Broadcast." + Guid.NewGuid().ToString("N"));
+        message.ShouldBeGreaterThan(0u);
+        using var topLevel = MessageWindow.Create(messageOnly: false).Value;
+        using var messageOnly = MessageWindow.Create().Value;
+        var topLevelHeard = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var messageOnlyHeard = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        topLevel.AddHandler(message, (_, _) => topLevelHeard.TrySetResult());
+        messageOnly.AddHandler(message, (_, _) => messageOnlyHeard.TrySetResult());
+
+        bool posted = PInvoke.PostMessage(new HWND(0xFFFF), message, default, default);   // HWND_BROADCAST
+        posted.ShouldBeTrue();
+
+        await topLevelHeard.Task.WaitAsync(TimeSpan.FromSeconds(10), Ct);
+        // The broadcast reaches every top-level window before it is over. Give a message-only window the chance to hear it too.
+        await Task.Delay(TimeSpan.FromMilliseconds(300), Ct);
+        messageOnlyHeard.Task.IsCompleted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_top_level_window_is_a_real_window_that_is_gone_after_dispose()
+    {
+        var window = MessageWindow.Create(messageOnly: false).Value;
+        var handle = window.Handle;
+
+        Exists(handle).ShouldBeTrue();
+
+        window.Dispose();
+
+        Exists(handle).ShouldBeFalse();
+    }
+
+    [Fact]
     public void Creating_a_window_gives_a_real_handle_that_is_gone_after_dispose()
     {
         var window = MessageWindow.Create().Value;

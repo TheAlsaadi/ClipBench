@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The app shell (`ClipBench.App`, ADR 0012 to ADR 0014): the app starts with its icon in the notification
+  area, watches the clipboard and keeps what is copied in the encrypted history, and a shortcut (Win+Alt+V
+  by default) opens a compact popup next to the text cursor or the mouse pointer. The popup has a search box,
+  rows with a two-line preview, an icon for the kind of clip, the source program and the age, pin and mark
+  signs, and the key hints; it hides when it loses focus and hides itself from screenshots and screen
+  sharing. Up and Down move (and wrap), Enter pastes the highlighted clip into the window that had focus,
+  Escape closes, Control+P pins, Control+R shows a hidden secret, Space marks a clip and Delete removes one
+  (a pinned clip asks first). Secrets (card numbers, tokens, keys) show as dots and are never read out by a
+  screen reader. The tray menu offers Open, Pause or Resume capturing, and Exit; notices (a shortcut that is
+  taken, a paste that could not be done) appear next to the icon, and a paste into an administrator window
+  leaves the clip on the clipboard. The popup is checked by driving the real app with the keyboard (FlaUI,
+  ADR 0013).
+- A log of what the app does (`clipbench.log`, kept to a fixed size) that holds only event names, kinds, sizes and
+  codes: its contract has no text field, so a copied text, a file name or a program name cannot get into it.
+- New command-line switches for checks and tests: `--data-dir`, `--hotkey` and `--allow-screen-capture`.
+  One copy runs per data folder.
+- The view models of the popup and the tray (`ClipBench.Presentation`, with CommunityToolkit.Mvvm), the
+  placement of the popup on the monitor, the paste flow with its plain-words notices, and the library that
+  keeps the history in memory and in step with the encrypted store. CI now enforces 80% line coverage on
+  `ClipBench.Presentation`.
 - Windows platform layer (`ClipBench.Platform.Windows`, ADR 0010 and ADR 0011): reading the clipboard
   (text, HTML, rich text, file lists and pictures) with the privacy check made before any content is read;
   writing it back in every form a program may ask for; a listener that reports each change once and

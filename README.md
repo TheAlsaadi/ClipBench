@@ -8,10 +8,12 @@ A security-first clipboard manager for Windows 11. ClipBench replaces
 encrypted local history, and a keyboard-first popup lets you search, select
 several items, and paste them in one action.
 
-> **Status: early development (pre-alpha).** The repository scaffolding and the
-> core clipboard logic (history, search, multi-paste composition, privacy filter and
-> secret detection) are built and tested. Storage, Windows integration and the
-> interface come next. Nothing is released yet and there is nothing to install.
+> **Status: early development (pre-alpha).** The core clipboard logic, the encrypted
+> history, the Windows integration and a first usable app are built and tested: a
+> tray icon, a shortcut (Win+Alt+V) that opens a search popup, and pasting one clip into
+> the program you were in. Multi-paste, transforms, boards, the settings window, OCR and
+> the installer come next. Nothing is released yet and there is nothing to install; you
+> can build it from source and check it by hand with [docs/MANUAL_QA.md](docs/MANUAL_QA.md).
 
 ## Privacy promise
 

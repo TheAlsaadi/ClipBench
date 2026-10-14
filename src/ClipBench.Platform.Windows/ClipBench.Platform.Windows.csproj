@@ -4,6 +4,8 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <!-- The generated Win32 declarations use pointers (ADR 0010). Only this project allows unsafe code. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The notification-area structure exists only per CPU architecture. x64 and ARM64 share the 64-bit layout, so one build serves both. -->
+    <CsWin32PlatformTarget>x64</CsWin32PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
