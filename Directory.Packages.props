@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Win32 interop (ADR 0010)">
-    <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.360" />
+    <PackageVersion Include="Microsoft.Windows.CsWin32" Version="0.3.363" />
   </ItemGroup>
 
   <ItemGroup Label="UI platform (ADR 0001)">
