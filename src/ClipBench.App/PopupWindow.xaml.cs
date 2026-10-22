@@ -27,6 +27,8 @@ public sealed partial class PopupWindow : Window
     /// <summary>The height of the popup in device-independent pixels.</summary>
     public const double HeightDip = 520;
 
+    private bool _customSeparatorChosen;
+
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
     public PopupWindow(PopupViewModel viewModel)
@@ -101,9 +103,22 @@ public sealed partial class PopupWindow : Window
 
         SeparatorMenu.Items.Add(new MenuFlyoutSeparator());
         var custom = new MenuFlyoutItem { Text = "Custom…" };
-        custom.Click += (_, _) => ShowCustomSeparatorBox();
+        custom.Click += (_, _) => _customSeparatorChosen = true;
         SeparatorMenu.Items.Add(custom);
-        SeparatorMenu.Closed += (_, _) => _ = SearchBox.Focus(FocusState.Programmatic);
+
+        // The box for a custom separator opens once the menu has closed, so the menu does not take the focus away from it.
+        SeparatorMenu.Closed += (_, _) =>
+        {
+            if (_customSeparatorChosen)
+            {
+                _customSeparatorChosen = false;
+                ShowCustomSeparatorBox();
+            }
+            else
+            {
+                _ = SearchBox.Focus(FocusState.Programmatic);
+            }
+        };
     }
 
     private void ShowCustomSeparatorBox()
@@ -125,6 +140,7 @@ public sealed partial class PopupWindow : Window
                 args.Handled = true;
             }
         };
+        flyout.Opened += (_, _) => _ = box.Focus(FocusState.Programmatic);
         flyout.Closed += (_, _) => _ = SearchBox.Focus(FocusState.Programmatic);
         flyout.ShowAt(SeparatorButton);
     }

@@ -2,6 +2,7 @@ using ClipBench.Core.Screen;
 using ClipBench.Presentation.Queue;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Windows.Graphics;
 
 namespace ClipBench.App;
@@ -77,6 +78,13 @@ public sealed partial class QueueHudWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // The window never has focus, so a screen reader hears about it only through its live region.
+        if (e.PropertyName == nameof(QueueHudViewModel.AutomationText) && ViewModel.IsVisible)
+        {
+            FrameworkElementAutomationPeer.CreatePeerForElement(Root).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            return;
+        }
+
         if (e.PropertyName != nameof(QueueHudViewModel.IsVisible))
         {
             return;

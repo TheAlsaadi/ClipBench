@@ -359,9 +359,17 @@ internal sealed class AppRoot : IAsyncDisposable
         // per change, not once per property.
         _trayViewModel.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName is nameof(TrayViewModel.ToolTip) or nameof(TrayViewModel.RestoreClipboard) && !_disposed)
+            // Changes come from the UI thread, the queue and the capture thread. The menu is built and sent from the UI
+            // thread, one change after another, so an older menu can never arrive after a newer one.
+            if (e.PropertyName is nameof(TrayViewModel.ToolTip) or nameof(TrayViewModel.RestoreClipboard))
             {
-                _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+                _dispatcher.Post(() =>
+                {
+                    if (!_disposed)
+                    {
+                        _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+                    }
+                });
             }
         };
 
@@ -398,7 +406,14 @@ internal sealed class AppRoot : IAsyncDisposable
         }
         else if (_collectHotkey is { } collect && e.Id == collect)
         {
-            _dispatcher.Post(() => _ = _services.GetRequiredService<CollectToggle>().ToggleAsync(CancellationToken.None));
+            _dispatcher.Post(() =>
+            {
+                // A press that arrives while the app shuts down finds the services gone.
+                if (!_disposed)
+                {
+                    _ = _services.GetRequiredService<CollectToggle>().ToggleAsync(CancellationToken.None);
+                }
+            });
         }
     }
 
