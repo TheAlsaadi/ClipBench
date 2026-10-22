@@ -8,7 +8,8 @@ namespace ClipBench.Core.Tray;
 /// <param name="Id">What the menu reports when the item is chosen. Positive. Zero marks a separator.</param>
 /// <param name="Text">The label, or empty for a separator.</param>
 /// <param name="IsDefault">True for the item that a double click would choose; Windows draws it in bold.</param>
-public sealed record TrayMenuItem(int Id, string Text, bool IsDefault = false)
+/// <param name="IsChecked">True for a setting that is on; Windows draws a tick next to it.</param>
+public sealed record TrayMenuItem(int Id, string Text, bool IsDefault = false, bool IsChecked = false)
 {
     /// <summary>A line between two groups of items.</summary>
     public static TrayMenuItem Separator { get; } = new(0, string.Empty);

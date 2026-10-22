@@ -4,15 +4,13 @@ using ClipBench.Core.Diagnostics;
 using ClipBench.Core.Notifications;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 
 namespace ClipBench.Presentation.Popup;
 
 /// <summary>How a paste is carried out.</summary>
 public sealed record PasteFlowOptions
 {
-    /// <summary>True to put the user's clipboard back after the paste.</summary>
-    public bool RestorePreviousClipboard { get; init; } = true;
-
     /// <summary>How long to wait after Ctrl+V before the clipboard is put back.</summary>
     public TimeSpan RestoreDelay { get; init; } = TimeSpan.FromMilliseconds(250);
 }
@@ -30,6 +28,7 @@ public sealed class PasteFlow : IPasteFlow
     private readonly IClipboardWriter _writer;
     private readonly IUserNotifier _notifier;
     private readonly IActivityLog _log;
+    private readonly SettingsService _settings;
     private readonly PasteFlowOptions _options;
     private readonly Lock _gate = new();
     private WindowHandle? _target;
@@ -40,6 +39,7 @@ public sealed class PasteFlow : IPasteFlow
     /// <param name="writer">Puts a clip on the clipboard when pasting is not possible, so the user can paste by hand.</param>
     /// <param name="notifier">Tells the user when a paste did not work.</param>
     /// <param name="log">Records what happened, without content.</param>
+    /// <param name="settings">Says whether to put the clipboard back after the paste.</param>
     /// <param name="options">How to paste, or null for the defaults.</param>
     public PasteFlow(
         IForegroundTracker tracker,
@@ -47,6 +47,7 @@ public sealed class PasteFlow : IPasteFlow
         IClipboardWriter writer,
         IUserNotifier notifier,
         IActivityLog log,
+        SettingsService settings,
         PasteFlowOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(tracker);
@@ -59,6 +60,8 @@ public sealed class PasteFlow : IPasteFlow
         _writer = writer;
         _notifier = notifier;
         _log = log;
+        ArgumentNullException.ThrowIfNull(settings);
+        _settings = settings;
         _options = options ?? new PasteFlowOptions();
     }
 
@@ -96,7 +99,7 @@ public sealed class PasteFlow : IPasteFlow
         {
             Content = content,
             Target = target,
-            RestorePreviousClipboard = _options.RestorePreviousClipboard,
+            RestorePreviousClipboard = _settings.Current.RestorePreviousClipboard,
             RestoreDelay = _options.RestoreDelay,
         };
 

@@ -354,11 +354,12 @@ internal sealed class AppRoot : IAsyncDisposable
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
-        // Pausing changes the tool tip and the wording of the pause item. The tool tip changes exactly when the state does,
-        // so it is the one change to answer: the icon is updated once, not once per property.
+        // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly
+        // when the menu does; the restore tick is the one item it does not show. Answering these two updates the icon once
+        // per change, not once per property.
         _trayViewModel.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(TrayViewModel.ToolTip) && !_disposed)
+            if (e.PropertyName is nameof(TrayViewModel.ToolTip) or nameof(TrayViewModel.RestoreClipboard) && !_disposed)
             {
                 _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
             }

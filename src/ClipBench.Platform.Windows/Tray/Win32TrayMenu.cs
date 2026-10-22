@@ -12,6 +12,16 @@ namespace ClipBench.Platform.Windows.Tray;
 /// </summary>
 internal sealed unsafe class Win32TrayMenu : ITrayMenu
 {
+    /// <summary>How an item is described to Windows: a separator, or text with a tick when it is checked.</summary>
+    /// <param name="item">The item.</param>
+    /// <returns>The flags for AppendMenu.</returns>
+    internal static MENU_ITEM_FLAGS FlagsFor(TrayMenuItem item) => item switch
+    {
+        { IsSeparator: true } => MENU_ITEM_FLAGS.MF_SEPARATOR,
+        { IsChecked: true } => MENU_ITEM_FLAGS.MF_STRING | MENU_ITEM_FLAGS.MF_CHECKED,
+        _ => MENU_ITEM_FLAGS.MF_STRING,
+    };
+
     /// <inheritdoc/>
     public int Show(nint window, PixelPoint at, IReadOnlyList<TrayMenuItem> items)
     {
@@ -29,13 +39,13 @@ internal sealed unsafe class Win32TrayMenu : ITrayMenu
             {
                 if (item.IsSeparator)
                 {
-                    _ = PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_SEPARATOR, 0, default(PCWSTR));
+                    _ = PInvoke.AppendMenu(menu, FlagsFor(item), 0, default(PCWSTR));
                     continue;
                 }
 
                 fixed (char* text = item.Text)
                 {
-                    _ = PInvoke.AppendMenu(menu, MENU_ITEM_FLAGS.MF_STRING, (nuint)item.Id, new PCWSTR(text));
+                    _ = PInvoke.AppendMenu(menu, FlagsFor(item), (nuint)item.Id, new PCWSTR(text));
                 }
 
                 if (item.IsDefault)

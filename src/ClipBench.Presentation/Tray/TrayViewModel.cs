@@ -1,5 +1,6 @@
 using ClipBench.Core.Capture;
 using ClipBench.Core.Pasting;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Collect;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -12,14 +13,18 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     private readonly ICaptureControl _capture;
     private readonly IQueueControl _queue;
     private readonly CollectToggle _collect;
+    private readonly SettingsService _settings;
     private int _exitRequested;
 
     /// <summary>Creates the view model.</summary>
     /// <param name="capture">The part of capture that can be paused.</param>
     /// <param name="queue">The paste queue, which the menu can stop.</param>
     /// <param name="collect">Starts and finishes collect mode.</param>
-    public TrayViewModel(ICaptureControl capture, IQueueControl queue, CollectToggle collect)
+    /// <param name="settings">Holds the restore-clipboard setting the menu switches.</param>
+    public TrayViewModel(ICaptureControl capture, IQueueControl queue, CollectToggle collect, SettingsService settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+        _settings = settings;
         ArgumentNullException.ThrowIfNull(capture);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(collect);
@@ -29,6 +34,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
         IsPaused = capture.IsPaused;
         _queue.Changed += OnQueueChanged;
         _collect.Collect.Changed += OnCollectChanged;
+        _settings.Changed += OnSettingsChanged;
     }
 
     /// <summary>Raised when the menu asks for the popup.</summary>
@@ -40,6 +46,9 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     /// <summary>True while capture is paused.</summary>
     [ObservableProperty]
     public partial bool IsPaused { get; set; }
+
+    /// <summary>True while the clipboard is put back after each paste.</summary>
+    public bool RestoreClipboard => _settings.Current.RestorePreviousClipboard;
 
     /// <summary>True while a collect session runs.</summary>
     public bool IsCollecting => _collect.Collect.IsActive;
@@ -77,6 +86,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     {
         _queue.Changed -= OnQueueChanged;
         _collect.Collect.Changed -= OnCollectChanged;
+        _settings.Changed -= OnSettingsChanged;
     }
 
     [RelayCommand]
@@ -86,7 +96,19 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     private void CancelCollect() => _collect.Cancel();
 
     [RelayCommand]
+    private async Task ToggleRestoreAsync(CancellationToken cancellationToken)
+    {
+        // A setting that could not be saved still applies for this run; the menu shows it either way.
+        _ = await _settings.UpdateAsync(
+            settings => settings with { RestorePreviousClipboard = !settings.RestorePreviousClipboard },
+            cancellationToken);
+    }
+
+    [RelayCommand]
     private Task StopQueueAsync(CancellationToken cancellationToken) => _queue.StopAsync(cancellationToken);
+
+    // Runs on whatever thread changed the settings.
+    private void OnSettingsChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(RestoreClipboard));
 
     // Runs on whatever thread collected a copy or started or ended the session.
     private void OnCollectChanged(object? sender, EventArgs e)

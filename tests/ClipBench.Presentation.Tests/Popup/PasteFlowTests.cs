@@ -2,12 +2,13 @@ using ClipBench.Core.Clips;
 using ClipBench.Core.Diagnostics;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Tests.Support;
 
 namespace ClipBench.Presentation.Tests.Popup;
 
-public class PasteFlowTests
+public sealed class PasteFlowTests : IDisposable
 {
     private readonly FakeForegroundTracker _tracker = new();
     private readonly FakePasteInjector _injector = new();
@@ -17,7 +18,11 @@ public class PasteFlowTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private PasteFlow Create(PasteFlowOptions? options = null) => new(_tracker, _injector, _writer, _notifier, _log, options);
+    private readonly SettingsService _settings = new(new FakeSettingsStore());
+
+    private PasteFlow Create(PasteFlowOptions? options = null) => new(_tracker, _injector, _writer, _notifier, _log, _settings, options);
+
+    public void Dispose() => _settings.Dispose();
 
     private static Clip Clip(string text = "hello") => new(ClipId.New(), new TextContent(text), DateTimeOffset.UnixEpoch);
 
@@ -40,6 +45,18 @@ public class PasteFlowTests
         request.RestorePreviousClipboard.ShouldBeTrue();
         request.RestoreDelay.ShouldBe(TimeSpan.FromMilliseconds(250));
         _tracker.Captures.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Each_paste_follows_the_restore_setting_in_force_at_that_moment()
+    {
+        var flow = Create();
+
+        await flow.PasteAsync(Clip("first"), Ct);
+        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+        await flow.PasteAsync(Clip("second"), Ct);
+
+        _injector.Requests.Select(request => request.RestorePreviousClipboard).ShouldBe([true, false]);
     }
 
     [Fact]
@@ -66,7 +83,8 @@ public class PasteFlowTests
     [Fact]
     public async Task The_options_decide_whether_and_when_the_clipboard_is_put_back()
     {
-        var flow = Create(new PasteFlowOptions { RestorePreviousClipboard = false, RestoreDelay = TimeSpan.FromSeconds(1) });
+        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+        var flow = Create(new PasteFlowOptions { RestoreDelay = TimeSpan.FromSeconds(1) });
         flow.Begin();
 
         await flow.PasteAsync(Clip(), Ct);

@@ -1,11 +1,12 @@
 using ClipBench.Core.Capture;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
 
 namespace ClipBench.Presentation.Tests.Tray;
 
-public class TrayMenuTests
+public sealed class TrayMenuTests : IDisposable
 {
     private sealed class FakeCapture : ICaptureControl
     {
@@ -18,8 +19,16 @@ public class TrayMenuTests
     private readonly FakeQueueControl _queue = new();
     private readonly FakeCollectControl _collect = new();
     private readonly FakeNotifier _notifier = new();
+    private readonly FakeSettingsStore _settingsStore = new();
+    private readonly SettingsService _settings;
 
-    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier));
+    public TrayMenuTests() => _settings = new SettingsService(_settingsStore);
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    public void Dispose() => _settings.Dispose();
+
+    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier), _settings);
 
     [Fact]
     public void The_menu_offers_open_collect_pause_and_exit_with_open_as_the_default()
@@ -31,6 +40,7 @@ public class TrayMenuTests
             (1, "Open ClipBench", true),
             (0, string.Empty, false),
             (5, "Start collecting", false),
+            (7, "Restore clipboard after paste", false),
             (2, "Pause capturing", false),
             (3, "Exit", false),
         ]);
@@ -99,6 +109,7 @@ public class TrayMenuTests
             (0, string.Empty),
             (TrayMenu.StopQueueId, "Stop paste queue"),
             (TrayMenu.CollectId, "Start collecting"),
+            (TrayMenu.RestoreId, "Restore clipboard after paste"),
             (TrayMenu.PauseId, "Pause capturing"),
             (TrayMenu.ExitId, "Exit"),
         ]);
@@ -131,9 +142,32 @@ public class TrayMenuTests
             (0, string.Empty),
             (TrayMenu.CollectId, "Finish collecting (2)"),
             (TrayMenu.CancelCollectId, "Cancel collecting"),
+            (TrayMenu.RestoreId, "Restore clipboard after paste"),
             (TrayMenu.PauseId, "Pause capturing"),
             (TrayMenu.ExitId, "Exit"),
         ]);
+    }
+
+    [Fact]
+    public async Task The_restore_item_is_ticked_while_the_clipboard_is_put_back_after_a_paste()
+    {
+        var tray = Create();
+        TrayMenu.Build(tray).Menu.Single(item => item.Id == TrayMenu.RestoreId).IsChecked.ShouldBeTrue();
+
+        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+
+        TrayMenu.Build(tray).Menu.Single(item => item.Id == TrayMenu.RestoreId).IsChecked.ShouldBeFalse();
+        TrayMenu.Build(tray).Menu.Where(item => item.Id != TrayMenu.RestoreId).ShouldAllBe(item => !item.IsChecked);
+    }
+
+    [Fact]
+    public void Choosing_the_restore_item_switches_it()
+    {
+        var tray = Create();
+
+        TrayMenu.Execute(tray, TrayMenu.RestoreId);
+
+        _settings.Current.RestorePreviousClipboard.ShouldBeFalse();
     }
 
     [Fact]

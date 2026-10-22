@@ -1,12 +1,13 @@
 using ClipBench.Core.Capture;
 using ClipBench.Core.Pasting;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
 
 namespace ClipBench.Presentation.Tests.Tray;
 
-public class TrayViewModelTests
+public sealed class TrayViewModelTests : IDisposable
 {
     private sealed class FakeCapture : ICaptureControl
     {
@@ -25,8 +26,16 @@ public class TrayViewModelTests
     private readonly FakeQueueControl _queue = new();
     private readonly FakeCollectControl _collect = new();
     private readonly FakeNotifier _notifier = new();
+    private readonly FakeSettingsStore _settingsStore = new();
+    private readonly SettingsService _settings;
 
-    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier));
+    public TrayViewModelTests() => _settings = new SettingsService(_settingsStore);
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    public void Dispose() => _settings.Dispose();
+
+    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier), _settings);
 
     private static string[] ChangedProperties(TrayViewModel tray, Action act)
     {
@@ -226,12 +235,61 @@ public class TrayViewModelTests
         _collect.SubscriberCount.ShouldBe(0);
     }
 
+    // --- restoring the clipboard ---
+
+    [Fact]
+    public void Restoring_the_clipboard_follows_the_settings()
+    {
+        var tray = Create();
+
+        tray.RestoreClipboard.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_restore_command_switches_the_setting_and_saves_it()
+    {
+        var tray = Create();
+
+        await tray.ToggleRestoreCommand.ExecuteAsync(null);
+
+        tray.RestoreClipboard.ShouldBeFalse();
+        _settingsStore.Saved.Single().RestorePreviousClipboard.ShouldBeFalse();
+        await tray.ToggleRestoreCommand.ExecuteAsync(null);
+        tray.RestoreClipboard.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_change_of_the_setting_made_elsewhere_is_announced()
+    {
+        var tray = Create();
+        List<string> changed = [];
+        tray.PropertyChanged += (_, args) => changed.Add(args.PropertyName!);
+
+        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+
+        changed.ShouldContain(nameof(TrayViewModel.RestoreClipboard));
+    }
+
+    [Fact]
+    public void Disposing_stops_following_the_settings()
+    {
+        var tray = Create();
+        var raised = 0;
+        tray.PropertyChanged += (_, _) => raised++;
+
+        tray.Dispose();
+        _ = _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+
+        raised.ShouldBe(0);
+    }
+
     [Fact]
     public void Missing_services_are_a_bug()
     {
         var toggle = new CollectToggle(_collect, _notifier);
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(null!, _queue, toggle));
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, null!, toggle));
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, null!));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(null!, _queue, toggle, _settings));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, null!, toggle, _settings));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, null!, _settings));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, toggle, null!));
     }
 }

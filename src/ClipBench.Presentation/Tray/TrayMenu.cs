@@ -23,6 +23,9 @@ public static class TrayMenu
     /// <summary>The id of the item that cancels collecting.</summary>
     public const int CancelCollectId = 6;
 
+    /// <summary>The id of the item that switches putting the clipboard back after a paste.</summary>
+    public const int RestoreId = 7;
+
     /// <summary>Builds the tool tip and the menu.</summary>
     /// <param name="tray">The tray view model.</param>
     /// <returns>What the icon should show now.</returns>
@@ -41,6 +44,7 @@ public static class TrayMenu
             menu.Add(new TrayMenuItem(CancelCollectId, "Cancel collecting"));
         }
 
+        menu.Add(new TrayMenuItem(RestoreId, "Restore clipboard after paste", IsChecked: tray.RestoreClipboard));
         menu.Add(new TrayMenuItem(PauseId, tray.PauseLabel));
         menu.Add(new TrayMenuItem(ExitId, "Exit"));
         return new TrayModel(tray.ToolTip, [.. menu]);
@@ -71,6 +75,9 @@ public static class TrayMenu
                 break;
             case CancelCollectId:
                 tray.CancelCollectCommand.Execute(null);
+                break;
+            case RestoreId:
+                tray.ToggleRestoreCommand.Execute(null);
                 break;
             default:
                 break;
