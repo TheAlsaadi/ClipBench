@@ -65,7 +65,11 @@ public sealed partial class PopupViewModel
     {
         if (!_disposed)
         {
-            _dispatcher.Post(() => OnPropertyChanged(nameof(SeparatorLabel)));
+            _dispatcher.Post(() =>
+            {
+                OnPropertyChanged(nameof(SeparatorLabel));
+                OnPropertyChanged(nameof(StatusText));
+            });
         }
     }
 }

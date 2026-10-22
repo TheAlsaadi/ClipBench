@@ -45,4 +45,14 @@ internal sealed class FakePasteFlow : IPasteFlow
         Order.Add("paste");
         return Task.CompletedTask;
     }
+
+    /// <summary>Content that was composed from several clips and pasted.</summary>
+    public List<ClipContent> PastedContent { get; } = [];
+
+    public Task PasteContentAsync(ClipContent content, CancellationToken cancellationToken)
+    {
+        PastedContent.Add(content);
+        Order.Add("paste");
+        return Task.CompletedTask;
+    }
 }

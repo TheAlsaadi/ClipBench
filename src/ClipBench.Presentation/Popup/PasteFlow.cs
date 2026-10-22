@@ -73,9 +73,16 @@ public sealed class PasteFlow : IPasteFlow
     }
 
     /// <inheritdoc/>
-    public async Task PasteAsync(Clip clip, CancellationToken cancellationToken)
+    public Task PasteAsync(Clip clip, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(clip);
+        return PasteContentAsync(clip.Content, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task PasteContentAsync(ClipContent content, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(content);
 
         // A window on record is good for one paste: the next popup records its own.
         WindowHandle? target;
@@ -87,7 +94,7 @@ public sealed class PasteFlow : IPasteFlow
 
         var request = new PasteRequest
         {
-            Content = clip.Content,
+            Content = content,
             Target = target,
             RestorePreviousClipboard = _options.RestorePreviousClipboard,
             RestoreDelay = _options.RestoreDelay,
@@ -101,12 +108,12 @@ public sealed class PasteFlow : IPasteFlow
                 _log.Write(
                     ActivityLevel.Information,
                     ActivityEvent.PasteSucceeded,
-                    new ActivityDetails { Format = clip.Content.Format, Bytes = clip.Content.SizeInBytes });
+                    new ActivityDetails { Format = content.Format, Bytes = content.SizeInBytes });
                 return;
             }
 
             _log.Write(ActivityLevel.Warning, ActivityEvent.PasteFailed, new ActivityDetails { Error = result.Error.Code });
-            await TellAboutAsync(result.Error.Code, clip.Content, cancellationToken).ConfigureAwait(false);
+            await TellAboutAsync(result.Error.Code, content, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

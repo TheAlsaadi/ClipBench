@@ -28,4 +28,13 @@ public interface IPasteFlow
     /// <param name="cancellationToken">Cancels the paste before any key is sent.</param>
     /// <returns>A task that completes when the paste has been attempted.</returns>
     Task PasteAsync(Clip clip, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Pastes content that is not a clip of its own, such as several clips joined, into the remembered window. It is
+    /// pasted the same way as a clip and is not added to the history.
+    /// </summary>
+    /// <param name="content">The content to paste.</param>
+    /// <param name="cancellationToken">Cancels the paste before any key is sent.</param>
+    /// <returns>A task that completes when the paste has been attempted.</returns>
+    Task PasteContentAsync(ClipContent content, CancellationToken cancellationToken);
 }

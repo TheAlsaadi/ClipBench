@@ -43,6 +43,27 @@ public class PasteFlowTests
     }
 
     [Fact]
+    public async Task Composed_content_is_pasted_into_the_same_window_as_a_clip_would_be()
+    {
+        var flow = Create();
+        flow.Begin();
+        var joined = new TextContent("one, two");
+
+        await flow.PasteContentAsync(joined, Ct);
+
+        var request = _injector.Requests.Single();
+        request.Target.ShouldBe(new WindowHandle(0x1234));
+        request.Content.ShouldBe(joined);
+        _log.Entries.Single().Activity.ShouldBe(ActivityEvent.PasteSucceeded);
+    }
+
+    [Fact]
+    public async Task Missing_content_is_a_bug()
+    {
+        await Should.ThrowAsync<ArgumentNullException>(() => Create().PasteContentAsync(null!, Ct));
+    }
+
+    [Fact]
     public async Task The_options_decide_whether_and_when_the_clipboard_is_put_back()
     {
         var flow = Create(new PasteFlowOptions { RestorePreviousClipboard = false, RestoreDelay = TimeSpan.FromSeconds(1) });

@@ -106,14 +106,19 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         get
         {
-            if (Rows.Count == 0)
-            {
-                return "Esc close";
-            }
-
             if (IsConfirmingDelete)
             {
                 return "Press Delete again to remove this pinned clip" + HintGap + "Esc cancels";
+            }
+
+            if (MarkedCount > 0)
+            {
+                return MarkedHints;
+            }
+
+            if (Rows.Count == 0)
+            {
+                return "Esc close";
             }
 
             var second = Current is { IsSensitive: true } ? "Ctrl+R reveal" : "Space select";
@@ -274,6 +279,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task PasteAsync(CancellationToken cancellationToken)
     {
+        if (_marks.Count > 0)
+        {
+            await PasteMarkedAsync(cancellationToken);
+            return;
+        }
+
         if (Current is not { } row)
         {
             return;
