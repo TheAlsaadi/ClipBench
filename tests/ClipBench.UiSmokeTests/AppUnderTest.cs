@@ -12,9 +12,9 @@ using FlaUI.UIA3;
 namespace ClipBench.UiSmokeTests;
 
 /// <summary>
-/// The built app, started on a throwaway history with F24 as its shortcut. The history is filled through the real
-/// storage before the app starts, so the tests never touch the user's clipboard or the user's history. Nobody may
-/// type or click while a test runs: the keys go to whichever window has focus.
+/// The built app, started on a throwaway history with F24 as its popup shortcut and F23 as its collect shortcut. The
+/// history is filled through the real storage before the app starts, so the tests never read the user's history. Nobody
+/// may type or click while a test runs: the keys go to whichever window has focus.
 /// </summary>
 public sealed class AppUnderTest : IAsyncLifetime
 {
@@ -47,7 +47,7 @@ public sealed class AppUnderTest : IAsyncLifetime
     {
         await SeedHistoryAsync();
 
-        var start = new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--allow-screen-capture"]) { UseShellExecute = false };
+        var start = new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
         _process = Process.Start(start) ?? throw new InvalidOperationException("The app did not start.");
         _automation = new UIA3Automation();
         _application = FlaUI.Core.Application.Attach(_process);
@@ -92,6 +92,57 @@ public sealed class AppUnderTest : IAsyncLifetime
     public Window? FindPopup() => _application!
         .GetAllTopLevelWindows(_automation!)
         .FirstOrDefault(window => window.Title == "ClipBench" && !window.Properties.IsOffscreen.ValueOrDefault);
+
+    /// <summary>The queue window when it is on screen, or null.</summary>
+    public Window? FindQueueWindow() => _application!
+        .GetAllTopLevelWindows(_automation!)
+        .FirstOrDefault(window => window.Title == "ClipBench paste queue" && !window.Properties.IsOffscreen.ValueOrDefault);
+
+    /// <summary>What the queue window says, or null when it is not on screen.</summary>
+    public string? QueueText() => FindQueueWindow()?.FindFirstDescendant(cf => cf.ByAutomationId("QueueHudText"))?.Properties.Name.ValueOrDefault;
+
+    /// <summary>Stops a queue that an earlier test left running, so its Ctrl+V cannot take this test's pastes.</summary>
+    public void EndQueue()
+    {
+        if (FindQueueWindow() is not null)
+        {
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
+            WaitFor(() => FindQueueWindow() is null, 10_000).ShouldBeTrue("Esc did not stop the queue left running");
+        }
+    }
+
+    /// <summary>
+    /// Saves a picture of an element when CLIPBENCH_SMOKE_SCREENSHOTS names a folder, so its looks can be checked by eye.
+    /// The app runs with --allow-screen-capture for this; it hides from captures otherwise.
+    /// </summary>
+    public static void SaveScreenshot(Window window, string name)
+    {
+        var folder = Environment.GetEnvironmentVariable("CLIPBENCH_SMOKE_SCREENSHOTS");
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return;
+        }
+
+        // The window draws itself into the picture, which works on any monitor at any scale; a copy of the screen
+        // misses windows on a second monitor with another scale.
+        _ = Directory.CreateDirectory(folder);
+        var bounds = window.BoundingRectangle;
+        using var image = new System.Drawing.Bitmap(Math.Max(bounds.Width, 1), Math.Max(bounds.Height, 1));
+        using (var graphics = System.Drawing.Graphics.FromImage(image))
+        {
+            var context = graphics.GetHdc();
+            _ = PrintWindow(window.Properties.NativeWindowHandle.ValueOrDefault, context, PrintFullContent);
+            graphics.ReleaseHdc(context);
+        }
+
+        image.Save(Path.Combine(folder, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+    }
+
+    private const uint PrintFullContent = 2;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern bool PrintWindow(nint window, nint context, uint flags);
 
     public Window OpenPopup()
     {
