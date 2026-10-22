@@ -121,10 +121,6 @@
                         <Setter Property="FontSize" Value="12" />
                         <Setter Property="Padding" Value="8,3" />
                     </Style>
-                    <Style BasedOn="{StaticResource DefaultDropDownButtonStyle}" TargetType="DropDownButton">
-                        <Setter Property="FontSize" Value="12" />
-                        <Setter Property="Padding" Value="8,3" />
-                    </Style>
                 </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -149,8 +145,10 @@
                     x:Name="SeparatorButton"
                     Grid.Column="1"
                     MaxWidth="128"
+                    Padding="8,3"
                     AutomationProperties.AutomationId="SeparatorButton"
                     AutomationProperties.HelpText="{x:Bind ViewModel.SeparatorLabel, Mode=OneWay}"
+                    FontSize="12"
                     AutomationProperties.Name="Separator"
                     ToolTipService.ToolTip="What goes between the clips (Ctrl+S)">
                     <TextBlock Text="{x:Bind ViewModel.SeparatorLabel, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
@@ -169,6 +167,8 @@
                 <DropDownButton
                     Grid.Column="3"
                     AutomationProperties.AutomationId="TableButton"
+                    FontSize="12"
+                    Padding="8,3"
                     Content="Table"
                     ToolTipService.ToolTip="Paste as spreadsheet cells">
                     <DropDownButton.Flyout>

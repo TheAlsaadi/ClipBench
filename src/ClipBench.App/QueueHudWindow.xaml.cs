@@ -41,6 +41,13 @@ public sealed partial class QueueHudWindow : Window
         AppWindow.SetPresenter(presenter);
         AppWindow.IsShownInSwitchers = false;
 
+        // WinUI loads a window's content, and starts its bindings, only when the window is first activated, and a window
+        // shown without activation stays blank. So it is activated once now, off screen, and hidden again at once. This
+        // is at start-up, before any queue runs; from then on it is only ever shown without focus.
+        AppWindow.Move(new PointInt32(-32000, -32000));
+        Activate();
+        AppWindow.Hide();
+
         Activated += OnActivated;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
@@ -49,10 +56,11 @@ public sealed partial class QueueHudWindow : Window
     public QueueHudViewModel ViewModel { get; }
 
     // The window is shown without focus, but a click can still give it focus. It then steps aside, so Windows hands
-    // focus back to the window the user was in, and comes back without taking focus.
+    // focus back to the window the user was in, and comes back without taking focus. Only a click counts: WinUI also
+    // reports an activation by code when the window is first shown, and answering that would hide it again at once.
     private void OnActivated(object sender, WindowActivatedEventArgs args)
     {
-        if (args.WindowActivationState == WindowActivationState.Deactivated || !ViewModel.IsVisible)
+        if (args.WindowActivationState != WindowActivationState.PointerActivated || !ViewModel.IsVisible)
         {
             return;
         }
