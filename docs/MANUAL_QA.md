@@ -88,6 +88,7 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 - [ ] **Esc** stops the queue at once, whichever program is in front. The small window goes away, and Esc and Ctrl+V work as usual again in every program.
 - [ ] While a queue runs, the tray tool tip says "paste queue running" and the tray menu has **Stop paste queue**, which stops it.
 - [ ] Pasting from the popup while a queue runs ends the queue first and pastes what you chose.
+- [ ] Known limit (ADR 0015): pressing Ctrl+V twice within about a quarter of a second pastes the same clip twice, and the queue counts only one. At a normal pace (Ctrl+V, Tab, Ctrl+V) each press takes the next clip.
 - [ ] A queue paste into a program that runs as administrator stops the queue with a notice.
 - [ ] Untick **Restore clipboard after paste** in the tray menu: after a queue paste the last queued clip is still on the clipboard. Tick it again: your earlier copy is back after each paste. The tick is remembered after a restart.
 - [ ] The small window is not in screenshots or screen sharing (Win+Shift+S, Teams or Zoom).
