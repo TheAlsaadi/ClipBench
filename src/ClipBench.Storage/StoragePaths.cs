@@ -29,6 +29,9 @@ public sealed class StoragePaths
     /// <summary>The file that holds the wrapped master key.</summary>
     public string KeyPath => Path.Combine(Root, "key.bin");
 
+    /// <summary>The file that holds the user's settings. It never holds clip content, so it is not encrypted.</summary>
+    public string SettingsPath => Path.Combine(Root, "settings.json");
+
     /// <summary>The default location: a <c>ClipBench</c> folder in the current user's local application data.</summary>
     /// <returns>The paths for the current user.</returns>
     public static StoragePaths ForCurrentUser()

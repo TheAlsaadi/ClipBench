@@ -15,6 +15,12 @@ public class StoragePathsTests
     }
 
     [Fact]
+    public void The_settings_live_directly_under_the_root()
+    {
+        new StoragePaths(_root).SettingsPath.ShouldBe(Path.Combine(_root, "settings.json"));
+    }
+
+    [Fact]
     public void The_default_root_is_the_per_user_local_application_data_folder()
     {
         var paths = StoragePaths.ForCurrentUser();
