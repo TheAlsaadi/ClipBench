@@ -71,6 +71,30 @@ public class ClipRowViewModelTests
         changed.ShouldContain(nameof(ClipRowViewModel.IsMarked));
     }
 
+    [Fact]
+    public void A_new_row_has_no_place_in_the_paste_order()
+    {
+        var row = Row(TestClips.Text("plain"));
+
+        row.MarkNumber.ShouldBe(0);
+        row.HasMarkNumber.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_place_in_the_paste_order_is_announced_and_read_out()
+    {
+        var row = Row(TestClips.Text("second"));
+        row.IsMarked = true;
+
+        var changed = ChangedProperties(row, () => row.MarkNumber = 2);
+
+        row.HasMarkNumber.ShouldBeTrue();
+        changed.ShouldContain(nameof(ClipRowViewModel.MarkNumber));
+        changed.ShouldContain(nameof(ClipRowViewModel.HasMarkNumber));
+        changed.ShouldContain(nameof(ClipRowViewModel.AutomationName));
+        row.AutomationName.ShouldBe("Text, second, 5 min ago, selected, number 2 in paste order");
+    }
+
     // --- sensitive clips ---
 
     [Fact]

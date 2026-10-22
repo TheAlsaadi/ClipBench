@@ -52,6 +52,13 @@ public sealed partial class ClipRowViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsRevealed { get; set; }
 
+    /// <summary>Where the clip comes in the paste order of the marked clips, from 1, or 0 when it is not marked.</summary>
+    [ObservableProperty]
+    public partial int MarkNumber { get; set; }
+
+    /// <summary>True when the row shows its place in the paste order.</summary>
+    public bool HasMarkNumber => MarkNumber > 0;
+
     /// <summary>What the row shows: the preview, or <see cref="Mask"/> for a hidden sensitive clip.</summary>
     public string DisplayText => IsSensitive && !IsRevealed ? Mask : _preview;
 
@@ -87,6 +94,11 @@ public sealed partial class ClipRowViewModel : ObservableObject
                 parts.Add("selected");
             }
 
+            if (HasMarkNumber)
+            {
+                parts.Add($"number {MarkNumber} in paste order");
+            }
+
             return string.Join(", ", parts);
         }
     }
@@ -108,4 +120,10 @@ public sealed partial class ClipRowViewModel : ObservableObject
     }
 
     partial void OnIsMarkedChanged(bool value) => OnPropertyChanged(nameof(AutomationName));
+
+    partial void OnMarkNumberChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasMarkNumber));
+        OnPropertyChanged(nameof(AutomationName));
+    }
 }

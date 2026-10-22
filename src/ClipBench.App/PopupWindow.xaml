@@ -79,10 +79,20 @@
                             Grid.Column="2"
                             Orientation="Horizontal"
                             Spacing="6">
-                            <FontIcon
-                                FontSize="12"
-                                Glyph="&#xE73E;"
-                                Visibility="{x:Bind IsMarked, Mode=OneWay}" />
+                            <Border
+                                MinWidth="20"
+                                Height="20"
+                                Padding="5,0"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                CornerRadius="10"
+                                Visibility="{x:Bind HasMarkNumber, Mode=OneWay}">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind MarkNumber, Mode=OneWay}" />
+                            </Border>
                             <FontIcon
                                 FontSize="12"
                                 Glyph="&#xE718;"

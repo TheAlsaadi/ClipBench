@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
 using ClipBench.Presentation.Rows;
@@ -21,6 +22,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
     private readonly ITimer _searchTimer;
+
+    // The marked clips in the order they were marked. Used on the UI thread only.
+    private readonly List<ClipId> _marks = [];
     private volatile bool _open;
     private volatile bool _disposed;
     private bool _searchTextIsSetByCode;
@@ -78,7 +82,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public ClipRowViewModel? Current => SelectedIndex >= 0 && SelectedIndex < Rows.Count ? Rows[SelectedIndex] : null;
 
     /// <summary>How many rows are marked for a multi-paste.</summary>
-    public int MarkedCount => Rows.Count(row => row.IsMarked);
+    public int MarkedCount => _marks.Count;
+
+    /// <summary>The marked clips, in the order they were marked, including any the search hides.</summary>
+    public IReadOnlyList<ClipId> MarkedIds => [.. _marks];
 
     /// <summary>True when there is nothing to list.</summary>
     public bool ShowEmptyState => Rows.Count == 0;
@@ -121,6 +128,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;
         ErrorMessage = null;
+        _marks.Clear();
         _open = true;
         IsOpen = true;
         Refresh(keepSelection: false);
@@ -140,6 +148,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;
         ErrorMessage = null;
+        _marks.Clear();
         Rows.Clear();
         SelectedIndex = -1;
         NotifyListChanged();
@@ -208,8 +217,25 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         if (Current is { } row)
         {
-            row.IsMarked = !row.IsMarked;
+            if (!_marks.Remove(row.Id))
+            {
+                _marks.Add(row.Id);
+            }
+
+            ShowMarks();
             OnPropertyChanged(nameof(MarkedCount));
+            OnPropertyChanged(nameof(StatusText));
+        }
+    }
+
+    // Each row shows whether it is marked and where it comes in the paste order.
+    private void ShowMarks()
+    {
+        foreach (var row in Rows)
+        {
+            var place = _marks.IndexOf(row.Id) + 1;
+            row.IsMarked = place > 0;
+            row.MarkNumber = place;
         }
     }
 
@@ -348,11 +374,14 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         var previousId = Current?.Id;
         var previousIndex = SelectedIndex;
         var wasConfirming = IsConfirmingDelete;
-        var marked = Rows.Where(row => row.IsMarked).Select(row => row.Id).ToHashSet();
         var now = _timeProvider.GetUtcNow();
 
+        // A search only hides marked clips, but a clip that left the history leaves the marks.
+        var present = _library.Clips.Select(clip => clip.Id).ToHashSet();
+        _ = _marks.RemoveAll(id => !present.Contains(id));
+
         var rows = _library.Search(SearchText)
-            .Select(result => new ClipRowViewModel(result.Clip, _library.GetSensitivity(result.Clip), now) { IsMarked = marked.Contains(result.Clip.Id) })
+            .Select(result => new ClipRowViewModel(result.Clip, _library.GetSensitivity(result.Clip), now))
             .ToList();
 
         Rows.Clear();
@@ -360,6 +389,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         {
             Rows.Add(row);
         }
+
+        ShowMarks();
 
         var index = -1;
         if (rows.Count > 0)

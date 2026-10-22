@@ -112,8 +112,8 @@ public sealed partial class PopupWindow : Window
                 ViewModel.DeleteCommand.Execute(null);
                 e.Handled = true;
                 break;
-            case VirtualKey.Space when SearchBox.Text.Length == 0:
-                // With nothing typed a space cannot start a search, so it marks the clip.
+            case VirtualKey.Space when control || SearchBox.Text.Length == 0:
+                // With nothing typed a space cannot start a search, so it marks the clip. Ctrl+Space marks while searching.
                 ViewModel.ToggleMarkCommand.Execute(null);
                 e.Handled = true;
                 break;
