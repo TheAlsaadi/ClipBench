@@ -125,6 +125,10 @@ public sealed partial class PopupWindow : Window
                 ViewModel.RevealCommand.Execute(null);
                 e.Handled = true;
                 break;
+            case VirtualKey.S when control:
+                ViewModel.NextSeparatorCommand.Execute(null);
+                e.Handled = true;
+                break;
             default:
                 break;
         }

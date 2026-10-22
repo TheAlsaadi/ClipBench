@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Rows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -15,10 +16,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(150);
 
     private const string SaveFailed = "That change could not be saved.";
-    private const string Separator = " · ";
+    private const string HintGap = " · ";
 
     private readonly ClipLibrary _library;
     private readonly IPasteFlow _paste;
+    private readonly SettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
     private readonly ITimer _searchTimer;
@@ -32,21 +34,25 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <summary>Creates the view model. It does nothing until <see cref="Open"/>.</summary>
     /// <param name="library">The clips.</param>
     /// <param name="paste">Pastes the chosen clip.</param>
+    /// <param name="settings">The user's settings, such as the separator for joining clips.</param>
     /// <param name="dispatcher">Moves work to the UI thread.</param>
     /// <param name="timeProvider">The clock and timers, for the age shown and the search delay.</param>
-    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IUiDispatcher dispatcher, TimeProvider timeProvider)
+    public PopupViewModel(ClipLibrary library, IPasteFlow paste, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(paste);
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _library = library;
         _paste = paste;
+        _settings = settings;
         _dispatcher = dispatcher;
         _timeProvider = timeProvider;
         Rows = [];
         _searchTimer = timeProvider.CreateTimer(OnSearchTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _library.Changed += OnLibraryChanged;
+        _settings.Changed += OnSettingsChanged;
     }
 
     /// <summary>Raised when the popup should be hidden.</summary>
@@ -107,11 +113,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
             if (IsConfirmingDelete)
             {
-                return "Press Delete again to remove this pinned clip" + Separator + "Esc cancels";
+                return "Press Delete again to remove this pinned clip" + HintGap + "Esc cancels";
             }
 
             var second = Current is { IsSensitive: true } ? "Ctrl+R reveal" : "Space select";
-            return string.Join(Separator, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
+            return string.Join(HintGap, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
         }
     }
 
@@ -165,6 +171,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _library.Changed -= OnLibraryChanged;
+        _settings.Changed -= OnSettingsChanged;
         _searchTimer.Dispose();
     }
 

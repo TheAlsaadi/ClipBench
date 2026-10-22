@@ -1,6 +1,7 @@
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Tests.Support;
@@ -17,12 +18,13 @@ public sealed class PopupViewModelTests : IDisposable
     private readonly FakePasteFlow _paste = new();
     private readonly ImmediateDispatcher _dispatcher = new();
     private readonly ClipLibrary _library;
+    private readonly SettingsService _settings = new(new FakeSettingsStore());
     private readonly PopupViewModel _vm;
 
     public PopupViewModelTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), _store);
-        _vm = new PopupViewModel(_library, _paste, _dispatcher, _time);
+        _vm = new PopupViewModel(_library, _paste, _settings, _dispatcher, _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -31,6 +33,7 @@ public sealed class PopupViewModelTests : IDisposable
     {
         _vm.Dispose();
         _library.Dispose();
+        _settings.Dispose();
     }
 
     /// <summary>Copies the texts in order, so the last one is the newest.</summary>

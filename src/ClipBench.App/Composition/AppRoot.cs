@@ -5,6 +5,7 @@ using ClipBench.Core.Hosting;
 using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Notifications;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
@@ -13,6 +14,7 @@ using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
 using ClipBench.Storage.Clips;
+using ClipBench.Storage.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 
@@ -113,10 +115,19 @@ internal sealed class AppRoot : IAsyncDisposable
             log.Write(ActivityLevel.Error, ActivityEvent.TrayFailed, new ActivityDetails { Error = trayCreated.Error.Code });
         }
 
-        var services = BuildServices(platform, storage, log, dispatcher, time, tray);
+        var services = BuildServices(platform, storage, paths, log, dispatcher, time, tray);
         PopupWindow? popup = null;
         try
         {
+            // Settings that cannot be read give the defaults; the app runs either way.
+            var settingsLoad = await services.GetRequiredService<SettingsService>().LoadAsync(cancellationToken);
+            if (settingsLoad is SettingsLoadStatus.Damaged or SettingsLoadStatus.Unreadable)
+            {
+                log.Write(
+                    ActivityLevel.Warning,
+                    settingsLoad == SettingsLoadStatus.Damaged ? ActivityEvent.SettingsDamaged : ActivityEvent.SettingsUnreadable);
+            }
+
             var library = services.GetRequiredService<ClipLibrary>();
             var loaded = await library.LoadAsync(cancellationToken);
             if (loaded.IsFailure)
@@ -220,7 +231,7 @@ internal sealed class AppRoot : IAsyncDisposable
         platform.Dispose();
     }
 
-    private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
+    private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, StoragePaths paths, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
     {
         var services = new ServiceCollection();
         _ = services.AddSingleton(time);
@@ -233,6 +244,8 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(platform.PasteInjector);
         _ = tray is null ? services.AddSingleton<IUserNotifier, NullNotifier>() : services.AddSingleton<IUserNotifier>(tray);
         _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
+        _ = services.AddSingleton<ISettingsStore>(new JsonSettingsStore(paths.SettingsPath));
+        _ = services.AddSingleton<SettingsService>();
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();

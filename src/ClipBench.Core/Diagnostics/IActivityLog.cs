@@ -73,6 +73,12 @@ public enum ActivityEvent
 
     /// <summary>The tray icon could not be shown, with the reason as an error code.</summary>
     TrayFailed,
+
+    /// <summary>The saved settings were damaged and were set aside; the defaults are in use.</summary>
+    SettingsDamaged,
+
+    /// <summary>The saved settings could not be read; the defaults are in use and the file was left alone.</summary>
+    SettingsUnreadable,
 }
 
 /// <summary>
