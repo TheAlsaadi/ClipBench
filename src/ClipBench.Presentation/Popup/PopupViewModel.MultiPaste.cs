@@ -1,5 +1,6 @@
 using ClipBench.Core.Clips;
 using ClipBench.Core.Pasting;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ClipBench.Presentation.Popup;
 
@@ -8,7 +9,7 @@ public sealed partial class PopupViewModel
 {
     private readonly PasteComposer _composer = new();
 
-    private string MarkedHints => string.Join(HintGap, $"Enter paste {MarkedCount}", $"Ctrl+S {SeparatorLabel}", "Esc close");
+    private string MarkedHints => string.Join(HintGap, $"Enter paste {MarkedCount}", $"Ctrl+S {SeparatorLabel}", "Ctrl+T table", "Esc close");
 
     // The marked clips that are still in the history, in the order they were marked.
     private List<Clip> MarkedClips()
@@ -45,4 +46,27 @@ public sealed partial class PopupViewModel
         Close();
         await _paste.PasteContentAsync(new TextContent(joined.Value), cancellationToken);
     }
+
+    [RelayCommand]
+    private async Task PasteTableAsync(TableLayout layout, CancellationToken cancellationToken)
+    {
+        var clips = _marks.Count > 0 ? MarkedClips() : HighlightedClip();
+        if (clips.Count == 0)
+        {
+            return;
+        }
+
+        var table = _composer.ComposeTable(clips, layout);
+        if (table.IsFailure)
+        {
+            ErrorMessage = table.Error.Message;
+            return;
+        }
+
+        Close();
+        await _paste.PasteContentAsync(new TextContent(table.Value), cancellationToken);
+    }
+
+    private List<Clip> HighlightedClip() =>
+        Current is { } row && _library.Clips.FirstOrDefault(clip => clip.Id == row.Id) is { } highlighted ? [highlighted] : [];
 }

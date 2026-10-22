@@ -1,3 +1,4 @@
+using ClipBench.Core.Pasting;
 using ClipBench.Core.Screen;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
@@ -123,6 +124,11 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.R when control:
                 ViewModel.RevealCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.T when control:
+                var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
+                ViewModel.PasteTableCommand.Execute(shift ? TableLayout.Row : TableLayout.Column);
                 e.Handled = true;
                 break;
             case VirtualKey.S when control:
