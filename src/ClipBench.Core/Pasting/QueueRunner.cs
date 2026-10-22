@@ -382,23 +382,5 @@ public sealed class QueueRunner : IQueueControl, IAsyncDisposable
         }
     }
 
-    private void RaiseChanged()
-    {
-        if (Changed is not { } handlers)
-        {
-            return;
-        }
-
-        foreach (var handler in handlers.GetInvocationList().Cast<EventHandler>())
-        {
-            try
-            {
-                handler(this, EventArgs.Empty);
-            }
-            catch (Exception exception) when (exception is not OutOfMemoryException)
-            {
-                // A subscriber's bug must not stop the queue.
-            }
-        }
-    }
+    private void RaiseChanged() => Changed.RaiseEach(this);
 }
