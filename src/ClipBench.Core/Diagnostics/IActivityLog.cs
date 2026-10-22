@@ -97,6 +97,24 @@ public enum ActivityEvent
 
     /// <summary>A queue stopped because of a bug, with the exception type.</summary>
     QueueFaulted,
+
+    /// <summary>A collect session started.</summary>
+    CollectStarted,
+
+    /// <summary>A copy was collected into the session instead of being saved on its own, with its kind and size.</summary>
+    CaptureCollected,
+
+    /// <summary>A copy was not collected because the session reached its size limit.</summary>
+    CollectLimitReached,
+
+    /// <summary>A collect session ended in one clip, with the number of copies and its size.</summary>
+    CollectFinished,
+
+    /// <summary>A collect session was cancelled and what it held was thrown away.</summary>
+    CollectCancelled,
+
+    /// <summary>A finished collect session could not be saved or put on the clipboard, with the reason as an error code.</summary>
+    CollectFailed,
 }
 
 /// <summary>

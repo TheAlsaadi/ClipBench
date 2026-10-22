@@ -20,6 +20,7 @@ public sealed class CaptureService : ICaptureControl, IDisposable
     private readonly ClipLibrary _library;
     private readonly IActivityLog _log;
     private readonly TimeProvider _timeProvider;
+    private readonly ICaptureRouter? _router;
     private readonly Lock _gate = new();
     private readonly Channel<long> _changes = Channel.CreateUnbounded<long>(new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _stopping = new();
@@ -36,13 +37,15 @@ public sealed class CaptureService : ICaptureControl, IDisposable
     /// <param name="log">Where activity is recorded. It never receives clip content.</param>
     /// <param name="timeProvider">The clock for the time a clip was copied.</param>
     /// <param name="filter">The starting rules, or null for the defaults.</param>
+    /// <param name="router">Gets the first look at each accepted copy, such as a collect session, or null for none.</param>
     public CaptureService(
         IClipboardListener listener,
         IClipboardReader reader,
         ClipLibrary library,
         IActivityLog log,
         TimeProvider timeProvider,
-        CaptureFilter? filter = null)
+        CaptureFilter? filter = null,
+        ICaptureRouter? router = null)
     {
         ArgumentNullException.ThrowIfNull(listener);
         ArgumentNullException.ThrowIfNull(reader);
@@ -55,6 +58,7 @@ public sealed class CaptureService : ICaptureControl, IDisposable
         _log = log;
         _timeProvider = timeProvider;
         _filter = filter ?? new CaptureFilter();
+        _router = router;
     }
 
     /// <summary>The rules in force. The next read uses the current ones.</summary>
@@ -193,6 +197,15 @@ public sealed class CaptureService : ICaptureControl, IDisposable
             }
 
             var clip = new Clip(ClipId.New(), content, _timeProvider.GetUtcNow(), capture.SourceProcess);
+            if (_router is { } router && !router.Offer(clip))
+            {
+                _log.Write(
+                    ActivityLevel.Information,
+                    ActivityEvent.CaptureCollected,
+                    new ActivityDetails { Format = content.Format, Bytes = content.SizeInBytes });
+                return;
+            }
+
             var added = await _library.AddAsync(clip, cancellationToken).ConfigureAwait(false);
             if (added.IsFailure)
             {

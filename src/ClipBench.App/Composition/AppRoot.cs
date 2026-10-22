@@ -279,6 +279,9 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
+        _ = services.AddSingleton<CollectController>();
+        _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
+        _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<CaptureService>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
