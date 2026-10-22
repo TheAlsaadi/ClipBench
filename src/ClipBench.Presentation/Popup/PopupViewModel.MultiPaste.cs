@@ -9,6 +9,15 @@ public sealed partial class PopupViewModel
 {
     private readonly PasteComposer _composer = new();
 
+    // A paste presses Ctrl+V. A running queue holds Ctrl+V and would take the paste for its own, so it ends first.
+    private async Task EndQueueAsync(CancellationToken cancellationToken)
+    {
+        if (_queue.Progress.IsRunning)
+        {
+            await _queue.StopAsync(cancellationToken);
+        }
+    }
+
     private string MarkedHints => string.Join(HintGap, $"Enter paste {MarkedCount}", $"Ctrl+S {SeparatorLabel}", "Ctrl+Q queue", "Ctrl+T table", "Esc close");
 
     // The marked clips that are still in the history, in the order they were marked.
@@ -31,6 +40,7 @@ public sealed partial class PopupViewModel
         if (clips.Count == 1)
         {
             Close();
+            await EndQueueAsync(cancellationToken);
             await _paste.PasteAsync(clips[0], cancellationToken);
             return;
         }
@@ -44,6 +54,7 @@ public sealed partial class PopupViewModel
 
         // Hide first: the paste needs the window underneath to have focus again.
         Close();
+        await EndQueueAsync(cancellationToken);
         await _paste.PasteContentAsync(new TextContent(joined.Value), cancellationToken);
     }
 
@@ -64,6 +75,7 @@ public sealed partial class PopupViewModel
         }
 
         Close();
+        await EndQueueAsync(cancellationToken);
         await _paste.PasteContentAsync(new TextContent(table.Value), cancellationToken);
     }
 

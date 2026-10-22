@@ -314,6 +314,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
         // Hide first: the paste needs the window underneath to have focus again.
         Close();
+        await EndQueueAsync(cancellationToken);
         await _paste.PasteAsync(clip, cancellationToken);
     }
 

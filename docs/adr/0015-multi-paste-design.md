@@ -25,5 +25,6 @@ Phase 5 adds the four ways of pasting more than one clip that PLAN.md calls the 
 
 - While a queue runs, Esc does nothing in other programs, and Ctrl+V pastes the queue's next clip instead of the clipboard. The HUD says so, and the queue ends on its own after the last clip.
 - Ctrl+V pressed while ClipBench's own popup has focus also takes the next queued clip. This is accepted: opening the popup is a deliberate step away from the form being filled.
+- A paste from the popup (one clip, the marked clips or a table) ends a running queue first. The paste presses Ctrl+V itself, and the queue would otherwise take that press and paste its own next clip instead. The smoke tests found this.
 - The settings file is plain JSON, not encrypted. It holds no clip content, only choices, and the threat model records this.
 - No new packages. The UI smoke test for queue mode sends real keys, so it runs on demand, like the Phase 4 smoke tests.

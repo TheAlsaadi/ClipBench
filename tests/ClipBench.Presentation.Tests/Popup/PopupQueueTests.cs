@@ -114,6 +114,64 @@ public sealed class PopupQueueTests : IDisposable
         _vm.StatusText.ShouldBe("Enter paste 2 · Ctrl+S New line · Ctrl+Q queue · Ctrl+T table · Esc close");
     }
 
+    // A paste from the popup sends Ctrl+V itself. A running queue holds Ctrl+V, so it would take that paste for its own.
+
+    [Fact]
+    public async Task Pasting_one_clip_while_a_queue_runs_stops_the_queue_first()
+    {
+        await CopyAsync("one");
+        _queue.Report(Core.Pasting.QueueState.Armed, 0, 2);
+        var stoppedBeforePaste = false;
+        _paste.OnPaste = () => stoppedBeforePaste = _queue.Stops == 1;
+        _vm.Open();
+
+        await _vm.PasteCommand.ExecuteAsync(null);
+
+        stoppedBeforePaste.ShouldBeTrue();
+        _paste.Pasted.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Pasting_marked_clips_while_a_queue_runs_stops_the_queue_first()
+    {
+        await CopyAsync("one", "two");
+        _queue.Report(Core.Pasting.QueueState.Armed, 0, 2);
+        var stoppedBeforePaste = false;
+        _paste.OnPaste = () => stoppedBeforePaste = _queue.Stops == 1;
+        _vm.Open();
+        Mark(0, 1);
+
+        await _vm.PasteCommand.ExecuteAsync(null);
+
+        stoppedBeforePaste.ShouldBeTrue();
+        _paste.PastedContent.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Pasting_a_table_while_a_queue_runs_stops_the_queue_first()
+    {
+        await CopyAsync("one");
+        _queue.Report(Core.Pasting.QueueState.Armed, 0, 2);
+        var stoppedBeforePaste = false;
+        _paste.OnPaste = () => stoppedBeforePaste = _queue.Stops == 1;
+        _vm.Open();
+
+        await _vm.PasteTableCommand.ExecuteAsync(Core.Pasting.TableLayout.Column);
+
+        stoppedBeforePaste.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Without_a_running_queue_a_paste_stops_nothing()
+    {
+        await CopyAsync("one");
+        _vm.Open();
+
+        await _vm.PasteCommand.ExecuteAsync(null);
+
+        _queue.Stops.ShouldBe(0);
+    }
+
     [Fact]
     public void A_missing_queue_is_a_bug()
     {
