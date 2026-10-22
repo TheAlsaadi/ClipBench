@@ -14,7 +14,34 @@ public class StartupOptionsTests
 
         options.DataDirectory.ShouldBeNull();
         options.Hotkey.ShouldBeNull();
+        options.CollectHotkey.ShouldBeNull();
         options.Problems.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_collect_shortcut_can_be_given_as_a_separate_value_or_after_an_equals_sign()
+    {
+        StartupOptions.Parse(["--collect-hotkey", "F23"]).CollectHotkey.ShouldBe(Hotkey.Parse("F23").Value);
+        StartupOptions.Parse(["--collect-hotkey=Ctrl+Alt+K"]).CollectHotkey.ShouldBe(Hotkey.Parse("Ctrl+Alt+K").Value);
+    }
+
+    [Fact]
+    public void The_collect_shortcut_and_the_popup_shortcut_are_separate()
+    {
+        var options = StartupOptions.Parse(["--hotkey", "F24", "--collect-hotkey", "F23"]);
+
+        options.Hotkey.ShouldBe(Hotkey.Parse("F24").Value);
+        options.CollectHotkey.ShouldBe(Hotkey.Parse("F23").Value);
+        options.Problems.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_collect_shortcut_that_does_not_parse_is_ignored_with_a_note()
+    {
+        var options = StartupOptions.Parse(["--collect-hotkey", "Ctrl+Nonsense"]);
+
+        options.CollectHotkey.ShouldBeNull();
+        options.Problems.ShouldBe(["--collect-hotkey is not a shortcut ClipBench understands, so it was ignored."]);
     }
 
     [Fact]
@@ -114,6 +141,8 @@ public class StartupOptionsTests
     [InlineData("--hotkey")]
     [InlineData("--data-dir=")]
     [InlineData("--hotkey=")]
+    [InlineData("--collect-hotkey")]
+    [InlineData("--collect-hotkey=")]
     public void A_switch_without_a_value_is_ignored_with_a_note(string argument)
     {
         var options = StartupOptions.Parse([argument]);
