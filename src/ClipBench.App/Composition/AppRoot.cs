@@ -12,6 +12,7 @@ using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
+using ClipBench.Presentation.Queue;
 using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
 using ClipBench.Storage.Clips;
@@ -36,6 +37,7 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly WindowsPlatform _platform;
     private readonly ClipStorage _storage;
     private readonly PopupWindow _popup;
+    private readonly QueueHudWindow _hud;
     private readonly PopupViewModel _popupViewModel;
     private readonly TrayViewModel _trayViewModel;
     private readonly ITrayIcon? _tray;
@@ -50,6 +52,7 @@ internal sealed class AppRoot : IAsyncDisposable
         WindowsPlatform platform,
         ClipStorage storage,
         PopupWindow popup,
+        QueueHudWindow hud,
         PopupViewModel popupViewModel,
         TrayViewModel trayViewModel,
         ITrayIcon? tray,
@@ -61,6 +64,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _platform = platform;
         _storage = storage;
         _popup = popup;
+        _hud = hud;
         _popupViewModel = popupViewModel;
         _trayViewModel = trayViewModel;
         _tray = tray;
@@ -118,6 +122,7 @@ internal sealed class AppRoot : IAsyncDisposable
 
         var services = BuildServices(platform, storage, paths, log, dispatcher, time, tray);
         PopupWindow? popup = null;
+        QueueHudWindow? hud = null;
         try
         {
             // Settings that cannot be read give the defaults; the app runs either way.
@@ -133,7 +138,7 @@ internal sealed class AppRoot : IAsyncDisposable
             var loaded = await library.LoadAsync(cancellationToken);
             if (loaded.IsFailure)
             {
-                await ReleaseAsync(services, storage, platform, tray, popup);
+                await ReleaseAsync(services, storage, platform, tray, popup, hud);
                 return new StartOutcome(null, "ClipBench could not read its saved history. Check that the folder is readable, then start ClipBench again.");
             }
 
@@ -156,7 +161,8 @@ internal sealed class AppRoot : IAsyncDisposable
 
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
 
-            var root = new AppRoot(services, platform, storage, popup, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
+            hud = CreateQueueWindow(services, platform, options);
+            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
             await root.ShowTrayAsync(cancellationToken);
             await root.RegisterShortcutAsync(options.Hotkey ?? Hotkey.Default, cancellationToken);
             platform.Hotkeys.Pressed += root.OnHotkeyPressed;
@@ -166,15 +172,16 @@ internal sealed class AppRoot : IAsyncDisposable
         catch
         {
             // Something failed half way: let go of what was already created, so no icon or connection is left behind.
-            await ReleaseAsync(services, storage, platform, tray, popup);
+            await ReleaseAsync(services, storage, platform, tray, popup, hud);
             throw;
         }
     }
 
-    private static async Task ReleaseAsync(ServiceProvider services, ClipStorage storage, WindowsPlatform platform, ITrayIcon? tray, PopupWindow? popup)
+    private static async Task ReleaseAsync(ServiceProvider services, ClipStorage storage, WindowsPlatform platform, ITrayIcon? tray, PopupWindow? popup, QueueHudWindow? hud)
     {
         tray?.Dispose();
         popup?.Close();
+        hud?.Close();
         await DisposeAllAsync(services, storage, platform);
     }
 
@@ -221,6 +228,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray?.Dispose();
         _popupViewModel.Close();
         _popup.Close();
+        _hud.Close();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
@@ -230,6 +238,26 @@ internal sealed class AppRoot : IAsyncDisposable
         await services.DisposeAsync();
         await storage.DisposeAsync();
         platform.Dispose();
+    }
+
+    // The queue window goes to the corner of the monitor the user is working on, and is kept out of screen captures like the popup.
+    private static QueueHudWindow CreateQueueWindow(ServiceProvider services, WindowsPlatform platform, StartupOptions options)
+    {
+        var hud = new QueueHudWindow(services.GetRequiredService<QueueHudViewModel>(), () =>
+        {
+            var focused = platform.ForegroundTracker.Capture();
+            var anchor = platform.ScreenLocator.Locate(focused.IsSuccess ? focused.Value.Window : null);
+            return HudPlacement.Compute(anchor, QueueHudWindow.WidthDip, QueueHudWindow.HeightDip);
+        });
+
+        var handle = new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(hud));
+        _ = platform.WindowEffects.UseRoundedCorners(handle);
+        if (!options.AllowScreenCapture)
+        {
+            _ = platform.WindowEffects.ExcludeFromCapture(handle);
+        }
+
+        return hud;
     }
 
     private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, StoragePaths paths, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
@@ -257,6 +285,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<QueueRunner>();
         _ = services.AddSingleton<IQueueControl>(provider => provider.GetRequiredService<QueueRunner>());
         _ = services.AddSingleton<PopupViewModel>();
+        _ = services.AddSingleton<QueueHudViewModel>();
         _ = services.AddSingleton<TrayViewModel>();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
     }
