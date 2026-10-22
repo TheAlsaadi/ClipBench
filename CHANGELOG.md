@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Multi-paste (ADR 0015). **Batch paste**: mark clips with Space, or Ctrl+Space while searching; each mark shows
+  its place in the paste order, and Enter pastes them joined by the chosen separator (new line, blank line, comma
+  and space, comma, semicolon, tab, space, nothing, or a custom one with `\n`, `\r`, `\t` and `\\`). Ctrl+S
+  moves to the next separator, and the choice is remembered. **Table paste**: Ctrl+T pastes the marked clips as a
+  spreadsheet column and Ctrl+Shift+T as a row, with cells quoted the way Excel reads them. **Queue paste**: Ctrl+Q
+  queues the marked clips, and each Ctrl+V then pastes the next one. Ctrl+V and Esc are claimed with RegisterHotKey
+  only while a queue runs, and are given back on every way it ends. A small window shows "Queue 2/5 · Esc to
+  stop" in the corner without keeping the focus, and is hidden from screen capture. **Collecting**: Win+Alt+C,
+  the tray menu or Ctrl+L in the popup start a session in which every copy is appended to one clip. Finishing
+  saves that clip at the top of the history and puts it on the clipboard. The popup footer has buttons for
+  paste, the separator, queue, table and collect. The tray menu gains Start, Finish and Cancel collecting, Stop
+  paste queue and a ticked Restore clipboard after paste.
+- A small settings file (`settings.json`, read with the base library's JSON support, so no new package) for the
+  separator, the restore switch and whether copies are also kept while collecting. It holds no clip content, is
+  read with a size and depth limit, falls back to the defaults, and keeps a damaged file aside as
+  `settings.json.bad`.
+- A `--collect-hotkey` switch for tests, beside `--hotkey`.
+- UI smoke tests for batch, table, queue (three clips pasted in order into a real window) and collect paste.
+
 - The app shell (`ClipBench.App`, ADR 0012 to ADR 0014): the app starts with its icon in the notification
   area, watches the clipboard and keeps what is copied in the encrypted history, and a shortcut (Win+Alt+V
   by default) opens a compact popup next to the text cursor or the mouse pointer. The popup has a search box,
@@ -82,6 +101,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A paste from the popup ends a running queue first, so the queue cannot take the paste's own Ctrl+V.
+- Whether the clipboard is put back after a paste now comes from the settings (the tray tick), read at each
+  paste, instead of a fixed option.
 - Dependabot now updates the three CodeQL action steps together in one pull request, because
   the action fails when its steps run different versions. All of them are on 4.38.3, and a test
   keeps it that way.
