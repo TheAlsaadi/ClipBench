@@ -26,7 +26,7 @@ public readonly record struct QueueProgress(QueueState State, int Pasted, int Co
 /// that fails, a new queue and disposal. Steps run one at a time; Esc takes effect at once and a paste that is under
 /// way finishes first.
 /// </summary>
-public sealed class QueueRunner : IAsyncDisposable
+public sealed class QueueRunner : IQueueControl, IAsyncDisposable
 {
     private const string Title = "ClipBench";
 

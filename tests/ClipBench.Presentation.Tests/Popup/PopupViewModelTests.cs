@@ -24,7 +24,7 @@ public sealed class PopupViewModelTests : IDisposable
     public PopupViewModelTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), _store);
-        _vm = new PopupViewModel(_library, _paste, _settings, _dispatcher, _time);
+        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), _settings, _dispatcher, _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

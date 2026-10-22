@@ -14,20 +14,24 @@ public static class TrayMenu
     /// <summary>The id of the item that quits.</summary>
     public const int ExitId = 3;
 
+    /// <summary>The id of the item that stops a running paste queue.</summary>
+    public const int StopQueueId = 4;
+
     /// <summary>Builds the tool tip and the menu.</summary>
     /// <param name="tray">The tray view model.</param>
     /// <returns>What the icon should show now.</returns>
     public static TrayModel Build(TrayViewModel tray)
     {
         ArgumentNullException.ThrowIfNull(tray);
-        return new TrayModel(
-            tray.ToolTip,
-            [
-                new TrayMenuItem(OpenId, "Open ClipBench", IsDefault: true),
-                TrayMenuItem.Separator,
-                new TrayMenuItem(PauseId, tray.PauseLabel),
-                new TrayMenuItem(ExitId, "Exit"),
-            ]);
+        List<TrayMenuItem> menu = [new TrayMenuItem(OpenId, "Open ClipBench", IsDefault: true), TrayMenuItem.Separator];
+        if (tray.IsQueueRunning)
+        {
+            menu.Add(new TrayMenuItem(StopQueueId, "Stop paste queue"));
+        }
+
+        menu.Add(new TrayMenuItem(PauseId, tray.PauseLabel));
+        menu.Add(new TrayMenuItem(ExitId, "Exit"));
+        return new TrayModel(tray.ToolTip, [.. menu]);
     }
 
     /// <summary>Runs the command behind a menu item. An id that is not one of ours does nothing.</summary>
@@ -46,6 +50,9 @@ public static class TrayMenu
                 break;
             case ExitId:
                 tray.ExitCommand.Execute(null);
+                break;
+            case StopQueueId:
+                tray.StopQueueCommand.Execute(null);
                 break;
             default:
                 break;

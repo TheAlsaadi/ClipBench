@@ -9,7 +9,7 @@ public sealed partial class PopupViewModel
 {
     private readonly PasteComposer _composer = new();
 
-    private string MarkedHints => string.Join(HintGap, $"Enter paste {MarkedCount}", $"Ctrl+S {SeparatorLabel}", "Ctrl+T table", "Esc close");
+    private string MarkedHints => string.Join(HintGap, $"Enter paste {MarkedCount}", $"Ctrl+S {SeparatorLabel}", "Ctrl+Q queue", "Ctrl+T table", "Esc close");
 
     // The marked clips that are still in the history, in the order they were marked.
     private List<Clip> MarkedClips()
@@ -69,4 +69,25 @@ public sealed partial class PopupViewModel
 
     private List<Clip> HighlightedClip() =>
         Current is { } row && _library.Clips.FirstOrDefault(clip => clip.Id == row.Id) is { } highlighted ? [highlighted] : [];
+
+    [RelayCommand]
+    private async Task QueueAsync(CancellationToken cancellationToken)
+    {
+        var clips = _marks.Count > 0 ? MarkedClips() : HighlightedClip();
+        if (clips.Count == 0)
+        {
+            return;
+        }
+
+        ErrorMessage = null;
+        var started = await _queue.StartAsync(clips, cancellationToken);
+        if (started.IsFailure)
+        {
+            ErrorMessage = started.Error.Message;
+            return;
+        }
+
+        // The queue pastes into whatever has focus once the popup is gone.
+        Close();
+    }
 }

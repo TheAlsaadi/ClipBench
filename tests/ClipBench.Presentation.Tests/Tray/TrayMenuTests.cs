@@ -1,4 +1,5 @@
 using ClipBench.Core.Capture;
+using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
 
 namespace ClipBench.Presentation.Tests.Tray;
@@ -13,11 +14,14 @@ public class TrayMenuTests
     }
 
     private readonly FakeCapture _capture = new();
+    private readonly FakeQueueControl _queue = new();
+
+    private TrayViewModel Create() => new(_capture, _queue);
 
     [Fact]
     public void The_menu_offers_open_pause_and_exit_with_open_as_the_default()
     {
-        var model = TrayMenu.Build(new TrayViewModel(_capture));
+        var model = TrayMenu.Build(Create());
 
         model.Menu.Select(item => (item.Id, item.Text, item.IsDefault)).ShouldBe(
         [
@@ -31,7 +35,7 @@ public class TrayMenuTests
     [Fact]
     public void The_tool_tip_and_the_pause_item_follow_the_state()
     {
-        var tray = new TrayViewModel(_capture);
+        var tray = Create();
         tray.TogglePauseCommand.Execute(null);
 
         var model = TrayMenu.Build(tray);
@@ -43,7 +47,7 @@ public class TrayMenuTests
     [Fact]
     public void Choosing_each_item_runs_its_command()
     {
-        var tray = new TrayViewModel(_capture);
+        var tray = Create();
         var opened = 0;
         var exited = 0;
         tray.OpenRequested += (_, _) => opened++;
@@ -60,12 +64,12 @@ public class TrayMenuTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(4)]
+    [InlineData(99)]
     [InlineData(-1)]
     [InlineData(int.MaxValue)]
     public void An_id_that_is_not_ours_does_nothing(int id)
     {
-        var tray = new TrayViewModel(_capture);
+        var tray = Create();
         var raised = 0;
         tray.OpenRequested += (_, _) => raised++;
         tray.ExitRequested += (_, _) => raised++;
@@ -74,5 +78,35 @@ public class TrayMenuTests
 
         raised.ShouldBe(0);
         _capture.IsPaused.ShouldBeFalse();
+        _queue.Stops.ShouldBe(0);
+    }
+
+    [Fact]
+    public void While_a_queue_runs_the_menu_offers_to_stop_it()
+    {
+        var tray = Create();
+        _queue.Report(Core.Pasting.QueueState.Armed, 1, 4);
+
+        var model = TrayMenu.Build(tray);
+
+        model.Menu.Select(item => (item.Id, item.Text)).ShouldBe(
+        [
+            (TrayMenu.OpenId, "Open ClipBench"),
+            (0, string.Empty),
+            (TrayMenu.StopQueueId, "Stop paste queue"),
+            (TrayMenu.PauseId, "Pause capturing"),
+            (TrayMenu.ExitId, "Exit"),
+        ]);
+    }
+
+    [Fact]
+    public void Choosing_stop_paste_queue_stops_it()
+    {
+        var tray = Create();
+        _queue.Report(Core.Pasting.QueueState.Armed, 0, 2);
+
+        TrayMenu.Execute(tray, TrayMenu.StopQueueId);
+
+        _queue.Stops.ShouldBe(1);
     }
 }

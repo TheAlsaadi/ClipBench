@@ -19,7 +19,7 @@ public sealed class PopupTableTests : IDisposable
     public PopupTableTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), new FakeClipStore());
-        _vm = new PopupViewModel(_library, _paste, _settings, new ImmediateDispatcher(), _time);
+        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), _settings, new ImmediateDispatcher(), _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

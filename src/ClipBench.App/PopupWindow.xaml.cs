@@ -131,6 +131,10 @@ public sealed partial class PopupWindow : Window
                 ViewModel.PasteTableCommand.Execute(shift ? TableLayout.Row : TableLayout.Column);
                 e.Handled = true;
                 break;
+            case VirtualKey.Q when control:
+                ViewModel.QueueCommand.Execute(null);
+                e.Handled = true;
+                break;
             case VirtualKey.S when control:
                 ViewModel.NextSeparatorCommand.Execute(null);
                 e.Handled = true;

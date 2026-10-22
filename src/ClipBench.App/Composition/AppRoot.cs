@@ -4,6 +4,7 @@ using ClipBench.Core.History;
 using ClipBench.Core.Hosting;
 using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Notifications;
+using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
 using ClipBench.Core.Tray;
@@ -242,6 +243,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(platform.ClipboardWriter);
         _ = services.AddSingleton(platform.ForegroundTracker);
         _ = services.AddSingleton(platform.PasteInjector);
+        _ = services.AddSingleton(platform.Hotkeys);
         _ = tray is null ? services.AddSingleton<IUserNotifier, NullNotifier>() : services.AddSingleton<IUserNotifier>(tray);
         _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
         _ = services.AddSingleton<ISettingsStore>(new JsonSettingsStore(paths.SettingsPath));
@@ -252,6 +254,8 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<CaptureService>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
+        _ = services.AddSingleton<QueueRunner>();
+        _ = services.AddSingleton<IQueueControl>(provider => provider.GetRequiredService<QueueRunner>());
         _ = services.AddSingleton<PopupViewModel>();
         _ = services.AddSingleton<TrayViewModel>();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
