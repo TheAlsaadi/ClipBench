@@ -29,6 +29,7 @@ public sealed class PasteFlow : IPasteFlow
     private readonly IUserNotifier _notifier;
     private readonly IActivityLog _log;
     private readonly SettingsService _settings;
+    private readonly IQueueControl _queue;
     private readonly PasteFlowOptions _options;
     private readonly Lock _gate = new();
     private WindowHandle? _target;
@@ -40,6 +41,7 @@ public sealed class PasteFlow : IPasteFlow
     /// <param name="notifier">Tells the user when a paste did not work.</param>
     /// <param name="log">Records what happened, without content.</param>
     /// <param name="settings">Says whether to put the clipboard back after the paste.</param>
+    /// <param name="queue">The paste queue, which a paste ends first.</param>
     /// <param name="options">How to paste, or null for the defaults.</param>
     public PasteFlow(
         IForegroundTracker tracker,
@@ -48,6 +50,7 @@ public sealed class PasteFlow : IPasteFlow
         IUserNotifier notifier,
         IActivityLog log,
         SettingsService settings,
+        IQueueControl queue,
         PasteFlowOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(tracker);
@@ -61,7 +64,9 @@ public sealed class PasteFlow : IPasteFlow
         _notifier = notifier;
         _log = log;
         ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(queue);
         _settings = settings;
+        _queue = queue;
         _options = options ?? new PasteFlowOptions();
     }
 
@@ -105,6 +110,12 @@ public sealed class PasteFlow : IPasteFlow
 
         try
         {
+            // The paste presses Ctrl+V. A running queue holds Ctrl+V and would take the press for its own, so it ends first.
+            if (_queue.Progress.IsRunning)
+            {
+                await _queue.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             var result = await _injector.PasteAsync(request, cancellationToken).ConfigureAwait(false);
             if (result.IsSuccess)
             {

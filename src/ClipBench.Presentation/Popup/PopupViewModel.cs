@@ -300,21 +300,19 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (Current is not { } row)
+        if (HighlightedClip() is not [var clip])
         {
-            return;
-        }
+            // A highlighted row whose clip has just left the history: show the list as it is now.
+            if (Current is not null)
+            {
+                Refresh(keepSelection: true);
+            }
 
-        var clip = _library.Clips.FirstOrDefault(candidate => candidate.Id == row.Id);
-        if (clip is null)
-        {
-            Refresh(keepSelection: true);
             return;
         }
 
         // Hide first: the paste needs the window underneath to have focus again.
         Close();
-        await EndQueueAsync(cancellationToken);
         await _paste.PasteAsync(clip, cancellationToken);
     }
 

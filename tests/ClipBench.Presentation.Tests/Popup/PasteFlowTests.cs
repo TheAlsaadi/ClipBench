@@ -20,7 +20,9 @@ public sealed class PasteFlowTests : IDisposable
 
     private readonly SettingsService _settings = new(new FakeSettingsStore());
 
-    private PasteFlow Create(PasteFlowOptions? options = null) => new(_tracker, _injector, _writer, _notifier, _log, _settings, options);
+    private readonly FakeQueueControl _queue = new();
+
+    private PasteFlow Create(PasteFlowOptions? options = null) => new(_tracker, _injector, _writer, _notifier, _log, _settings, _queue, options);
 
     public void Dispose() => _settings.Dispose();
 
@@ -57,6 +59,53 @@ public sealed class PasteFlowTests : IDisposable
         await flow.PasteAsync(Clip("second"), Ct);
 
         _injector.Requests.Select(request => request.RestorePreviousClipboard).ShouldBe([true, false]);
+    }
+
+    // --- a running queue ---
+
+    // A paste presses Ctrl+V itself. A running queue holds Ctrl+V, so it would take that press and paste its own clip.
+
+    [Fact]
+    public async Task A_paste_ends_a_running_queue_before_any_key_is_sent()
+    {
+        var flow = Create();
+        _queue.Report(QueueState.Armed, 0, 2);
+        var requestsWhenStopped = -1;
+        _queue.OnStop = () => requestsWhenStopped = _injector.Requests.Count;
+
+        await flow.PasteAsync(Clip(), Ct);
+
+        _queue.Stops.ShouldBe(1);
+        requestsWhenStopped.ShouldBe(0);
+        _injector.Requests.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Composed_content_also_ends_a_running_queue_first()
+    {
+        var flow = Create();
+        _queue.Report(QueueState.Pasting, 1, 2);
+        var requestsWhenStopped = -1;
+        _queue.OnStop = () => requestsWhenStopped = _injector.Requests.Count;
+
+        await flow.PasteContentAsync(new TextContent("a, b"), Ct);
+
+        _queue.Stops.ShouldBe(1);
+        requestsWhenStopped.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(QueueState.Idle)]
+    [InlineData(QueueState.Exhausted)]
+    [InlineData(QueueState.Cancelled)]
+    public async Task Without_a_running_queue_nothing_is_stopped(QueueState state)
+    {
+        var flow = Create();
+        _queue.Report(state, 0, 0);
+
+        await flow.PasteAsync(Clip(), Ct);
+
+        _queue.Stops.ShouldBe(0);
     }
 
     [Fact]

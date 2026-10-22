@@ -38,8 +38,12 @@ internal sealed class FakeQueueControl : IQueueControl
         return Task.FromResult(StartResult);
     }
 
+    /// <summary>Runs at the start of every stop, so a test can look at the state at that moment.</summary>
+    public Action? OnStop { get; set; }
+
     public Task StopAsync(CancellationToken cancellationToken)
     {
+        OnStop?.Invoke();
         Stops++;
         Report(QueueState.Cancelled, Progress.Pasted, Progress.Count);
         return Task.CompletedTask;
