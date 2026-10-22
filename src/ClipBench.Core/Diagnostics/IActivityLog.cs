@@ -79,6 +79,24 @@ public enum ActivityEvent
 
     /// <summary>The saved settings could not be read; the defaults are in use and the file was left alone.</summary>
     SettingsUnreadable,
+
+    /// <summary>A paste queue started, with the number of clips as the count.</summary>
+    QueueStarted,
+
+    /// <summary>A queue pasted one clip, with its kind and size.</summary>
+    QueuePasted,
+
+    /// <summary>A queue pasted its last clip.</summary>
+    QueueFinished,
+
+    /// <summary>The user stopped a queue before it finished.</summary>
+    QueueStopped,
+
+    /// <summary>A queue stopped because a step did not work, with the reason as an error code.</summary>
+    QueueFailed,
+
+    /// <summary>A queue stopped because of a bug, with the exception type.</summary>
+    QueueFaulted,
 }
 
 /// <summary>
