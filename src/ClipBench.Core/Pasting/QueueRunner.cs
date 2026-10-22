@@ -83,7 +83,7 @@ public sealed class QueueRunner : IQueueControl, IAsyncDisposable
     public static Hotkey StopKey { get; } = new(HotkeyModifiers.None, 0x1B);
 
     /// <summary>Where the queue is.</summary>
-    public QueueProgress Progress => new(_queue.State, _queue.PastedCount, _queue.Count);
+    public QueueProgress Progress => _queue.Progress;
 
     /// <summary>
     /// Starts a queue: claims Ctrl+V and Esc and waits for the first Ctrl+V. A queue that is running is stopped first.

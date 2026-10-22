@@ -63,6 +63,18 @@ public sealed class PasteQueue
         }
     }
 
+    /// <summary>The state and both counts, read together so they always belong to the same moment.</summary>
+    public QueueProgress Progress
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return new QueueProgress(_state, _pasted, _clips.Length);
+            }
+        }
+    }
+
     /// <summary>True when the queue starts over after the last clip.</summary>
     public bool IsLooping
     {
