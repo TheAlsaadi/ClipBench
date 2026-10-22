@@ -311,6 +311,74 @@ public sealed class CaptureServiceTests : IDisposable
         Texts(_library).ShouldBe(["after the fault"]);
     }
 
+    // --- collecting ---
+
+    private sealed class FakeRouter : ICaptureRouter
+    {
+        public bool Keep { get; set; } = true;
+
+        public List<Clip> Offered { get; } = [];
+
+        public bool Offer(Clip clip)
+        {
+            lock (Offered)
+            {
+                Offered.Add(clip);
+            }
+
+            return Keep;
+        }
+    }
+
+    [Fact]
+    public async Task A_clip_the_router_takes_is_not_stored_and_is_logged_as_collected()
+    {
+        var router = new FakeRouter { Keep = false };
+        using var service = new CaptureService(_listener, _reader, _library, _log, _clock, router: router);
+        (await service.StartAsync(Ct)).IsSuccess.ShouldBeTrue();
+        _reader.Returns(Copied(1, "part one"));
+
+        _listener.Raise(1);
+        await _log.WaitForCountAsync(2, Ct);
+
+        _library.Clips.ShouldBeEmpty();
+        ((TextContent)router.Offered.Single().Content).Text.ShouldBe("part one");
+        var entry = _log.Entries[1];
+        entry.Activity.ShouldBe(ActivityEvent.CaptureCollected);
+        entry.Details.Format.ShouldBe(ClipFormat.Text);
+        entry.Details.Bytes.ShouldBe(8);
+    }
+
+    [Fact]
+    public async Task A_clip_the_router_lets_through_is_stored_as_usual()
+    {
+        var router = new FakeRouter { Keep = true };
+        using var service = new CaptureService(_listener, _reader, _library, _log, _clock, router: router);
+        (await service.StartAsync(Ct)).IsSuccess.ShouldBeTrue();
+        _reader.Returns(Copied(1, "kept"));
+
+        _listener.Raise(1);
+        await _log.WaitForCountAsync(2, Ct);
+
+        Texts(_library).ShouldBe(["kept"]);
+        router.Offered.ShouldHaveSingleItem();
+        _log.Entries[1].Activity.ShouldBe(ActivityEvent.CaptureStored);
+    }
+
+    [Fact]
+    public async Task A_change_the_filter_rejects_never_reaches_the_router()
+    {
+        var router = new FakeRouter();
+        using var service = new CaptureService(_listener, _reader, _library, _log, _clock, router: router);
+        (await service.StartAsync(Ct)).IsSuccess.ShouldBeTrue();
+        _reader.Returns(Result.Success(ClipboardCapture.Rejected(1, CaptureRejection.PrivacyMarker)));
+
+        _listener.Raise(1);
+        await _log.WaitForCountAsync(2, Ct);
+
+        router.Offered.ShouldBeEmpty();
+    }
+
     // --- stopping ---
 
     [Fact]

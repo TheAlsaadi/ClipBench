@@ -4,15 +4,20 @@ using ClipBench.Core.History;
 using ClipBench.Core.Hosting;
 using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Notifications;
+using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
+using ClipBench.Presentation.Queue;
 using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
 using ClipBench.Storage.Clips;
+using ClipBench.Storage.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 
@@ -33,6 +38,7 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly WindowsPlatform _platform;
     private readonly ClipStorage _storage;
     private readonly PopupWindow _popup;
+    private readonly QueueHudWindow _hud;
     private readonly PopupViewModel _popupViewModel;
     private readonly TrayViewModel _trayViewModel;
     private readonly ITrayIcon? _tray;
@@ -40,6 +46,7 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
     private HotkeyId? _hotkey;
+    private HotkeyId? _collectHotkey;
     private bool _disposed;
 
     private AppRoot(
@@ -47,6 +54,7 @@ internal sealed class AppRoot : IAsyncDisposable
         WindowsPlatform platform,
         ClipStorage storage,
         PopupWindow popup,
+        QueueHudWindow hud,
         PopupViewModel popupViewModel,
         TrayViewModel trayViewModel,
         ITrayIcon? tray,
@@ -58,6 +66,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _platform = platform;
         _storage = storage;
         _popup = popup;
+        _hud = hud;
         _popupViewModel = popupViewModel;
         _trayViewModel = trayViewModel;
         _tray = tray;
@@ -113,15 +122,25 @@ internal sealed class AppRoot : IAsyncDisposable
             log.Write(ActivityLevel.Error, ActivityEvent.TrayFailed, new ActivityDetails { Error = trayCreated.Error.Code });
         }
 
-        var services = BuildServices(platform, storage, log, dispatcher, time, tray);
+        var services = BuildServices(platform, storage, paths, log, dispatcher, time, tray);
         PopupWindow? popup = null;
+        QueueHudWindow? hud = null;
         try
         {
+            // Settings that cannot be read give the defaults; the app runs either way.
+            var settingsLoad = await services.GetRequiredService<SettingsService>().LoadAsync(cancellationToken);
+            if (settingsLoad is SettingsLoadStatus.Damaged or SettingsLoadStatus.Unreadable)
+            {
+                log.Write(
+                    ActivityLevel.Warning,
+                    settingsLoad == SettingsLoadStatus.Damaged ? ActivityEvent.SettingsDamaged : ActivityEvent.SettingsUnreadable);
+            }
+
             var library = services.GetRequiredService<ClipLibrary>();
             var loaded = await library.LoadAsync(cancellationToken);
             if (loaded.IsFailure)
             {
-                await ReleaseAsync(services, storage, platform, tray, popup);
+                await ReleaseAsync(services, storage, platform, tray, popup, hud);
                 return new StartOutcome(null, "ClipBench could not read its saved history. Check that the folder is readable, then start ClipBench again.");
             }
 
@@ -144,9 +163,17 @@ internal sealed class AppRoot : IAsyncDisposable
 
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
 
-            var root = new AppRoot(services, platform, storage, popup, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
+            hud = CreateQueueWindow(services, platform, options);
+            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
             await root.ShowTrayAsync(cancellationToken);
-            await root.RegisterShortcutAsync(options.Hotkey ?? Hotkey.Default, cancellationToken);
+            root._hotkey = await root.RegisterShortcutAsync(
+                options.Hotkey ?? Hotkey.Default,
+                "You can still open ClipBench from its tray icon.",
+                cancellationToken);
+            root._collectHotkey = await root.RegisterShortcutAsync(
+                options.CollectHotkey ?? CollectToggle.DefaultShortcut,
+                "You can still start and finish collecting from the tray menu.",
+                cancellationToken);
             platform.Hotkeys.Pressed += root.OnHotkeyPressed;
             guard.ShowRequested += root.OnShowRequested;
             return new StartOutcome(root, null);
@@ -154,15 +181,16 @@ internal sealed class AppRoot : IAsyncDisposable
         catch
         {
             // Something failed half way: let go of what was already created, so no icon or connection is left behind.
-            await ReleaseAsync(services, storage, platform, tray, popup);
+            await ReleaseAsync(services, storage, platform, tray, popup, hud);
             throw;
         }
     }
 
-    private static async Task ReleaseAsync(ServiceProvider services, ClipStorage storage, WindowsPlatform platform, ITrayIcon? tray, PopupWindow? popup)
+    private static async Task ReleaseAsync(ServiceProvider services, ClipStorage storage, WindowsPlatform platform, ITrayIcon? tray, PopupWindow? popup, QueueHudWindow? hud)
     {
         tray?.Dispose();
         popup?.Close();
+        hud?.Close();
         await DisposeAllAsync(services, storage, platform);
     }
 
@@ -209,6 +237,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray?.Dispose();
         _popupViewModel.Close();
         _popup.Close();
+        _hud.Close();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
@@ -220,7 +249,27 @@ internal sealed class AppRoot : IAsyncDisposable
         platform.Dispose();
     }
 
-    private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
+    // The queue window goes to the corner of the monitor the user is working on, and is kept out of screen captures like the popup.
+    private static QueueHudWindow CreateQueueWindow(ServiceProvider services, WindowsPlatform platform, StartupOptions options)
+    {
+        var hud = new QueueHudWindow(services.GetRequiredService<QueueHudViewModel>(), () =>
+        {
+            var focused = platform.ForegroundTracker.Capture();
+            var anchor = platform.ScreenLocator.Locate(focused.IsSuccess ? focused.Value.Window : null);
+            return HudPlacement.Compute(anchor, QueueHudWindow.WidthDip, QueueHudWindow.HeightDip);
+        });
+
+        var handle = new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(hud));
+        _ = platform.WindowEffects.UseRoundedCorners(handle);
+        if (!options.AllowScreenCapture)
+        {
+            _ = platform.WindowEffects.ExcludeFromCapture(handle);
+        }
+
+        return hud;
+    }
+
+    private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, StoragePaths paths, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
     {
         var services = new ServiceCollection();
         _ = services.AddSingleton(time);
@@ -231,15 +280,25 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(platform.ClipboardWriter);
         _ = services.AddSingleton(platform.ForegroundTracker);
         _ = services.AddSingleton(platform.PasteInjector);
+        _ = services.AddSingleton(platform.Hotkeys);
         _ = tray is null ? services.AddSingleton<IUserNotifier, NullNotifier>() : services.AddSingleton<IUserNotifier>(tray);
         _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
+        _ = services.AddSingleton<ISettingsStore>(new JsonSettingsStore(paths.SettingsPath));
+        _ = services.AddSingleton<SettingsService>();
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
+        _ = services.AddSingleton<CollectController>();
+        _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
+        _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<CaptureService>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
+        _ = services.AddSingleton<QueueRunner>();
+        _ = services.AddSingleton<IQueueControl>(provider => provider.GetRequiredService<QueueRunner>());
         _ = services.AddSingleton<PopupViewModel>();
+        _ = services.AddSingleton<QueueHudViewModel>();
+        _ = services.AddSingleton<CollectToggle>();
         _ = services.AddSingleton<TrayViewModel>();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
     }
@@ -295,13 +354,22 @@ internal sealed class AppRoot : IAsyncDisposable
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
-        // Pausing changes the tool tip and the wording of the pause item. The tool tip changes exactly when the state does,
-        // so it is the one change to answer: the icon is updated once, not once per property.
+        // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly
+        // when the menu does; the restore tick is the one item it does not show. Answering these two updates the icon once
+        // per change, not once per property.
         _trayViewModel.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(TrayViewModel.ToolTip) && !_disposed)
+            // Changes come from the UI thread, the queue and the capture thread. The menu is built and sent from the UI
+            // thread, one change after another, so an older menu can never arrive after a newer one.
+            if (e.PropertyName is nameof(TrayViewModel.ToolTip) or nameof(TrayViewModel.RestoreClipboard))
             {
-                _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+                _dispatcher.Post(() =>
+                {
+                    if (!_disposed)
+                    {
+                        _ = _tray.UpdateAsync(TrayMenu.Build(_trayViewModel), CancellationToken.None);
+                    }
+                });
             }
         };
 
@@ -312,20 +380,21 @@ internal sealed class AppRoot : IAsyncDisposable
         }
     }
 
-    private async Task RegisterShortcutAsync(Hotkey hotkey, CancellationToken cancellationToken)
+    // Returns the registration, or null when another program holds the shortcut; the user is then told what still works.
+    private async Task<HotkeyId?> RegisterShortcutAsync(Hotkey hotkey, string fallback, CancellationToken cancellationToken)
     {
         var registered = await _platform.Hotkeys.RegisterAsync(hotkey, cancellationToken);
         if (registered.IsSuccess)
         {
-            _hotkey = registered.Value;
             _log.Write(ActivityLevel.Information, ActivityEvent.HotkeyRegistered);
-            return;
+            return registered.Value;
         }
 
         _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = registered.Error.Code });
         _services.GetRequiredService<IUserNotifier>().Show(
             "ClipBench",
-            $"ClipBench could not claim the shortcut {hotkey} because another program uses it. You can still open ClipBench from its tray icon.");
+            $"ClipBench could not claim the shortcut {hotkey} because another program uses it. {fallback}");
+        return null;
     }
 
     // Runs on a pool thread.
@@ -334,6 +403,17 @@ internal sealed class AppRoot : IAsyncDisposable
         if (_hotkey is { } own && e.Id == own)
         {
             _dispatcher.Post(() => TogglePopup());
+        }
+        else if (_collectHotkey is { } collect && e.Id == collect)
+        {
+            _dispatcher.Post(() =>
+            {
+                // A press that arrives while the app shuts down finds the services gone.
+                if (!_disposed)
+                {
+                    _ = _services.GetRequiredService<CollectToggle>().ToggleAsync(CancellationToken.None);
+                }
+            });
         }
     }
 

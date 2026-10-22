@@ -1,6 +1,8 @@
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Tests.Support;
@@ -17,12 +19,13 @@ public sealed class PopupViewModelTests : IDisposable
     private readonly FakePasteFlow _paste = new();
     private readonly ImmediateDispatcher _dispatcher = new();
     private readonly ClipLibrary _library;
+    private readonly SettingsService _settings = new(new FakeSettingsStore());
     private readonly PopupViewModel _vm;
 
     public PopupViewModelTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), _store);
-        _vm = new PopupViewModel(_library, _paste, _dispatcher, _time);
+        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), _settings, _dispatcher, _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -31,6 +34,7 @@ public sealed class PopupViewModelTests : IDisposable
     {
         _vm.Dispose();
         _library.Dispose();
+        _settings.Dispose();
     }
 
     /// <summary>Copies the texts in order, so the last one is the newest.</summary>
@@ -43,6 +47,21 @@ public sealed class PopupViewModelTests : IDisposable
     }
 
     private string[] Shown() => [.. _vm.Rows.Select(row => row.DisplayText)];
+
+    private string[] MarkedTexts() =>
+        [.. _vm.MarkedIds.Select(id => ((TextContent)_library.Clips.Single(clip => clip.Id == id).Content).Text)];
+
+    /// <summary>Marks every listed row from the top down.</summary>
+    private void MarkAll()
+    {
+        for (var index = 0; index < _vm.Rows.Count; index++)
+        {
+            _vm.SelectedIndex = index;
+            _vm.ToggleMarkCommand.Execute(null);
+        }
+
+        _vm.SelectedIndex = 0;
+    }
 
     private void Type(string text)
     {
@@ -271,6 +290,85 @@ public sealed class PopupViewModelTests : IDisposable
 
         Should.NotThrow(() => _vm.ToggleMarkCommand.Execute(null));
         _vm.MarkedCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Marks_are_kept_in_the_order_they_were_made_and_numbered_that_way()
+    {
+        await CopyAsync("one", "two", "three");
+        _vm.Open();
+
+        _vm.MoveDownCommand.Execute(null);
+        _vm.MoveDownCommand.Execute(null);
+        _vm.ToggleMarkCommand.Execute(null);
+        _vm.MoveUpCommand.Execute(null);
+        _vm.MoveUpCommand.Execute(null);
+        _vm.ToggleMarkCommand.Execute(null);
+
+        MarkedTexts().ShouldBe(["one", "three"]);
+        _vm.Rows.Select(row => row.MarkNumber).ShouldBe([2, 0, 1]);
+    }
+
+    [Fact]
+    public async Task Unmarking_closes_the_gap_in_the_numbers()
+    {
+        await CopyAsync("one", "two", "three");
+        _vm.Open();
+        MarkAll();
+
+        _vm.MoveUpCommand.Execute(null);
+        _vm.MoveUpCommand.Execute(null);
+        _vm.ToggleMarkCommand.Execute(null);
+
+        MarkedTexts().ShouldBe(["three", "one"]);
+        _vm.Rows.Select(row => row.MarkNumber).ShouldBe([1, 0, 2]);
+        _vm.Rows[1].IsMarked.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Marks_survive_a_search_that_hides_them()
+    {
+        await CopyAsync("apple", "banana", "cherry");
+        _vm.Open();
+        _vm.ToggleMarkCommand.Execute(null);
+
+        Type("ban");
+        _vm.ToggleMarkCommand.Execute(null);
+
+        _vm.MarkedCount.ShouldBe(2);
+        Type(string.Empty);
+        MarkedTexts().ShouldBe(["cherry", "banana"]);
+        _vm.Rows.Select(row => row.MarkNumber).ShouldBe([1, 2, 0]);
+    }
+
+    [Fact]
+    public async Task A_marked_clip_that_leaves_the_history_leaves_the_marks()
+    {
+        await CopyAsync("one", "two", "three");
+        _vm.Open();
+        MarkAll();
+        var middle = _vm.Rows[1].Id;
+
+        (await _library.RemoveAsync(middle, Ct)).IsSuccess.ShouldBeTrue();
+
+        _vm.MarkedIds.ShouldNotContain(middle);
+        MarkedTexts().ShouldBe(["three", "one"]);
+        _vm.Rows.Select(row => row.MarkNumber).ShouldBe([1, 2]);
+        _vm.MarkedCount.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Marking_is_announced_so_the_footer_can_follow()
+    {
+        await CopyAsync("one");
+        _vm.Open();
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.ToggleMarkCommand.Execute(null);
+
+        changed.ShouldContain(nameof(PopupViewModel.MarkedCount));
+        changed.ShouldContain(nameof(PopupViewModel.StatusText));
     }
 
     // --- pasting ---

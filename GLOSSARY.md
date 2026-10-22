@@ -62,7 +62,7 @@ Loading a Queue and then pasting its Clips one at a time, one per Ctrl+V, in ord
 The ordered list of Clips waiting to be pasted by queue paste.
 
 **Collect session**:
-A period in which every copy is appended to one growing Clip until the user finishes it.
+A period in which every copy is appended to one growing Clip until the user finishes it. Finishing saves that Clip at the top of the History and puts it on the clipboard. In the app it is called "collecting".
 _Avoid_: collect mode
 
 **Table paste**:
@@ -161,8 +161,16 @@ The row of dots a clip that looks like a secret shows instead of its text, until
 _Avoid_: blur, redaction
 
 **Mark**:
-The tick a user puts on a clip with Space to choose several clips for one paste. Marks arrive with the multi-paste of a later phase.
-_Avoid_: check, selection (a selection is the highlighted row)
+The number a user puts on a clip with Space, or Ctrl+Space while searching, to choose it for a multi-paste. The number is the clip's place in the paste order.
+_Avoid_: check, tick, selection (a selection is the highlighted row)
+
+**Queue window**:
+The small window in the corner of the screen that shows a running Queue: which clip Ctrl+V pastes next and how to stop. It never keeps the focus and shows no clip content. The code calls it the queue HUD.
+_Avoid_: overlay, toast
+
+**Settings**:
+The user's choices that last between runs, kept in `settings.json`: the Separator, whether the clipboard is put back after a paste, and whether copies are also kept while collecting. Never clip content.
+_Avoid_: preferences, options
 
 **Notice**:
 A short message shown next to the tray icon when something that happened in the background did not work, such as a shortcut another program already uses. Its text is always written by the app, never taken from a clip.

@@ -79,10 +79,20 @@
                             Grid.Column="2"
                             Orientation="Horizontal"
                             Spacing="6">
-                            <FontIcon
-                                FontSize="12"
-                                Glyph="&#xE73E;"
-                                Visibility="{x:Bind IsMarked, Mode=OneWay}" />
+                            <Border
+                                MinWidth="20"
+                                Height="20"
+                                Padding="5,0"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                CornerRadius="10"
+                                Visibility="{x:Bind HasMarkNumber, Mode=OneWay}">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind MarkNumber, Mode=OneWay}" />
+                            </Border>
                             <FontIcon
                                 FontSize="12"
                                 Glyph="&#xE718;"
@@ -104,7 +114,79 @@
             TextWrapping="Wrap"
             Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}" />
 
-        <StackPanel Grid.Row="2" Spacing="2">
+        <StackPanel Grid.Row="2" Spacing="4">
+            <Grid ColumnSpacing="6">
+                <Grid.Resources>
+                    <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                        <Setter Property="FontSize" Value="12" />
+                        <Setter Property="Padding" Value="8,3" />
+                    </Style>
+                </Grid.Resources>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button
+                    Grid.Column="0"
+                    Padding="10,3"
+                    AutomationProperties.AutomationId="PasteButton"
+                    Command="{x:Bind ViewModel.PasteCommand}"
+                    Content="{x:Bind ViewModel.PasteLabel, Mode=OneWay}"
+                    FontSize="12"
+                    Style="{StaticResource AccentButtonStyle}"
+                    ToolTipService.ToolTip="Paste (Enter)" />
+
+                <DropDownButton
+                    x:Name="SeparatorButton"
+                    Grid.Column="1"
+                    MaxWidth="128"
+                    Padding="8,3"
+                    AutomationProperties.AutomationId="SeparatorButton"
+                    AutomationProperties.HelpText="{x:Bind ViewModel.SeparatorLabel, Mode=OneWay}"
+                    FontSize="12"
+                    AutomationProperties.Name="Separator"
+                    ToolTipService.ToolTip="What goes between the clips (Ctrl+S)">
+                    <TextBlock Text="{x:Bind ViewModel.SeparatorLabel, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                    <DropDownButton.Flyout>
+                        <MenuFlyout x:Name="SeparatorMenu" Placement="Top" />
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+
+                <Button
+                    Grid.Column="2"
+                    AutomationProperties.AutomationId="QueueButton"
+                    Command="{x:Bind ViewModel.QueueCommand}"
+                    Content="Queue"
+                    ToolTipService.ToolTip="Paste one clip with each Ctrl+V (Ctrl+Q)" />
+
+                <DropDownButton
+                    Grid.Column="3"
+                    AutomationProperties.AutomationId="TableButton"
+                    FontSize="12"
+                    Padding="8,3"
+                    Content="Table"
+                    ToolTipService.ToolTip="Paste as spreadsheet cells">
+                    <DropDownButton.Flyout>
+                        <MenuFlyout Placement="Top">
+                            <MenuFlyoutItem Click="TableColumn_Click" Text="As a column (Ctrl+T)" />
+                            <MenuFlyoutItem Click="TableRow_Click" Text="As a row (Ctrl+Shift+T)" />
+                        </MenuFlyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+
+                <Button
+                    Grid.Column="5"
+                    AutomationProperties.AutomationId="CollectButton"
+                    Command="{x:Bind ViewModel.ToggleCollectCommand}"
+                    Content="{x:Bind ViewModel.CollectLabel, Mode=OneWay}"
+                    ToolTipService.ToolTip="Add every copy to one clip until you finish (Ctrl+L)" />
+            </Grid>
+
             <TextBlock
                 Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"

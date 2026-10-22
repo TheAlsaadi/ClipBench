@@ -39,9 +39,24 @@ internal sealed class FakePasteFlow : IPasteFlow
         OnBegin?.Invoke();
     }
 
+    /// <summary>Runs at the start of every paste, so a test can look at the state at that moment.</summary>
+    public Action? OnPaste { get; set; }
+
     public Task PasteAsync(Clip clip, CancellationToken cancellationToken)
     {
+        OnPaste?.Invoke();
         Pasted.Add(clip);
+        Order.Add("paste");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Content that was composed from several clips and pasted.</summary>
+    public List<ClipContent> PastedContent { get; } = [];
+
+    public Task PasteContentAsync(ClipContent content, CancellationToken cancellationToken)
+    {
+        OnPaste?.Invoke();
+        PastedContent.Add(content);
         Order.Add("paste");
         return Task.CompletedTask;
     }

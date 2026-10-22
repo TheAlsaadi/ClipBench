@@ -345,4 +345,16 @@ public class PasteQueueTests
 
         handedOut.ShouldBe(clips);
     }
+
+    [Fact]
+    public void Progress_reports_the_state_and_both_counts_from_one_moment()
+    {
+        var queue = Armed(Clips("a", "b", "c"));
+        queue.Next();
+        queue.Complete();
+        queue.Next();
+
+        queue.Progress.ShouldBe(new QueueProgress(QueueState.Pasting, 1, 3));
+        new PasteQueue().Progress.ShouldBe(new QueueProgress(QueueState.Idle, 0, 0));
+    }
 }

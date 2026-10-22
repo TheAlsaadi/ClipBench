@@ -2,12 +2,13 @@ using ClipBench.Core.Clips;
 using ClipBench.Core.Diagnostics;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Tests.Support;
 
 namespace ClipBench.Presentation.Tests.Popup;
 
-public class PasteFlowTests
+public sealed class PasteFlowTests : IDisposable
 {
     private readonly FakeForegroundTracker _tracker = new();
     private readonly FakePasteInjector _injector = new();
@@ -17,7 +18,13 @@ public class PasteFlowTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private PasteFlow Create(PasteFlowOptions? options = null) => new(_tracker, _injector, _writer, _notifier, _log, options);
+    private readonly SettingsService _settings = new(new FakeSettingsStore());
+
+    private readonly FakeQueueControl _queue = new();
+
+    private PasteFlow Create(PasteFlowOptions? options = null) => new(_tracker, _injector, _writer, _notifier, _log, _settings, _queue, options);
+
+    public void Dispose() => _settings.Dispose();
 
     private static Clip Clip(string text = "hello") => new(ClipId.New(), new TextContent(text), DateTimeOffset.UnixEpoch);
 
@@ -43,9 +50,90 @@ public class PasteFlowTests
     }
 
     [Fact]
+    public async Task Each_paste_follows_the_restore_setting_in_force_at_that_moment()
+    {
+        var flow = Create();
+
+        await flow.PasteAsync(Clip("first"), Ct);
+        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+        await flow.PasteAsync(Clip("second"), Ct);
+
+        _injector.Requests.Select(request => request.RestorePreviousClipboard).ShouldBe([true, false]);
+    }
+
+    // --- a running queue ---
+
+    // A paste presses Ctrl+V itself. A running queue holds Ctrl+V, so it would take that press and paste its own clip.
+
+    [Fact]
+    public async Task A_paste_ends_a_running_queue_before_any_key_is_sent()
+    {
+        var flow = Create();
+        _queue.Report(QueueState.Armed, 0, 2);
+        var requestsWhenStopped = -1;
+        _queue.OnStop = () => requestsWhenStopped = _injector.Requests.Count;
+
+        await flow.PasteAsync(Clip(), Ct);
+
+        _queue.Stops.ShouldBe(1);
+        requestsWhenStopped.ShouldBe(0);
+        _injector.Requests.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task Composed_content_also_ends_a_running_queue_first()
+    {
+        var flow = Create();
+        _queue.Report(QueueState.Pasting, 1, 2);
+        var requestsWhenStopped = -1;
+        _queue.OnStop = () => requestsWhenStopped = _injector.Requests.Count;
+
+        await flow.PasteContentAsync(new TextContent("a, b"), Ct);
+
+        _queue.Stops.ShouldBe(1);
+        requestsWhenStopped.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(QueueState.Idle)]
+    [InlineData(QueueState.Exhausted)]
+    [InlineData(QueueState.Cancelled)]
+    public async Task Without_a_running_queue_nothing_is_stopped(QueueState state)
+    {
+        var flow = Create();
+        _queue.Report(state, 0, 0);
+
+        await flow.PasteAsync(Clip(), Ct);
+
+        _queue.Stops.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Composed_content_is_pasted_into_the_same_window_as_a_clip_would_be()
+    {
+        var flow = Create();
+        flow.Begin();
+        var joined = new TextContent("one, two");
+
+        await flow.PasteContentAsync(joined, Ct);
+
+        var request = _injector.Requests.Single();
+        request.Target.ShouldBe(new WindowHandle(0x1234));
+        request.Content.ShouldBe(joined);
+        _log.Entries.Single().Activity.ShouldBe(ActivityEvent.PasteSucceeded);
+    }
+
+    [Fact]
+    public async Task Missing_content_is_a_bug()
+    {
+        await Should.ThrowAsync<ArgumentNullException>(() => Create().PasteContentAsync(null!, Ct));
+    }
+
+    [Fact]
     public async Task The_options_decide_whether_and_when_the_clipboard_is_put_back()
     {
-        var flow = Create(new PasteFlowOptions { RestorePreviousClipboard = false, RestoreDelay = TimeSpan.FromSeconds(1) });
+        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
+        var flow = Create(new PasteFlowOptions { RestoreDelay = TimeSpan.FromSeconds(1) });
         flow.Begin();
 
         await flow.PasteAsync(Clip(), Ct);

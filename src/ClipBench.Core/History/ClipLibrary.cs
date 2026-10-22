@@ -202,23 +202,5 @@ public sealed class ClipLibrary : IDisposable
         }
     }
 
-    private void RaiseChanged()
-    {
-        if (Changed is not { } handlers)
-        {
-            return;
-        }
-
-        foreach (var handler in handlers.GetInvocationList().Cast<EventHandler>())
-        {
-            try
-            {
-                handler(this, EventArgs.Empty);
-            }
-            catch (Exception exception) when (exception is not OutOfMemoryException)
-            {
-                // A subscriber's bug must not stop the others, or the change that was already made.
-            }
-        }
-    }
+    private void RaiseChanged() => Changed.RaiseEach(this);
 }

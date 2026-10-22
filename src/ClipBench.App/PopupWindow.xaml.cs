@@ -1,10 +1,13 @@
+using ClipBench.Core.Pasting;
 using ClipBench.Core.Screen;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Windows.Graphics;
 using Windows.System;
@@ -23,6 +26,8 @@ public sealed partial class PopupWindow : Window
 
     /// <summary>The height of the popup in device-independent pixels.</summary>
     public const double HeightDip = 520;
+
+    private bool _customSeparatorChosen;
 
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
@@ -44,6 +49,7 @@ public sealed partial class PopupWindow : Window
         Activated += OnActivated;
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        BuildSeparatorMenu();
     }
 
     /// <summary>What the window shows.</summary>
@@ -85,9 +91,73 @@ public sealed partial class PopupWindow : Window
         }
     }
 
+    // The presets, then a way to type a custom separator. Choosing one puts the cursor back in the search box.
+    private void BuildSeparatorMenu()
+    {
+        foreach (var option in PopupViewModel.SeparatorOptions)
+        {
+            var item = new MenuFlyoutItem { Text = option.Label };
+            item.Click += (_, _) => ViewModel.ChooseSeparatorCommand.Execute(option.Choice);
+            SeparatorMenu.Items.Add(item);
+        }
+
+        SeparatorMenu.Items.Add(new MenuFlyoutSeparator());
+        var custom = new MenuFlyoutItem { Text = "Custom…" };
+        custom.Click += (_, _) => _customSeparatorChosen = true;
+        SeparatorMenu.Items.Add(custom);
+
+        // The box for a custom separator opens once the menu has closed, so the menu does not take the focus away from it.
+        SeparatorMenu.Closed += (_, _) =>
+        {
+            if (_customSeparatorChosen)
+            {
+                _customSeparatorChosen = false;
+                ShowCustomSeparatorBox();
+            }
+            else
+            {
+                _ = SearchBox.Focus(FocusState.Programmatic);
+            }
+        };
+    }
+
+    private void ShowCustomSeparatorBox()
+    {
+        var box = new TextBox
+        {
+            Width = 200,
+            PlaceholderText = @"For example  |  or \t",
+            Header = @"Separator (\n, \r, \t and \\ work)",
+        };
+        AutomationProperties.SetName(box, "Custom separator");
+        var flyout = new Flyout { Content = box, Placement = FlyoutPlacementMode.Top };
+        box.KeyDown += (_, args) =>
+        {
+            if (args.Key == VirtualKey.Enter)
+            {
+                ViewModel.SetCustomSeparatorCommand.Execute(box.Text);
+                flyout.Hide();
+                args.Handled = true;
+            }
+        };
+        flyout.Opened += (_, _) => _ = box.Focus(FocusState.Programmatic);
+        flyout.Closed += (_, _) => _ = SearchBox.Focus(FocusState.Programmatic);
+        flyout.ShowAt(SeparatorButton);
+    }
+
+    private void TableColumn_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.Execute(TableLayout.Column);
+
+    private void TableRow_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.Execute(TableLayout.Row);
+
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var control = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+
+        // On a footer button, Enter and Space press the button, as they do everywhere else.
+        if (e.Key is VirtualKey.Enter or VirtualKey.Space && FocusManager.GetFocusedElement(Content.XamlRoot) is ButtonBase)
+        {
+            return;
+        }
 
         switch (e.Key)
         {
@@ -112,8 +182,8 @@ public sealed partial class PopupWindow : Window
                 ViewModel.DeleteCommand.Execute(null);
                 e.Handled = true;
                 break;
-            case VirtualKey.Space when SearchBox.Text.Length == 0:
-                // With nothing typed a space cannot start a search, so it marks the clip.
+            case VirtualKey.Space when control || SearchBox.Text.Length == 0:
+                // With nothing typed a space cannot start a search, so it marks the clip. Ctrl+Space marks while searching.
                 ViewModel.ToggleMarkCommand.Execute(null);
                 e.Handled = true;
                 break;
@@ -123,6 +193,23 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.R when control:
                 ViewModel.RevealCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.T when control:
+                var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
+                ViewModel.PasteTableCommand.Execute(shift ? TableLayout.Row : TableLayout.Column);
+                e.Handled = true;
+                break;
+            case VirtualKey.L when control:
+                ViewModel.ToggleCollectCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Q when control:
+                ViewModel.QueueCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.S when control:
+                ViewModel.NextSeparatorCommand.Execute(null);
                 e.Handled = true;
                 break;
             default:

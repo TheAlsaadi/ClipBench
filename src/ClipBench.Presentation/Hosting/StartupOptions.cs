@@ -4,8 +4,8 @@ using ClipBench.Core.Hotkeys;
 namespace ClipBench.Presentation.Hosting;
 
 /// <summary>
-/// What the command line can change. There are two switches and both exist so that tests can run the app without
-/// touching the user's history or taking the user's shortcut. Anyone who can start the app with arguments can already
+/// What the command line can change. Every switch exists so that tests can run the app without touching the user's
+/// history or taking the user's shortcuts. Anyone who can start the app with arguments can already
 /// run code as the user, so they give nobody more reach.
 /// </summary>
 public sealed record StartupOptions
@@ -16,6 +16,9 @@ public sealed record StartupOptions
     /// <summary>The switch that replaces the popup shortcut.</summary>
     public const string HotkeySwitch = "--hotkey";
 
+    /// <summary>The switch that replaces the collect shortcut.</summary>
+    public const string CollectHotkeySwitch = "--collect-hotkey";
+
     /// <summary>The switch that lets other programs capture the popup in screenshots. Only for testing: the popup hides itself from capture otherwise.</summary>
     public const string AllowScreenCaptureSwitch = "--allow-screen-capture";
 
@@ -24,6 +27,9 @@ public sealed record StartupOptions
 
     /// <summary>The popup shortcut, or null for the default.</summary>
     public Hotkey? Hotkey { get; init; }
+
+    /// <summary>The collect shortcut, or null for the default.</summary>
+    public Hotkey? CollectHotkey { get; init; }
 
     /// <summary>True to leave the popup visible to screenshots and screen sharing, which it hides from by default.</summary>
     public bool AllowScreenCapture { get; init; }
@@ -40,6 +46,7 @@ public sealed record StartupOptions
 
         string? dataDirectory = null;
         Hotkey? hotkey = null;
+        Hotkey? collectHotkey = null;
         var allowScreenCapture = false;
         var problems = ImmutableArray.CreateBuilder<string>();
 
@@ -49,7 +56,8 @@ public sealed record StartupOptions
             var equals = argument.IndexOf('=', StringComparison.Ordinal);
             var name = equals < 0 ? argument : argument[..equals];
             var isDataDirectory = name.Equals(DataDirectorySwitch, StringComparison.OrdinalIgnoreCase);
-            var isHotkey = name.Equals(HotkeySwitch, StringComparison.OrdinalIgnoreCase);
+            var isCollectHotkey = name.Equals(CollectHotkeySwitch, StringComparison.OrdinalIgnoreCase);
+            var isHotkey = isCollectHotkey || name.Equals(HotkeySwitch, StringComparison.OrdinalIgnoreCase);
 
             if (name.Equals(AllowScreenCaptureSwitch, StringComparison.OrdinalIgnoreCase))
             {
@@ -71,7 +79,7 @@ public sealed record StartupOptions
                 continue;
             }
 
-            var switchName = isDataDirectory ? DataDirectorySwitch : HotkeySwitch;
+            var switchName = isDataDirectory ? DataDirectorySwitch : isCollectHotkey ? CollectHotkeySwitch : HotkeySwitch;
             string? value;
             if (equals >= 0)
             {
@@ -109,17 +117,21 @@ public sealed record StartupOptions
             else
             {
                 var parsed = Core.Hotkeys.Hotkey.Parse(value);
-                if (parsed.IsSuccess)
+                if (parsed.IsFailure)
                 {
-                    hotkey = parsed.Value;
+                    problems.Add($"{switchName} is not a shortcut ClipBench understands, so it was ignored.");
+                }
+                else if (isCollectHotkey)
+                {
+                    collectHotkey = parsed.Value;
                 }
                 else
                 {
-                    problems.Add($"{HotkeySwitch} is not a shortcut ClipBench understands, so it was ignored.");
+                    hotkey = parsed.Value;
                 }
             }
         }
 
-        return new StartupOptions { DataDirectory = dataDirectory, Hotkey = hotkey, AllowScreenCapture = allowScreenCapture, Problems = problems.ToImmutable() };
+        return new StartupOptions { DataDirectory = dataDirectory, Hotkey = hotkey, CollectHotkey = collectHotkey, AllowScreenCapture = allowScreenCapture, Problems = problems.ToImmutable() };
     }
 }

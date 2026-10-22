@@ -19,6 +19,19 @@ internal sealed class PasteTargetWindow : IDisposable
 
     public string Text => (string)_form!.Invoke(() => _box!.Text);
 
+    /// <summary>Empties the text box.</summary>
+    public void Clear() => _form!.Invoke(() => _box!.Clear());
+
+    /// <summary>Copies text the way a program does when the user presses Ctrl+C in it: the text box puts it on the clipboard.</summary>
+    /// <param name="text">The text to copy.</param>
+    public void Copy(string text) => _form!.Invoke(() =>
+    {
+        _box!.Text = text;
+        _box.SelectAll();
+        _box.Copy();
+        _box.Clear();
+    });
+
     public static PasteTargetWindow Create()
     {
         var window = new PasteTargetWindow();

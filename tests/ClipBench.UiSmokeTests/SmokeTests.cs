@@ -8,6 +8,7 @@ namespace ClipBench.UiSmokeTests;
 /// integration tests and run on demand: dotnet test --project tests/ClipBench.UiSmokeTests -c Release --filter-trait "Category=Integration"
 /// </summary>
 [Trait("Category", "Integration")]
+[Collection(SharedDesktop.Name)]
 public sealed class SmokeTests(AppUnderTest app) : IClassFixture<AppUnderTest>
 {
     [Fact]

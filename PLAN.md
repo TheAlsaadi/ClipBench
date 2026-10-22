@@ -316,6 +316,8 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 
 **Implementation**: Follow §2.5 and §2.6. Add a settings toggle for "restore previous clipboard after paste" (default on). Add a separator picker UI in the popup footer: `[Paste ⏎] [Paste all ▾ separator] [Queue] [Table ▾]`.
 
+*As built (ADR 0015):* the owner chose the keys and the behavior on 2026-10-22. A small `settings.json` arrived ahead of Phase 7 for the separator and the restore switch, which is a ticked tray item until the Settings window exists. Collecting also has a global shortcut, Win+Alt+C. The queue window does not keep the focus but does not let clicks through, because that would need `SetWindowLongPtr`, which the platform safety test forbids. A paste from the popup ends a running queue first.
+
 **Acceptance**: The demo scenarios from `MANUAL_QA.md` all pass:
 - 5 emails become one comma-separated list in a mail "To" field.
 - A 4-field web form is filled using queue mode.

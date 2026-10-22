@@ -1,0 +1,36 @@
+<Window
+    x:Class="ClipBench.App.QueueHudWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ClipBench paste queue">
+
+    <Grid
+        x:Name="Root"
+        Padding="14,0"
+        AutomationProperties.AutomationId="QueueHud"
+        AutomationProperties.LiveSetting="Polite"
+        AutomationProperties.Name="{x:Bind ViewModel.AutomationText, Mode=OneWay}"
+        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        ColumnSpacing="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <FontIcon
+            Grid.Column="0"
+            VerticalAlignment="Center"
+            FontSize="16"
+            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+            Glyph="&#xE77F;" />
+
+        <TextBlock
+            Grid.Column="1"
+            VerticalAlignment="Center"
+            AutomationProperties.AutomationId="QueueHudText"
+            Text="{x:Bind ViewModel.Text, Mode=OneWay}"
+            TextTrimming="CharacterEllipsis" />
+    </Grid>
+</Window>

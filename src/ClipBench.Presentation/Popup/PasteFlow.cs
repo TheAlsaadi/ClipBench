@@ -4,15 +4,13 @@ using ClipBench.Core.Diagnostics;
 using ClipBench.Core.Notifications;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
 
 namespace ClipBench.Presentation.Popup;
 
 /// <summary>How a paste is carried out.</summary>
 public sealed record PasteFlowOptions
 {
-    /// <summary>True to put the user's clipboard back after the paste.</summary>
-    public bool RestorePreviousClipboard { get; init; } = true;
-
     /// <summary>How long to wait after Ctrl+V before the clipboard is put back.</summary>
     public TimeSpan RestoreDelay { get; init; } = TimeSpan.FromMilliseconds(250);
 }
@@ -30,6 +28,8 @@ public sealed class PasteFlow : IPasteFlow
     private readonly IClipboardWriter _writer;
     private readonly IUserNotifier _notifier;
     private readonly IActivityLog _log;
+    private readonly SettingsService _settings;
+    private readonly IQueueControl _queue;
     private readonly PasteFlowOptions _options;
     private readonly Lock _gate = new();
     private WindowHandle? _target;
@@ -40,6 +40,8 @@ public sealed class PasteFlow : IPasteFlow
     /// <param name="writer">Puts a clip on the clipboard when pasting is not possible, so the user can paste by hand.</param>
     /// <param name="notifier">Tells the user when a paste did not work.</param>
     /// <param name="log">Records what happened, without content.</param>
+    /// <param name="settings">Says whether to put the clipboard back after the paste.</param>
+    /// <param name="queue">The paste queue, which a paste ends first.</param>
     /// <param name="options">How to paste, or null for the defaults.</param>
     public PasteFlow(
         IForegroundTracker tracker,
@@ -47,6 +49,8 @@ public sealed class PasteFlow : IPasteFlow
         IClipboardWriter writer,
         IUserNotifier notifier,
         IActivityLog log,
+        SettingsService settings,
+        IQueueControl queue,
         PasteFlowOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(tracker);
@@ -59,6 +63,10 @@ public sealed class PasteFlow : IPasteFlow
         _writer = writer;
         _notifier = notifier;
         _log = log;
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(queue);
+        _settings = settings;
+        _queue = queue;
         _options = options ?? new PasteFlowOptions();
     }
 
@@ -73,9 +81,16 @@ public sealed class PasteFlow : IPasteFlow
     }
 
     /// <inheritdoc/>
-    public async Task PasteAsync(Clip clip, CancellationToken cancellationToken)
+    public Task PasteAsync(Clip clip, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(clip);
+        return PasteContentAsync(clip.Content, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task PasteContentAsync(ClipContent content, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(content);
 
         // A window on record is good for one paste: the next popup records its own.
         WindowHandle? target;
@@ -87,26 +102,32 @@ public sealed class PasteFlow : IPasteFlow
 
         var request = new PasteRequest
         {
-            Content = clip.Content,
+            Content = content,
             Target = target,
-            RestorePreviousClipboard = _options.RestorePreviousClipboard,
+            RestorePreviousClipboard = _settings.Current.RestorePreviousClipboard,
             RestoreDelay = _options.RestoreDelay,
         };
 
         try
         {
+            // The paste presses Ctrl+V. A running queue holds Ctrl+V and would take the press for its own, so it ends first.
+            if (_queue.Progress.IsRunning)
+            {
+                await _queue.StopAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             var result = await _injector.PasteAsync(request, cancellationToken).ConfigureAwait(false);
             if (result.IsSuccess)
             {
                 _log.Write(
                     ActivityLevel.Information,
                     ActivityEvent.PasteSucceeded,
-                    new ActivityDetails { Format = clip.Content.Format, Bytes = clip.Content.SizeInBytes });
+                    new ActivityDetails { Format = content.Format, Bytes = content.SizeInBytes });
                 return;
             }
 
             _log.Write(ActivityLevel.Warning, ActivityEvent.PasteFailed, new ActivityDetails { Error = result.Error.Code });
-            await TellAboutAsync(result.Error.Code, clip.Content, cancellationToken).ConfigureAwait(false);
+            await TellAboutAsync(result.Error.Code, content, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

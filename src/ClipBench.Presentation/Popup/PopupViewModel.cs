@@ -1,6 +1,10 @@
 using System.Collections.ObjectModel;
+using ClipBench.Core.Clips;
 using ClipBench.Core.History;
+using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Settings;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Rows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -14,13 +18,19 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(150);
 
     private const string SaveFailed = "That change could not be saved.";
-    private const string Separator = " · ";
+    private const string HintGap = " · ";
 
     private readonly ClipLibrary _library;
     private readonly IPasteFlow _paste;
+    private readonly IQueueControl _queue;
+    private readonly CollectToggle _collect;
+    private readonly SettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
     private readonly ITimer _searchTimer;
+
+    // The marked clips in the order they were marked. Used on the UI thread only.
+    private readonly List<ClipId> _marks = [];
     private volatile bool _open;
     private volatile bool _disposed;
     private bool _searchTextIsSetByCode;
@@ -28,21 +38,32 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <summary>Creates the view model. It does nothing until <see cref="Open"/>.</summary>
     /// <param name="library">The clips.</param>
     /// <param name="paste">Pastes the chosen clip.</param>
+    /// <param name="queue">Runs a paste queue of the chosen clips.</param>
+    /// <param name="collect">Starts and finishes collect mode.</param>
+    /// <param name="settings">The user's settings, such as the separator for joining clips.</param>
     /// <param name="dispatcher">Moves work to the UI thread.</param>
     /// <param name="timeProvider">The clock and timers, for the age shown and the search delay.</param>
-    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IUiDispatcher dispatcher, TimeProvider timeProvider)
+    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(paste);
+        ArgumentNullException.ThrowIfNull(queue);
+        ArgumentNullException.ThrowIfNull(collect);
+        ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _library = library;
         _paste = paste;
+        _queue = queue;
+        _collect = collect;
+        _settings = settings;
         _dispatcher = dispatcher;
         _timeProvider = timeProvider;
         Rows = [];
         _searchTimer = timeProvider.CreateTimer(OnSearchTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _library.Changed += OnLibraryChanged;
+        _settings.Changed += OnSettingsChanged;
+        _collect.Collect.Changed += OnCollectChanged;
     }
 
     /// <summary>Raised when the popup should be hidden.</summary>
@@ -78,7 +99,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public ClipRowViewModel? Current => SelectedIndex >= 0 && SelectedIndex < Rows.Count ? Rows[SelectedIndex] : null;
 
     /// <summary>How many rows are marked for a multi-paste.</summary>
-    public int MarkedCount => Rows.Count(row => row.IsMarked);
+    public int MarkedCount => _marks.Count;
+
+    /// <summary>The marked clips, in the order they were marked, including any the search hides.</summary>
+    public IReadOnlyList<ClipId> MarkedIds => [.. _marks];
 
     /// <summary>True when there is nothing to list.</summary>
     public bool ShowEmptyState => Rows.Count == 0;
@@ -93,18 +117,25 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         get
         {
+            if (IsConfirmingDelete)
+            {
+                return "Press Delete again to remove this pinned clip" + HintGap + "Esc cancels";
+            }
+
+            if (MarkedCount > 0)
+            {
+                return MarkedHints;
+            }
+
             if (Rows.Count == 0)
             {
                 return "Esc close";
             }
 
-            if (IsConfirmingDelete)
-            {
-                return "Press Delete again to remove this pinned clip" + Separator + "Esc cancels";
-            }
-
             var second = Current is { IsSensitive: true } ? "Ctrl+R reveal" : "Space select";
-            return string.Join(Separator, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
+            return IsCollecting
+                ? string.Join(HintGap, $"Collecting {_collect.Collect.Count}", "Ctrl+L finish", "Enter paste", second, "Esc close")
+                : string.Join(HintGap, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
         }
     }
 
@@ -121,6 +152,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;
         ErrorMessage = null;
+        _marks.Clear();
         _open = true;
         IsOpen = true;
         Refresh(keepSelection: false);
@@ -140,6 +172,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;
         ErrorMessage = null;
+        _marks.Clear();
         Rows.Clear();
         SelectedIndex = -1;
         NotifyListChanged();
@@ -156,6 +189,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         _library.Changed -= OnLibraryChanged;
+        _settings.Changed -= OnSettingsChanged;
+        _collect.Collect.Changed -= OnCollectChanged;
         _searchTimer.Dispose();
     }
 
@@ -208,8 +243,26 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         if (Current is { } row)
         {
-            row.IsMarked = !row.IsMarked;
+            if (!_marks.Remove(row.Id))
+            {
+                _marks.Add(row.Id);
+            }
+
+            ShowMarks();
             OnPropertyChanged(nameof(MarkedCount));
+            OnPropertyChanged(nameof(PasteLabel));
+            OnPropertyChanged(nameof(StatusText));
+        }
+    }
+
+    // Each row shows whether it is marked and where it comes in the paste order.
+    private void ShowMarks()
+    {
+        foreach (var row in Rows)
+        {
+            var place = _marks.IndexOf(row.Id) + 1;
+            row.IsMarked = place > 0;
+            row.MarkNumber = place;
         }
     }
 
@@ -241,15 +294,20 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task PasteAsync(CancellationToken cancellationToken)
     {
-        if (Current is not { } row)
+        if (_marks.Count > 0)
         {
+            await PasteMarkedAsync(cancellationToken);
             return;
         }
 
-        var clip = _library.Clips.FirstOrDefault(candidate => candidate.Id == row.Id);
-        if (clip is null)
+        if (HighlightedClip() is not [var clip])
         {
-            Refresh(keepSelection: true);
+            // A highlighted row whose clip has just left the history: show the list as it is now.
+            if (Current is not null)
+            {
+                Refresh(keepSelection: true);
+            }
+
             return;
         }
 
@@ -348,11 +406,14 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         var previousId = Current?.Id;
         var previousIndex = SelectedIndex;
         var wasConfirming = IsConfirmingDelete;
-        var marked = Rows.Where(row => row.IsMarked).Select(row => row.Id).ToHashSet();
         var now = _timeProvider.GetUtcNow();
 
+        // A search only hides marked clips, but a clip that left the history leaves the marks.
+        var present = _library.Clips.Select(clip => clip.Id).ToHashSet();
+        _ = _marks.RemoveAll(id => !present.Contains(id));
+
         var rows = _library.Search(SearchText)
-            .Select(result => new ClipRowViewModel(result.Clip, _library.GetSensitivity(result.Clip), now) { IsMarked = marked.Contains(result.Clip.Id) })
+            .Select(result => new ClipRowViewModel(result.Clip, _library.GetSensitivity(result.Clip), now))
             .ToList();
 
         Rows.Clear();
@@ -360,6 +421,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         {
             Rows.Add(row);
         }
+
+        ShowMarks();
 
         var index = -1;
         if (rows.Count > 0)
@@ -384,6 +447,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(Current));
         OnPropertyChanged(nameof(MarkedCount));
+        OnPropertyChanged(nameof(PasteLabel));
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(EmptyText));
         OnPropertyChanged(nameof(StatusText));
