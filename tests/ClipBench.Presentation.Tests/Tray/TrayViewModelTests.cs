@@ -271,6 +271,18 @@ public sealed class TrayViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task A_settings_change_that_leaves_the_restore_switch_alone_is_not_announced_as_one()
+    {
+        var tray = Create();
+        List<string> changed = [];
+        tray.PropertyChanged += (_, args) => changed.Add(args.PropertyName!);
+
+        await _settings.UpdateAsync(settings => settings with { Separator = SeparatorChoice.Tab }, Ct);
+
+        changed.ShouldNotContain(nameof(TrayViewModel.RestoreClipboard));
+    }
+
+    [Fact]
     public void Disposing_stops_following_the_settings()
     {
         var tray = Create();

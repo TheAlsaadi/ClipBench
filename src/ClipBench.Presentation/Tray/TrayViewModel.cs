@@ -14,6 +14,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     private readonly IQueueControl _queue;
     private readonly CollectToggle _collect;
     private readonly SettingsService _settings;
+    private int _shownRestore;
     private int _exitRequested;
 
     /// <summary>Creates the view model.</summary>
@@ -34,6 +35,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
         IsPaused = capture.IsPaused;
         _queue.Changed += OnQueueChanged;
         _collect.Collect.Changed += OnCollectChanged;
+        _shownRestore = RestoreClipboard ? 1 : 0;
         _settings.Changed += OnSettingsChanged;
     }
 
@@ -107,8 +109,15 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private Task StopQueueAsync(CancellationToken cancellationToken) => _queue.StopAsync(cancellationToken);
 
-    // Runs on whatever thread changed the settings.
-    private void OnSettingsChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(RestoreClipboard));
+    // Runs on whatever thread changed the settings. Only the restore switch is on the menu, so only its change counts.
+    private void OnSettingsChanged(object? sender, EventArgs e)
+    {
+        var restore = RestoreClipboard;
+        if (Interlocked.Exchange(ref _shownRestore, restore ? 1 : 0) != (restore ? 1 : 0))
+        {
+            OnPropertyChanged(nameof(RestoreClipboard));
+        }
+    }
 
     // Runs on whatever thread collected a copy or started or ended the session.
     private void OnCollectChanged(object? sender, EventArgs e)
