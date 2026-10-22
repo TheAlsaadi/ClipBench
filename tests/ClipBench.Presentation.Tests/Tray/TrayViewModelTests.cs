@@ -1,5 +1,6 @@
 using ClipBench.Core.Capture;
 using ClipBench.Core.Pasting;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
 
@@ -22,8 +23,10 @@ public class TrayViewModelTests
 
     private readonly FakeCapture _capture = new();
     private readonly FakeQueueControl _queue = new();
+    private readonly FakeCollectControl _collect = new();
+    private readonly FakeNotifier _notifier = new();
 
-    private TrayViewModel Create() => new(_capture, _queue);
+    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier));
 
     private static string[] ChangedProperties(TrayViewModel tray, Action act)
     {
@@ -159,10 +162,76 @@ public class TrayViewModelTests
         _queue.SubscriberCount.ShouldBe(0);
     }
 
+    // --- collecting ---
+
+    [Fact]
+    public void Collecting_shows_in_the_label_and_the_tool_tip_with_the_count()
+    {
+        var tray = Create();
+
+        var changed = ChangedProperties(tray, () =>
+        {
+            _collect.Start();
+            _collect.Collected();
+        });
+
+        tray.IsCollecting.ShouldBeTrue();
+        tray.CollectLabel.ShouldBe("Finish collecting (1)");
+        tray.ToolTip.ShouldBe("ClipBench · capturing · collecting 1");
+        changed.ShouldContain(nameof(TrayViewModel.CollectLabel));
+        changed.ShouldContain(nameof(TrayViewModel.ToolTip));
+    }
+
+    [Fact]
+    public void Without_a_session_the_label_offers_to_start()
+    {
+        var tray = Create();
+
+        tray.IsCollecting.ShouldBeFalse();
+        tray.CollectLabel.ShouldBe("Start collecting");
+    }
+
+    [Fact]
+    public void Collecting_and_a_queue_both_show_in_the_tool_tip()
+    {
+        var tray = Create();
+        _collect.Start();
+        _queue.Report(QueueState.Armed, 0, 2);
+
+        tray.ToolTip.ShouldBe("ClipBench · capturing · collecting 0 · paste queue running");
+    }
+
+    [Fact]
+    public async Task The_collect_command_starts_and_finishes_and_cancel_cancels()
+    {
+        var tray = Create();
+
+        await tray.ToggleCollectCommand.ExecuteAsync(null);
+        _collect.IsActive.ShouldBeTrue();
+        await tray.ToggleCollectCommand.ExecuteAsync(null);
+        _collect.Finishes.ShouldBe(1);
+        await tray.ToggleCollectCommand.ExecuteAsync(null);
+        tray.CancelCollectCommand.Execute(null);
+
+        _collect.Cancels.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Disposing_stops_following_the_collect_session()
+    {
+        var tray = Create();
+
+        tray.Dispose();
+
+        _collect.SubscriberCount.ShouldBe(0);
+    }
+
     [Fact]
     public void Missing_services_are_a_bug()
     {
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(null!, _queue));
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, null!));
+        var toggle = new CollectToggle(_collect, _notifier);
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(null!, _queue, toggle));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, null!, toggle));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, null!));
     }
 }

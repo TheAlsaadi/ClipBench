@@ -90,4 +90,33 @@ public sealed partial class PopupViewModel
         // The queue pastes into whatever has focus once the popup is gone.
         Close();
     }
+
+    /// <summary>True while a collect session runs.</summary>
+    public bool IsCollecting => _collect.Collect.IsActive;
+
+    [RelayCommand]
+    private async Task ToggleCollectAsync(CancellationToken cancellationToken)
+    {
+        // Starting sends the user off to copy, so the popup goes away. Finishing keeps it open: the collected clip
+        // arrives at the top of the list, ready to paste.
+        var starting = !_collect.Collect.IsActive;
+        await _collect.ToggleAsync(cancellationToken);
+        if (starting)
+        {
+            Close();
+        }
+    }
+
+    // Runs on whatever thread collected a copy or started or ended the session.
+    private void OnCollectChanged(object? sender, EventArgs e)
+    {
+        if (!_disposed)
+        {
+            _dispatcher.Post(() =>
+            {
+                OnPropertyChanged(nameof(IsCollecting));
+                OnPropertyChanged(nameof(StatusText));
+            });
+        }
+    }
 }

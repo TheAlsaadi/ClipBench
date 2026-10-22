@@ -10,6 +10,7 @@ using ClipBench.Core.Settings;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Queue;
@@ -45,6 +46,7 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
     private HotkeyId? _hotkey;
+    private HotkeyId? _collectHotkey;
     private bool _disposed;
 
     private AppRoot(
@@ -164,7 +166,14 @@ internal sealed class AppRoot : IAsyncDisposable
             hud = CreateQueueWindow(services, platform, options);
             var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
             await root.ShowTrayAsync(cancellationToken);
-            await root.RegisterShortcutAsync(options.Hotkey ?? Hotkey.Default, cancellationToken);
+            root._hotkey = await root.RegisterShortcutAsync(
+                options.Hotkey ?? Hotkey.Default,
+                "You can still open ClipBench from its tray icon.",
+                cancellationToken);
+            root._collectHotkey = await root.RegisterShortcutAsync(
+                options.CollectHotkey ?? CollectToggle.DefaultShortcut,
+                "You can still start and finish collecting from the tray menu.",
+                cancellationToken);
             platform.Hotkeys.Pressed += root.OnHotkeyPressed;
             guard.ShowRequested += root.OnShowRequested;
             return new StartOutcome(root, null);
@@ -289,6 +298,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<IQueueControl>(provider => provider.GetRequiredService<QueueRunner>());
         _ = services.AddSingleton<PopupViewModel>();
         _ = services.AddSingleton<QueueHudViewModel>();
+        _ = services.AddSingleton<CollectToggle>();
         _ = services.AddSingleton<TrayViewModel>();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
     }
@@ -361,20 +371,21 @@ internal sealed class AppRoot : IAsyncDisposable
         }
     }
 
-    private async Task RegisterShortcutAsync(Hotkey hotkey, CancellationToken cancellationToken)
+    // Returns the registration, or null when another program holds the shortcut; the user is then told what still works.
+    private async Task<HotkeyId?> RegisterShortcutAsync(Hotkey hotkey, string fallback, CancellationToken cancellationToken)
     {
         var registered = await _platform.Hotkeys.RegisterAsync(hotkey, cancellationToken);
         if (registered.IsSuccess)
         {
-            _hotkey = registered.Value;
             _log.Write(ActivityLevel.Information, ActivityEvent.HotkeyRegistered);
-            return;
+            return registered.Value;
         }
 
         _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = registered.Error.Code });
         _services.GetRequiredService<IUserNotifier>().Show(
             "ClipBench",
-            $"ClipBench could not claim the shortcut {hotkey} because another program uses it. You can still open ClipBench from its tray icon.");
+            $"ClipBench could not claim the shortcut {hotkey} because another program uses it. {fallback}");
+        return null;
     }
 
     // Runs on a pool thread.
@@ -383,6 +394,10 @@ internal sealed class AppRoot : IAsyncDisposable
         if (_hotkey is { } own && e.Id == own)
         {
             _dispatcher.Post(() => TogglePopup());
+        }
+        else if (_collectHotkey is { } collect && e.Id == collect)
+        {
+            _dispatcher.Post(() => _ = _services.GetRequiredService<CollectToggle>().ToggleAsync(CancellationToken.None));
         }
     }
 

@@ -17,6 +17,12 @@ public static class TrayMenu
     /// <summary>The id of the item that stops a running paste queue.</summary>
     public const int StopQueueId = 4;
 
+    /// <summary>The id of the item that starts or finishes collecting.</summary>
+    public const int CollectId = 5;
+
+    /// <summary>The id of the item that cancels collecting.</summary>
+    public const int CancelCollectId = 6;
+
     /// <summary>Builds the tool tip and the menu.</summary>
     /// <param name="tray">The tray view model.</param>
     /// <returns>What the icon should show now.</returns>
@@ -27,6 +33,12 @@ public static class TrayMenu
         if (tray.IsQueueRunning)
         {
             menu.Add(new TrayMenuItem(StopQueueId, "Stop paste queue"));
+        }
+
+        menu.Add(new TrayMenuItem(CollectId, tray.CollectLabel));
+        if (tray.IsCollecting)
+        {
+            menu.Add(new TrayMenuItem(CancelCollectId, "Cancel collecting"));
         }
 
         menu.Add(new TrayMenuItem(PauseId, tray.PauseLabel));
@@ -53,6 +65,12 @@ public static class TrayMenu
                 break;
             case StopQueueId:
                 tray.StopQueueCommand.Execute(null);
+                break;
+            case CollectId:
+                tray.ToggleCollectCommand.Execute(null);
+                break;
+            case CancelCollectId:
+                tray.CancelCollectCommand.Execute(null);
                 break;
             default:
                 break;

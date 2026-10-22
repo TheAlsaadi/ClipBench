@@ -1,5 +1,6 @@
 using ClipBench.Core.Capture;
 using ClipBench.Core.Pasting;
+using ClipBench.Presentation.Collect;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -10,19 +11,24 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
 {
     private readonly ICaptureControl _capture;
     private readonly IQueueControl _queue;
+    private readonly CollectToggle _collect;
     private int _exitRequested;
 
     /// <summary>Creates the view model.</summary>
     /// <param name="capture">The part of capture that can be paused.</param>
     /// <param name="queue">The paste queue, which the menu can stop.</param>
-    public TrayViewModel(ICaptureControl capture, IQueueControl queue)
+    /// <param name="collect">Starts and finishes collect mode.</param>
+    public TrayViewModel(ICaptureControl capture, IQueueControl queue, CollectToggle collect)
     {
         ArgumentNullException.ThrowIfNull(capture);
         ArgumentNullException.ThrowIfNull(queue);
+        ArgumentNullException.ThrowIfNull(collect);
         _capture = capture;
         _queue = queue;
+        _collect = collect;
         IsPaused = capture.IsPaused;
         _queue.Changed += OnQueueChanged;
+        _collect.Collect.Changed += OnCollectChanged;
     }
 
     /// <summary>Raised when the menu asks for the popup.</summary>
@@ -35,6 +41,12 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsPaused { get; set; }
 
+    /// <summary>True while a collect session runs.</summary>
+    public bool IsCollecting => _collect.Collect.IsActive;
+
+    /// <summary>The label of the collect item: what choosing it does.</summary>
+    public string CollectLabel => IsCollecting ? $"Finish collecting ({_collect.Collect.Count})" : "Start collecting";
+
     /// <summary>True while a paste queue runs.</summary>
     public bool IsQueueRunning => _queue.Progress.IsRunning;
 
@@ -42,7 +54,10 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     public string PauseLabel => IsPaused ? "Resume capturing" : "Pause capturing";
 
     /// <summary>The text shown when the pointer rests on the icon.</summary>
-    public string ToolTip => (IsPaused ? "ClipBench · paused" : "ClipBench · capturing") + (IsQueueRunning ? " · paste queue running" : string.Empty);
+    public string ToolTip =>
+        (IsPaused ? "ClipBench · paused" : "ClipBench · capturing")
+        + (IsCollecting ? $" · collecting {_collect.Collect.Count}" : string.Empty)
+        + (IsQueueRunning ? " · paste queue running" : string.Empty);
 
     partial void OnIsPausedChanged(bool value)
     {
@@ -58,10 +73,28 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Stops following the queue.</summary>
-    public void Dispose() => _queue.Changed -= OnQueueChanged;
+    public void Dispose()
+    {
+        _queue.Changed -= OnQueueChanged;
+        _collect.Collect.Changed -= OnCollectChanged;
+    }
+
+    [RelayCommand]
+    private Task ToggleCollectAsync(CancellationToken cancellationToken) => _collect.ToggleAsync(cancellationToken);
+
+    [RelayCommand]
+    private void CancelCollect() => _collect.Cancel();
 
     [RelayCommand]
     private Task StopQueueAsync(CancellationToken cancellationToken) => _queue.StopAsync(cancellationToken);
+
+    // Runs on whatever thread collected a copy or started or ended the session.
+    private void OnCollectChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(IsCollecting));
+        OnPropertyChanged(nameof(CollectLabel));
+        OnPropertyChanged(nameof(ToolTip));
+    }
 
     // Runs on whatever thread took the queue's step.
     private void OnQueueChanged(object? sender, EventArgs e)

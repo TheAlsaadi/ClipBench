@@ -1,4 +1,5 @@
 using ClipBench.Core.Capture;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
 
@@ -15,11 +16,13 @@ public class TrayMenuTests
 
     private readonly FakeCapture _capture = new();
     private readonly FakeQueueControl _queue = new();
+    private readonly FakeCollectControl _collect = new();
+    private readonly FakeNotifier _notifier = new();
 
-    private TrayViewModel Create() => new(_capture, _queue);
+    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier));
 
     [Fact]
-    public void The_menu_offers_open_pause_and_exit_with_open_as_the_default()
+    public void The_menu_offers_open_collect_pause_and_exit_with_open_as_the_default()
     {
         var model = TrayMenu.Build(Create());
 
@@ -27,6 +30,7 @@ public class TrayMenuTests
         [
             (1, "Open ClipBench", true),
             (0, string.Empty, false),
+            (5, "Start collecting", false),
             (2, "Pause capturing", false),
             (3, "Exit", false),
         ]);
@@ -94,6 +98,7 @@ public class TrayMenuTests
             (TrayMenu.OpenId, "Open ClipBench"),
             (0, string.Empty),
             (TrayMenu.StopQueueId, "Stop paste queue"),
+            (TrayMenu.CollectId, "Start collecting"),
             (TrayMenu.PauseId, "Pause capturing"),
             (TrayMenu.ExitId, "Exit"),
         ]);
@@ -108,5 +113,42 @@ public class TrayMenuTests
         TrayMenu.Execute(tray, TrayMenu.StopQueueId);
 
         _queue.Stops.ShouldBe(1);
+    }
+
+    [Fact]
+    public void While_collecting_the_menu_offers_to_finish_with_the_count_or_to_cancel()
+    {
+        var tray = Create();
+        _collect.Start();
+        _collect.Collected();
+        _collect.Collected();
+
+        var model = TrayMenu.Build(tray);
+
+        model.Menu.Select(item => (item.Id, item.Text)).ShouldBe(
+        [
+            (TrayMenu.OpenId, "Open ClipBench"),
+            (0, string.Empty),
+            (TrayMenu.CollectId, "Finish collecting (2)"),
+            (TrayMenu.CancelCollectId, "Cancel collecting"),
+            (TrayMenu.PauseId, "Pause capturing"),
+            (TrayMenu.ExitId, "Exit"),
+        ]);
+    }
+
+    [Fact]
+    public void Choosing_collect_starts_and_then_finishes_and_cancel_cancels()
+    {
+        var tray = Create();
+
+        TrayMenu.Execute(tray, TrayMenu.CollectId);
+        _collect.IsActive.ShouldBeTrue();
+        TrayMenu.Execute(tray, TrayMenu.CollectId);
+        _collect.Finishes.ShouldBe(1);
+        TrayMenu.Execute(tray, TrayMenu.CollectId);
+        TrayMenu.Execute(tray, TrayMenu.CancelCollectId);
+
+        _collect.Cancels.ShouldBe(1);
+        _collect.IsActive.ShouldBeFalse();
     }
 }

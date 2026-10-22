@@ -4,6 +4,7 @@ using ClipBench.Core.History;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Rows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -22,6 +23,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     private readonly ClipLibrary _library;
     private readonly IPasteFlow _paste;
     private readonly IQueueControl _queue;
+    private readonly CollectToggle _collect;
     private readonly SettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
@@ -37,20 +39,23 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <param name="library">The clips.</param>
     /// <param name="paste">Pastes the chosen clip.</param>
     /// <param name="queue">Runs a paste queue of the chosen clips.</param>
+    /// <param name="collect">Starts and finishes collect mode.</param>
     /// <param name="settings">The user's settings, such as the separator for joining clips.</param>
     /// <param name="dispatcher">Moves work to the UI thread.</param>
     /// <param name="timeProvider">The clock and timers, for the age shown and the search delay.</param>
-    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
+    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(paste);
         ArgumentNullException.ThrowIfNull(queue);
+        ArgumentNullException.ThrowIfNull(collect);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _library = library;
         _paste = paste;
         _queue = queue;
+        _collect = collect;
         _settings = settings;
         _dispatcher = dispatcher;
         _timeProvider = timeProvider;
@@ -58,6 +63,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _searchTimer = timeProvider.CreateTimer(OnSearchTimer, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _library.Changed += OnLibraryChanged;
         _settings.Changed += OnSettingsChanged;
+        _collect.Collect.Changed += OnCollectChanged;
     }
 
     /// <summary>Raised when the popup should be hidden.</summary>
@@ -127,7 +133,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             }
 
             var second = Current is { IsSensitive: true } ? "Ctrl+R reveal" : "Space select";
-            return string.Join(HintGap, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
+            return IsCollecting
+                ? string.Join(HintGap, $"Collecting {_collect.Collect.Count}", "Ctrl+L finish", "Enter paste", second, "Esc close")
+                : string.Join(HintGap, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
         }
     }
 
@@ -182,6 +190,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _disposed = true;
         _library.Changed -= OnLibraryChanged;
         _settings.Changed -= OnSettingsChanged;
+        _collect.Collect.Changed -= OnCollectChanged;
         _searchTimer.Dispose();
     }
 

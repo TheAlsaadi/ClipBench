@@ -2,6 +2,7 @@ using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
+using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Tests.Support;
@@ -24,7 +25,7 @@ public sealed class PopupViewModelTests : IDisposable
     public PopupViewModelTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), _store);
-        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), _settings, _dispatcher, _time);
+        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), _settings, _dispatcher, _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
