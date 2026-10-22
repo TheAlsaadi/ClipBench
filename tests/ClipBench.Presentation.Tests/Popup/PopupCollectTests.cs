@@ -91,6 +91,21 @@ public sealed class PopupCollectTests : IDisposable
     }
 
     [Fact]
+    public void The_collect_button_offers_to_start_and_then_to_finish_with_the_count()
+    {
+        _vm.Open();
+        _vm.CollectLabel.ShouldBe("Collect");
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _collect.Start();
+        _collect.Collected();
+
+        _vm.CollectLabel.ShouldBe("Finish (1)");
+        changed.ShouldContain(nameof(PopupViewModel.CollectLabel));
+    }
+
+    [Fact]
     public void After_disposal_the_session_is_no_longer_followed()
     {
         _vm.Dispose();

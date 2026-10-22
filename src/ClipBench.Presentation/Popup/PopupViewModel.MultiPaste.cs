@@ -91,6 +91,12 @@ public sealed partial class PopupViewModel
         Close();
     }
 
+    /// <summary>The label of the paste button: how many clips Enter pastes.</summary>
+    public string PasteLabel => MarkedCount > 1 ? $"Paste {MarkedCount}" : "Paste";
+
+    /// <summary>The label of the collect button: what choosing it does.</summary>
+    public string CollectLabel => IsCollecting ? $"Finish ({_collect.Collect.Count})" : "Collect";
+
     /// <summary>True while a collect session runs.</summary>
     public bool IsCollecting => _collect.Collect.IsActive;
 
@@ -115,6 +121,7 @@ public sealed partial class PopupViewModel
             _dispatcher.Post(() =>
             {
                 OnPropertyChanged(nameof(IsCollecting));
+                OnPropertyChanged(nameof(CollectLabel));
                 OnPropertyChanged(nameof(StatusText));
             });
         }

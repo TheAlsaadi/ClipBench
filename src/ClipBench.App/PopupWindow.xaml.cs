@@ -5,7 +5,9 @@ using ClipBench.Presentation.Rows;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Windows.Graphics;
 using Windows.System;
@@ -45,6 +47,7 @@ public sealed partial class PopupWindow : Window
         Activated += OnActivated;
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        BuildSeparatorMenu();
     }
 
     /// <summary>What the window shows.</summary>
@@ -86,9 +89,59 @@ public sealed partial class PopupWindow : Window
         }
     }
 
+    // The presets, then a way to type a custom separator. Choosing one puts the cursor back in the search box.
+    private void BuildSeparatorMenu()
+    {
+        foreach (var option in PopupViewModel.SeparatorOptions)
+        {
+            var item = new MenuFlyoutItem { Text = option.Label };
+            item.Click += (_, _) => ViewModel.ChooseSeparatorCommand.Execute(option.Choice);
+            SeparatorMenu.Items.Add(item);
+        }
+
+        SeparatorMenu.Items.Add(new MenuFlyoutSeparator());
+        var custom = new MenuFlyoutItem { Text = "Custom…" };
+        custom.Click += (_, _) => ShowCustomSeparatorBox();
+        SeparatorMenu.Items.Add(custom);
+        SeparatorMenu.Closed += (_, _) => _ = SearchBox.Focus(FocusState.Programmatic);
+    }
+
+    private void ShowCustomSeparatorBox()
+    {
+        var box = new TextBox
+        {
+            Width = 200,
+            PlaceholderText = @"For example  |  or \t",
+            Header = @"Separator (\n, \r, \t and \\ work)",
+        };
+        AutomationProperties.SetName(box, "Custom separator");
+        var flyout = new Flyout { Content = box, Placement = FlyoutPlacementMode.Top };
+        box.KeyDown += (_, args) =>
+        {
+            if (args.Key == VirtualKey.Enter)
+            {
+                ViewModel.SetCustomSeparatorCommand.Execute(box.Text);
+                flyout.Hide();
+                args.Handled = true;
+            }
+        };
+        flyout.Closed += (_, _) => _ = SearchBox.Focus(FocusState.Programmatic);
+        flyout.ShowAt(SeparatorButton);
+    }
+
+    private void TableColumn_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.Execute(TableLayout.Column);
+
+    private void TableRow_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.Execute(TableLayout.Row);
+
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var control = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+
+        // On a footer button, Enter and Space press the button, as they do everywhere else.
+        if (e.Key is VirtualKey.Enter or VirtualKey.Space && FocusManager.GetFocusedElement(Content.XamlRoot) is ButtonBase)
+        {
+            return;
+        }
 
         switch (e.Key)
         {

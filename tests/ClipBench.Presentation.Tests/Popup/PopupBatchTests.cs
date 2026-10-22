@@ -194,6 +194,23 @@ public sealed class PopupBatchTests : IDisposable
     }
 
     [Fact]
+    public async Task The_paste_button_says_how_many_clips_it_pastes()
+    {
+        await AddAsync(TestClips.Text("one"), TestClips.Text("two"));
+        _vm.Open();
+        _vm.PasteLabel.ShouldBe("Paste");
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Mark(0, 1);
+
+        _vm.PasteLabel.ShouldBe("Paste 2");
+        changed.ShouldContain(nameof(PopupViewModel.PasteLabel));
+        Mark(1);
+        _vm.PasteLabel.ShouldBe("Paste");
+    }
+
+    [Fact]
     public async Task Without_marks_the_footer_offers_marking()
     {
         await AddAsync(TestClips.Text("one"));
