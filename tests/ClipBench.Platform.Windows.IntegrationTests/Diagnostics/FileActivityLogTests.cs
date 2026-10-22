@@ -27,7 +27,18 @@ public sealed class FileActivityLogTests : IDisposable
     private FileActivityLog Create(long maxBytes = 1024 * 1024, int maxFiles = 3) => new(_directory, _time, maxBytes, maxFiles);
 
     private string[] Lines(string name = FileActivityLog.FileName) =>
-        File.Exists(Path.Combine(_directory, name)) ? File.ReadAllLines(Path.Combine(_directory, name)) : [];
+        File.Exists(Path.Combine(_directory, name))
+            ? Encoding.UTF8.GetString(ReadShared(Path.Combine(_directory, name))).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : [];
+
+    // The log may be writing while a test reads, and a plain File.Read* refuses to open a file someone else has open.
+    private static byte[] ReadShared(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        return copy.ToArray();
+    }
 
     private static readonly string[] _fourFiles = ["clipbench.log", "clipbench.1.log", "clipbench.2.log", "clipbench.3.log"];
 
@@ -285,12 +296,12 @@ public sealed class FileActivityLogTests : IDisposable
             await WaitForLinesAsync(1 + sequence);
         }
 
-        var allText = string.Concat(Directory.GetFiles(_directory).Select(File.ReadAllText));
+        var allText = string.Concat(Directory.GetFiles(_directory).Select(path => Encoding.UTF8.GetString(ReadShared(path))));
         allText.Length.ShouldBeGreaterThan(0);
         allText.ShouldNotContain(Marker);
         allText.ShouldNotContain(Source);
         allText.ShouldNotContain("eyJ");
-        var bytes = Directory.GetFiles(_directory).SelectMany(File.ReadAllBytes).ToArray();
+        var bytes = Directory.GetFiles(_directory).SelectMany(ReadShared).ToArray();
         bytes.AsSpan().IndexOf(Encoding.UTF8.GetBytes(Marker)).ShouldBe(-1);
         bytes.AsSpan().IndexOf(Encoding.Unicode.GetBytes(Marker)).ShouldBe(-1);
         library.Dispose();
