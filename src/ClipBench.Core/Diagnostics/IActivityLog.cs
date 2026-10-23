@@ -115,6 +115,12 @@ public enum ActivityEvent
 
     /// <summary>A finished collect session could not be saved or put on the clipboard, with the reason as an error code.</summary>
     CollectFailed,
+
+    /// <summary>Text was changed by a chain of transforms and pasted, with the length of the chain as the count.</summary>
+    TransformApplied,
+
+    /// <summary>A chain of transforms could not change the text, with the reason as an error code.</summary>
+    TransformFailed,
 }
 
 /// <summary>

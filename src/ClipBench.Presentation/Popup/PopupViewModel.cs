@@ -6,6 +6,7 @@ using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Rows;
+using ClipBench.Presentation.Transforms;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -24,6 +25,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     private readonly IPasteFlow _paste;
     private readonly IQueueControl _queue;
     private readonly CollectToggle _collect;
+    private readonly TransformPickerViewModel _transforms;
     private readonly SettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
@@ -40,15 +42,17 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <param name="paste">Pastes the chosen clip.</param>
     /// <param name="queue">Runs a paste queue of the chosen clips.</param>
     /// <param name="collect">Starts and finishes collect mode.</param>
+    /// <param name="transforms">The picker that changes the text before it is pasted.</param>
     /// <param name="settings">The user's settings, such as the separator for joining clips.</param>
     /// <param name="dispatcher">Moves work to the UI thread.</param>
     /// <param name="timeProvider">The clock and timers, for the age shown and the search delay.</param>
-    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
+    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, TransformPickerViewModel transforms, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(paste);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(collect);
+        ArgumentNullException.ThrowIfNull(transforms);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -56,6 +60,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _paste = paste;
         _queue = queue;
         _collect = collect;
+        _transforms = transforms;
         _settings = settings;
         _dispatcher = dispatcher;
         _timeProvider = timeProvider;
@@ -64,6 +69,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _library.Changed += OnLibraryChanged;
         _settings.Changed += OnSettingsChanged;
         _collect.Collect.Changed += OnCollectChanged;
+        _transforms.PropertyChanged += OnTransformsChanged;
     }
 
     /// <summary>Raised when the popup should be hidden.</summary>
@@ -117,6 +123,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         get
         {
+            if (_transforms.IsOpen)
+            {
+                return _transforms.StatusText;
+            }
+
             if (IsConfirmingDelete)
             {
                 return "Press Delete again to remove this pinned clip" + HintGap + "Esc cancels";
@@ -153,6 +164,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         IsConfirmingDelete = false;
         ErrorMessage = null;
         _marks.Clear();
+        _transforms.Close();
         _open = true;
         IsOpen = true;
         Refresh(keepSelection: false);
@@ -168,6 +180,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
         _open = false;
         IsOpen = false;
+        _transforms.Close();
         _ = _searchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;
@@ -191,6 +204,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _library.Changed -= OnLibraryChanged;
         _settings.Changed -= OnSettingsChanged;
         _collect.Collect.Changed -= OnCollectChanged;
+        _transforms.PropertyChanged -= OnTransformsChanged;
         _searchTimer.Dispose();
     }
 
@@ -279,6 +293,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Escape()
     {
+        if (_transforms.IsOpen)
+        {
+            _transforms.Cancel();
+            return;
+        }
+
         if (IsConfirmingDelete)
         {
             IsConfirmingDelete = false;
