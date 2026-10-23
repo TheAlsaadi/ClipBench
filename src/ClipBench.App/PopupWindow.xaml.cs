@@ -32,7 +32,7 @@ public sealed partial class PopupWindow : Window
     public const double HeightDip = 520;
 
     /// <summary>How much wider the popup is while the sidebar is shown, in device-independent pixels.</summary>
-    public const double SidebarWidthDip = 148;
+    public const double SidebarWidthDip = 168;
 
     private bool _customSeparatorChosen;
 
@@ -368,6 +368,11 @@ public sealed partial class PopupWindow : Window
 
         switch (e.Key)
         {
+            case VirtualKey.Application:
+            case VirtualKey.F10 when shift:
+                ShowMenuForCurrent();
+                e.Handled = true;
+                break;
             case VirtualKey.Enter when shift:
                 ViewModel.OpenTransformsCommand.Execute(null);
                 e.Handled = true;
@@ -473,6 +478,30 @@ public sealed partial class PopupWindow : Window
             default:
                 break;
         }
+    }
+
+    // A click puts the focus on what was clicked: a row, a sidebar entry or a button. The popup is typed into and moved
+    // with the keys, so the focus goes straight back to the box that is being typed in. Moving through the popup with Tab
+    // is left alone: only a focus that a click made is moved.
+    private void Frame_GotFocus(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is not Control { FocusState: FocusState.Pointer } clicked || clicked is TextBox || clicked is CheckBox)
+        {
+            return;
+        }
+
+        _ = DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!ViewModel.IsOpen || ViewModel.IsPromptingSnippet)
+            {
+                return;
+            }
+
+            Control target = ViewModel.IsTransformsOpen
+                ? (ViewModel.Transforms.IsChoosing ? TransformFilterBox : FindBox)
+                : (ViewModel.Sidebar.IsEditing ? BoardNameBox : SearchBox);
+            _ = target.Focus(FocusState.Programmatic);
+        });
     }
 
     private bool IsInsideFrame(DependencyObject element)

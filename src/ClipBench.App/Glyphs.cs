@@ -35,6 +35,16 @@ internal static class Glyphs
         _ => ((char)0xE8F1).ToString(),
     };
 
+    /// <summary>The icon of the button that pins a clip or lets it go.</summary>
+    /// <param name="pinned">True when the clip is pinned now.</param>
+    /// <returns>An unpin icon for a pinned clip and a pin for the others.</returns>
+    public static string PinGlyph(bool pinned) => ((char)(pinned ? 0xE77A : 0xE718)).ToString();
+
+    /// <summary>The tip of the button that pins a clip or lets it go.</summary>
+    /// <param name="pinned">True when the clip is pinned now.</param>
+    /// <returns>What the button does.</returns>
+    public static string PinTip(bool pinned) => pinned ? "Unpin the clip (Ctrl+P)" : "Pin the clip (Ctrl+P)";
+
     /// <summary>Decodes a picture at thumbnail size, so a large screenshot does not cost a full-size bitmap per row.</summary>
     /// <param name="png">The PNG data, or empty for no picture.</param>
     /// <returns>The thumbnail, or null when there is no picture or it cannot be decoded.</returns>
