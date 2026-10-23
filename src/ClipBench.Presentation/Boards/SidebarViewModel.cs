@@ -3,6 +3,7 @@ using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
+using ClipBench.Core.Snippets;
 using ClipBench.Presentation.Popup;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,12 +11,13 @@ using CommunityToolkit.Mvvm.Input;
 namespace ClipBench.Presentation.Boards;
 
 /// <summary>
-/// The popup's sidebar: History, Pinned and the boards, which one is shown, and making, renaming and deleting boards.
+/// The popup's sidebar: History, Pinned, the boards and Snippets, which one is shown, and making, renaming and deleting boards.
 /// It tells the popup when the list it shows must be rebuilt. Used on the UI thread only.
 /// </summary>
 public sealed partial class SidebarViewModel : ObservableObject, IDisposable
 {
     private readonly BoardCatalog _boards;
+    private readonly SnippetCatalog _snippets;
     private readonly ClipLibrary _library;
     private readonly IUiDispatcher _dispatcher;
     private volatile bool _disposed;
@@ -23,26 +25,30 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
 
     /// <summary>Creates the sidebar and starts following the boards and the clips.</summary>
     /// <param name="boards">The boards.</param>
+    /// <param name="snippets">The snippets, for the count.</param>
     /// <param name="library">The clips, for the counts.</param>
     /// <param name="dispatcher">Moves updates to the UI thread.</param>
-    public SidebarViewModel(BoardCatalog boards, ClipLibrary library, IUiDispatcher dispatcher)
+    public SidebarViewModel(BoardCatalog boards, SnippetCatalog snippets, ClipLibrary library, IUiDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(boards);
+        ArgumentNullException.ThrowIfNull(snippets);
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(dispatcher);
         _boards = boards;
+        _snippets = snippets;
         _library = library;
         _dispatcher = dispatcher;
         Entries = [];
         Rebuild();
         _library.Changed += OnSourceChanged;
         _boards.Changed += OnSourceChanged;
+        _snippets.Changed += OnSourceChanged;
     }
 
     /// <summary>Raised when the list the popup shows must be rebuilt: another entry was chosen, or the chosen board is gone.</summary>
     public event EventHandler? ScopeChanged;
 
-    /// <summary>History, Pinned and then the boards.</summary>
+    /// <summary>History, Pinned, the boards and then Snippets.</summary>
     public ObservableCollection<SidebarEntryViewModel> Entries { get; }
 
     /// <summary>True while the sidebar is shown.</summary>
@@ -112,6 +118,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
             new(PopupScope.History, null, "History", clips.Length),
             new(PopupScope.Pinned, null, "Pinned", clips.Count(clip => clip.IsPinned)),
             .. _boards.Boards.Select(board => new SidebarEntryViewModel(PopupScope.Board, board.Id, board.Name, _library.ClipsOnBoard(board.Id).Length)),
+            new(PopupScope.Snippets, null, "Snippets", _snippets.Snippets.Length),
         ];
 
         var chosen = Entries.Count > 0 ? Current : null;
@@ -231,6 +238,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         _disposed = true;
         _library.Changed -= OnSourceChanged;
         _boards.Changed -= OnSourceChanged;
+        _snippets.Changed -= OnSourceChanged;
     }
 
     partial void OnSelectedIndexChanged(int value)

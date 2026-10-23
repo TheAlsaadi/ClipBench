@@ -14,6 +14,9 @@ public enum PopupScope
 
     /// <summary>The clips on one board, in the order of the board.</summary>
     Board,
+
+    /// <summary>The snippets, which are pasted with their variables filled in.</summary>
+    Snippets,
 }
 
 /// <summary>One line of the sidebar: History, Pinned or a board.</summary>
@@ -50,9 +53,15 @@ public sealed partial class SidebarEntryViewModel : ObservableObject
     public bool IsBoard => Scope == PopupScope.Board;
 
     /// <summary>The text a screen reader says.</summary>
-    public string AutomationName => IsBoard
-        ? $"Board {Name}, {Count} {(Count == 1 ? "clip" : "clips")}"
-        : $"{Name}, {Count} {(Count == 1 ? "clip" : "clips")}";
+    public string AutomationName
+    {
+        get
+        {
+            var noun = Scope == PopupScope.Snippets ? "snippet" : "clip";
+            var counted = $"{Count} {noun}{(Count == 1 ? string.Empty : "s")}";
+            return IsBoard ? $"Board {Name}, {counted}" : $"{Name}, {counted}";
+        }
+    }
 
     partial void OnCountChanged(int value) => OnPropertyChanged(nameof(AutomationName));
 

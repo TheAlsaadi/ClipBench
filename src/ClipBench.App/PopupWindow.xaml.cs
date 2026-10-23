@@ -3,6 +3,7 @@ using ClipBench.Core.Screen;
 using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
+using ClipBench.Presentation.Snippets;
 using ClipBench.Presentation.Transforms;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
@@ -89,6 +90,18 @@ public sealed partial class PopupWindow : Window
         if (e.PropertyName == nameof(PopupViewModel.SelectedIndex) && ViewModel.Current is { } current)
         {
             ClipList.ScrollIntoView(current);
+        }
+        else if (e.PropertyName == nameof(PopupViewModel.SelectedIndex) && ViewModel.CurrentSnippet is { } snippet)
+        {
+            SnippetList.ScrollIntoView(snippet);
+        }
+        else if (e.PropertyName == nameof(PopupViewModel.IsPromptingSnippet))
+        {
+            // The first value is focused by the field itself when it appears; going back puts the cursor in the search box.
+            if (!ViewModel.IsPromptingSnippet)
+            {
+                _ = DispatcherQueue.TryEnqueue(() => _ = SearchBox.Focus(FocusState.Programmatic));
+            }
         }
         else if (e.PropertyName == nameof(PopupViewModel.IsTransformsOpen))
         {
@@ -189,6 +202,26 @@ public sealed partial class PopupWindow : Window
 
     private void TransformBack_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.Execute(null);
 
+    private void SnippetList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is SnippetRowViewModel row)
+        {
+            ViewModel.SelectedIndex = ViewModel.Snippets.Rows.IndexOf(row);
+            ViewModel.PasteCommand.Execute(null);
+        }
+    }
+
+    private void SnippetPromptCancel_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.Execute(null);
+
+    // The first field of the prompt takes the cursor as it appears, so the user can start typing at once.
+    private void SnippetField_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox box && ReferenceEquals(box.DataContext, ViewModel.Snippets.Fields.FirstOrDefault()))
+        {
+            _ = box.Focus(FocusState.Programmatic);
+        }
+    }
+
     private void ClipList_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is ClipRowViewModel row)
@@ -270,6 +303,12 @@ public sealed partial class PopupWindow : Window
         if (ViewModel.IsTransformsOpen)
         {
             HandleTransformKey(e, control);
+            return;
+        }
+
+        if (ViewModel.IsPromptingSnippet)
+        {
+            HandleSnippetPromptKey(e);
             return;
         }
 
@@ -377,6 +416,34 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.S when control:
                 ViewModel.NextSeparatorCommand.Execute(null);
+                e.Handled = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    // While a snippet asks for values, Enter goes to the next value and pastes after the last. Tab walks the values too.
+    private void HandleSnippetPromptKey(KeyRoutedEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case VirtualKey.Enter:
+                var fields = ViewModel.Snippets.Fields;
+                var onLast = FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox { DataContext: SnippetFieldViewModel field } && ReferenceEquals(field, fields.LastOrDefault());
+                if (onLast)
+                {
+                    ViewModel.SubmitSnippetPromptCommand.Execute(null);
+                }
+                else
+                {
+                    _ = FocusManager.TryMoveFocus(FocusNavigationDirection.Next);
+                }
+
+                e.Handled = true;
+                break;
+            case VirtualKey.Escape:
+                ViewModel.EscapeCommand.Execute(null);
                 e.Handled = true;
                 break;
             default:

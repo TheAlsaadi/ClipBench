@@ -26,11 +26,12 @@ internal static class Glyphs
 
     /// <summary>The Segoe Fluent Icons character for an entry of the sidebar.</summary>
     /// <param name="scope">What the entry shows.</param>
-    /// <returns>The glyph: a clock for the history, a pin for the pinned clips and a library for a board.</returns>
+    /// <returns>The glyph: a clock for the history, a pin for the pinned clips, a paste icon for the snippets and a library for a board.</returns>
     public static string ForScope(PopupScope scope) => scope switch
     {
         PopupScope.History => ((char)0xE81C).ToString(),
         PopupScope.Pinned => ((char)0xE718).ToString(),
+        PopupScope.Snippets => ((char)0xE77F).ToString(),
         _ => ((char)0xE8F1).ToString(),
     };
 

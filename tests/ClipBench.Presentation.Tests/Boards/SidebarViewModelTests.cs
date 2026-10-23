@@ -2,6 +2,7 @@ using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
+using ClipBench.Core.Snippets;
 using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Tests.Support;
 
@@ -14,6 +15,7 @@ public sealed class SidebarViewModelTests : IDisposable
     private readonly FakeBoardStore _boardStore = new();
     private readonly ClipLibrary _library;
     private readonly BoardCatalog _catalog;
+    private readonly SnippetCatalog _snippets = new(new FakeSnippetStore());
     private readonly SidebarViewModel _sidebar;
     private int _scopeChanges;
 
@@ -21,7 +23,7 @@ public sealed class SidebarViewModelTests : IDisposable
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), _clipStore);
         _catalog = new BoardCatalog(_library, _boardStore);
-        _sidebar = new SidebarViewModel(_catalog, _library, new ImmediateDispatcher());
+        _sidebar = new SidebarViewModel(_catalog, _snippets, _library, new ImmediateDispatcher());
         _sidebar.ScopeChanged += (_, _) => _scopeChanges++;
     }
 
@@ -30,6 +32,7 @@ public sealed class SidebarViewModelTests : IDisposable
     public void Dispose()
     {
         _sidebar.Dispose();
+        _snippets.Dispose();
         _catalog.Dispose();
         _library.Dispose();
     }
@@ -63,7 +66,7 @@ public sealed class SidebarViewModelTests : IDisposable
     [Fact]
     public void A_new_sidebar_shows_history_and_pinned_chosen_on_history()
     {
-        Names().ShouldBe(["History", "Pinned"]);
+        Names().ShouldBe(["History", "Pinned", "Snippets"]);
         _sidebar.SelectedIndex.ShouldBe(0);
         _sidebar.Scope.ShouldBe(PopupScope.History);
         _sidebar.CurrentBoard.ShouldBeNull();
@@ -82,8 +85,8 @@ public sealed class SidebarViewModelTests : IDisposable
         await _catalog.AddClipAsync(work.Id, a.Id, Ct);
         await _catalog.AddClipAsync(work.Id, b.Id, Ct);
 
-        Names().ShouldBe(["History", "Pinned", "Work", "Home"]);
-        Counts().ShouldBe([3, 2, 2, 0]);
+        Names().ShouldBe(["History", "Pinned", "Work", "Home", "Snippets"]);
+        Counts().ShouldBe([3, 2, 2, 0, 0]);
         _sidebar.BoardEntries.Select(entry => entry.Name).ShouldBe(["Work", "Home"]);
         _sidebar.Entries[2].Board.ShouldBe(work.Id);
         _sidebar.Entries[0].IsBoard.ShouldBeFalse();
@@ -96,13 +99,13 @@ public sealed class SidebarViewModelTests : IDisposable
         await NewClipAsync("one");
         var two = await NewClipAsync("two");
 
-        Counts().ShouldBe([2, 0]);
+        Counts().ShouldBe([2, 0, 0]);
 
         await _library.SetPinnedAsync(two.Id, true, Ct);
-        Counts().ShouldBe([2, 1]);
+        Counts().ShouldBe([2, 1, 0]);
 
         await _library.RemoveAsync(two.Id, Ct);
-        Counts().ShouldBe([1, 0]);
+        Counts().ShouldBe([1, 0, 0]);
     }
 
     [Fact]
@@ -124,6 +127,58 @@ public sealed class SidebarViewModelTests : IDisposable
         await NewBoardAsync("secret-marker");
 
         _sidebar.Entries[2].ToString().ShouldNotContain("secret-marker");
+    }
+
+    // --- snippets ---
+
+    [Fact]
+    public async Task The_snippets_entry_comes_last_after_the_boards_and_counts_the_snippets()
+    {
+        await NewBoardAsync("Work");
+        await _snippets.CreateAsync("Signature", "Regards", Ct);
+        await _snippets.CreateAsync("Date", "{date}", Ct);
+
+        Names().ShouldBe(["History", "Pinned", "Work", "Snippets"]);
+        _sidebar.Entries[^1].Scope.ShouldBe(PopupScope.Snippets);
+        _sidebar.Entries[^1].Count.ShouldBe(2);
+        _sidebar.Entries[^1].IsBoard.ShouldBeFalse();
+        _sidebar.Entries[^1].AutomationName.ShouldBe("Snippets, 2 snippets");
+        _sidebar.BoardEntries.Select(entry => entry.Name).ShouldBe(["Work"]);
+    }
+
+    [Fact]
+    public async Task Choosing_snippets_changes_what_the_list_shows_and_a_board_made_later_still_goes_before_it()
+    {
+        _sidebar.SelectEntryCommand.Execute(2);
+        _sidebar.Scope.ShouldBe(PopupScope.Snippets);
+        _sidebar.CurrentBoard.ShouldBeNull();
+
+        await NewBoardAsync("Work");
+
+        _sidebar.Scope.ShouldBe(PopupScope.Snippets);
+        Names().ShouldBe(["History", "Pinned", "Work", "Snippets"]);
+        _sidebar.SelectedIndex.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Snippets_made_elsewhere_change_the_count()
+    {
+        await _snippets.CreateAsync("Signature", "Regards", Ct);
+
+        _sidebar.Entries[^1].Count.ShouldBe(1);
+        _sidebar.Entries[^1].AutomationName.ShouldBe("Snippets, 1 snippet");
+    }
+
+    [Fact]
+    public void Snippets_cannot_be_renamed_or_deleted_like_a_board()
+    {
+        _sidebar.SelectEntryCommand.Execute(2);
+
+        _sidebar.StartRenameCommand.Execute(null);
+        _sidebar.DeleteBoardCommand.Execute(null);
+
+        _sidebar.IsEditing.ShouldBeFalse();
+        _sidebar.IsConfirmingDelete.ShouldBeFalse();
     }
 
     // --- choosing ---
@@ -158,7 +213,7 @@ public sealed class SidebarViewModelTests : IDisposable
 
     [Theory]
     [InlineData(-1)]
-    [InlineData(2)]
+    [InlineData(3)]
     [InlineData(99)]
     public void An_entry_that_does_not_exist_is_ignored(int index)
     {
@@ -174,7 +229,7 @@ public sealed class SidebarViewModelTests : IDisposable
         await NewBoardAsync("Work");
 
         _sidebar.PreviousCommand.Execute(null);
-        _sidebar.SelectedIndex.ShouldBe(2);
+        _sidebar.SelectedIndex.ShouldBe(3);
 
         _sidebar.NextCommand.Execute(null);
         _sidebar.SelectedIndex.ShouldBe(0);
@@ -210,7 +265,7 @@ public sealed class SidebarViewModelTests : IDisposable
 
         await EditAsync("  Work  ");
 
-        Names().ShouldBe(["History", "Pinned", "Work"]);
+        Names().ShouldBe(["History", "Pinned", "Work", "Snippets"]);
         _sidebar.IsEditing.ShouldBeFalse();
         _sidebar.Scope.ShouldBe(PopupScope.Board);
         _sidebar.Current.Name.ShouldBe("Work");
@@ -227,7 +282,7 @@ public sealed class SidebarViewModelTests : IDisposable
 
         _sidebar.IsEditing.ShouldBeTrue();
         _sidebar.EditError.ShouldNotBeNullOrWhiteSpace();
-        Names().ShouldBe(["History", "Pinned"]);
+        Names().ShouldBe(["History", "Pinned", "Snippets"]);
     }
 
     [Fact]
@@ -252,7 +307,7 @@ public sealed class SidebarViewModelTests : IDisposable
         await EditAsync("Home");
 
         _sidebar.EditError.ShouldBeNull();
-        Names().ShouldBe(["History", "Pinned", "Home"]);
+        Names().ShouldBe(["History", "Pinned", "Home", "Snippets"]);
     }
 
     [Fact]
@@ -282,7 +337,7 @@ public sealed class SidebarViewModelTests : IDisposable
 
         await EditAsync("Office");
 
-        Names().ShouldBe(["History", "Pinned", "Office"]);
+        Names().ShouldBe(["History", "Pinned", "Office", "Snippets"]);
         _sidebar.Current.Board.ShouldBe(work.Id);
         _sidebar.IsEditing.ShouldBeFalse();
         _boardStore.Renamed.ShouldBe([(work.Id, "Office")]);
@@ -311,7 +366,7 @@ public sealed class SidebarViewModelTests : IDisposable
 
         _sidebar.IsEditing.ShouldBeFalse();
         _sidebar.EditError.ShouldBeNull();
-        Names().ShouldBe(["History", "Pinned", "Work"]);
+        Names().ShouldBe(["History", "Pinned", "Work", "Snippets"]);
         _boardStore.Renamed.ShouldBeEmpty();
     }
 
@@ -343,7 +398,7 @@ public sealed class SidebarViewModelTests : IDisposable
         await _sidebar.DeleteBoardCommand.ExecuteAsync(null);
 
         _sidebar.IsConfirmingDelete.ShouldBeFalse();
-        Names().ShouldBe(["History", "Pinned"]);
+        Names().ShouldBe(["History", "Pinned", "Snippets"]);
         _sidebar.Scope.ShouldBe(PopupScope.History);
         _scopeChanges.ShouldBe(1);
         _boardStore.Deleted.ShouldBe([work.Id]);
@@ -405,7 +460,7 @@ public sealed class SidebarViewModelTests : IDisposable
 
         await NewBoardAsync("Home");
 
-        Names().ShouldBe(["History", "Pinned", "Work", "Home"]);
+        Names().ShouldBe(["History", "Pinned", "Work", "Home", "Snippets"]);
         _sidebar.CurrentBoard.ShouldBe(work.Id);
     }
 
@@ -503,20 +558,21 @@ public sealed class SidebarViewModelTests : IDisposable
     [Fact]
     public async Task After_disposing_changes_are_no_longer_followed()
     {
-        var sidebar = new SidebarViewModel(_catalog, _library, new ImmediateDispatcher());
+        var sidebar = new SidebarViewModel(_catalog, _snippets, _library, new ImmediateDispatcher());
         sidebar.Dispose();
 
         await NewBoardAsync("Late");
 
-        sidebar.Entries.Count.ShouldBe(2);
+        sidebar.Entries.Count.ShouldBe(3);
     }
 
     [Fact]
     public void Missing_arguments_are_bugs()
     {
-        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(null!, _library, new ImmediateDispatcher()));
-        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(_catalog, null!, new ImmediateDispatcher()));
-        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(_catalog, _library, null!));
+        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(null!, _snippets, _library, new ImmediateDispatcher()));
+        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(_catalog, null!, _library, new ImmediateDispatcher()));
+        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(_catalog, _snippets, null!, new ImmediateDispatcher()));
+        Should.Throw<ArgumentNullException>(() => new SidebarViewModel(_catalog, _snippets, _library, null!));
         Should.Throw<ArgumentNullException>(() => _sidebar.AddClipsAsync(BoardId.New(), null!, Ct));
         Should.Throw<ArgumentNullException>(() => _sidebar.RemoveClipsAsync(null!, Ct));
         Should.Throw<ArgumentNullException>(() => new SidebarEntryViewModel(PopupScope.History, null, null!, 0));

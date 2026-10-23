@@ -5,6 +5,7 @@
     xmlns:local="using:ClipBench.App"
     xmlns:boards="using:ClipBench.Presentation.Boards"
     xmlns:rows="using:ClipBench.Presentation.Rows"
+    xmlns:snippets="using:ClipBench.Presentation.Snippets"
     xmlns:transforms="using:ClipBench.Presentation.Transforms"
     Title="ClipBench">
 
@@ -151,6 +152,7 @@
             IsItemClickEnabled="True"
             IsTabStop="False"
             ItemClick="ClipList_ItemClick"
+            Visibility="{x:Bind ViewModel.IsClipsView, Mode=OneWay}"
             ItemsSource="{x:Bind ViewModel.Rows}"
             SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=TwoWay}"
             SelectionMode="Single">
@@ -213,6 +215,40 @@
                                 Visibility="{x:Bind IsPinned}" />
                         </StackPanel>
                     </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <ListView
+            x:Name="SnippetList"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="SnippetList"
+            AutomationProperties.Name="Snippets"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+            IsItemClickEnabled="True"
+            IsTabStop="False"
+            ItemClick="SnippetList_ItemClick"
+            ItemsSource="{x:Bind ViewModel.Snippets.Rows}"
+            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=TwoWay}"
+            SelectionMode="Single"
+            Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="snippets:SnippetRowViewModel">
+                    <StackPanel Padding="2,6" AutomationProperties.Name="{x:Bind AutomationName}" Spacing="2">
+                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            MaxLines="2"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind Preview}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind Details}"
+                            Visibility="{x:Bind HasDetails}" />
+                    </StackPanel>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
@@ -484,6 +520,73 @@
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Style="{StaticResource CaptionTextBlockStyle}"
                     Text="{x:Bind ViewModel.Transforms.StatusText, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Grid>
+
+        <Grid
+            x:Name="SnippetPromptPanel"
+            Grid.Row="0"
+            Grid.RowSpan="3"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            RowSpacing="8"
+            Visibility="{x:Bind ViewModel.IsPromptingSnippet, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                AutomationProperties.AutomationId="SnippetPromptTitle"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="{x:Bind ViewModel.Snippets.PromptTitle, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis" />
+
+            <ScrollViewer Grid.Row="1" IsTabStop="False">
+                <ItemsControl
+                    AutomationProperties.AutomationId="SnippetFields"
+                    AutomationProperties.Name="Values for the snippet"
+                    IsTabStop="False"
+                    ItemsSource="{x:Bind ViewModel.Snippets.Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="snippets:SnippetFieldViewModel">
+                            <TextBox
+                                Margin="0,0,0,8"
+                                AutomationProperties.Name="{x:Bind Name}"
+                                Header="{x:Bind Name}"
+                                Loaded="SnippetField_Loaded"
+                                MaxLength="10000"
+                                Text="{x:Bind Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Spacing="6">
+                <TextBlock
+                    AutomationProperties.AutomationId="SnippetPromptError"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.Snippets.PromptError, Mode=OneWay}"
+                    TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button
+                        AutomationProperties.AutomationId="SnippetPromptPasteButton"
+                        Command="{x:Bind ViewModel.SubmitSnippetPromptCommand}"
+                        Content="Paste"
+                        Style="{StaticResource AccentButtonStyle}" />
+                    <Button
+                        AutomationProperties.AutomationId="SnippetPromptCancelButton"
+                        Click="SnippetPromptCancel_Click"
+                        Content="Cancel" />
+                </StackPanel>
+                <TextBlock
+                    AutomationProperties.AutomationId="SnippetPromptStatusText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                     TextTrimming="CharacterEllipsis" />
             </StackPanel>
         </Grid>

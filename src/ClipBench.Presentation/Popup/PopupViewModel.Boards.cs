@@ -96,6 +96,8 @@ public sealed partial class PopupViewModel
     // Another entry was chosen, or the shown board is gone: the list is rebuilt from the top.
     private void OnScopeChanged(object? sender, EventArgs e)
     {
+        OnPropertyChanged(nameof(IsSnippetsView));
+        OnPropertyChanged(nameof(IsClipsView));
         if (_open && !_disposed)
         {
             Refresh(keepSelection: false);

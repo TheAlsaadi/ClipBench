@@ -15,8 +15,8 @@ public sealed partial class PopupViewModel
     /// <summary>True while the transform picker is shown over the list.</summary>
     public bool IsTransformsOpen => _transforms.IsOpen;
 
-    /// <summary>False while the picker covers the list, so nothing behind it can be used.</summary>
-    public bool IsMainEnabled => !_transforms.IsOpen;
+    /// <summary>False while the transform picker or the prompt for a snippet covers the list, so nothing behind it can be used.</summary>
+    public bool IsMainEnabled => !_transforms.IsOpen && !_snippets.IsPrompting;
 
     // What would be pasted without a transform is what the picker works on: the marked clips joined, or the highlighted clip.
     [RelayCommand]

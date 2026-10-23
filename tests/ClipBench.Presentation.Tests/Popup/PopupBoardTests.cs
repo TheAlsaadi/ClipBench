@@ -24,8 +24,8 @@ public sealed class PopupBoardTests : IDisposable
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), new FakeClipStore());
         _catalog = new BoardCatalog(_library, _boardStore);
-        _sidebar = TestSidebars.New(_library, _catalog);
-        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), _sidebar, _settings, new ImmediateDispatcher(), _time);
+        _sidebar = TestSidebars.New(_library, _catalog, new Core.Snippets.SnippetCatalog(new FakeSnippetStore()));
+        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), _sidebar, TestSnippets.New(), _settings, new ImmediateDispatcher(), _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -486,6 +486,6 @@ public sealed class PopupBoardTests : IDisposable
     [Fact]
     public void A_missing_sidebar_is_a_bug()
     {
-        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), null!, _settings, new ImmediateDispatcher(), _time));
+        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), null!, TestSnippets.New(), _settings, new ImmediateDispatcher(), _time));
     }
 }

@@ -7,6 +7,7 @@ using ClipBench.Core.Settings;
 using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Rows;
+using ClipBench.Presentation.Snippets;
 using ClipBench.Presentation.Transforms;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -31,6 +32,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     private readonly CollectToggle _collect;
     private readonly TransformPickerViewModel _transforms;
     private readonly SidebarViewModel _sidebar;
+    private readonly SnippetsViewModel _snippets;
     private readonly SettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
@@ -48,11 +50,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <param name="queue">Runs a paste queue of the chosen clips.</param>
     /// <param name="collect">Starts and finishes collect mode.</param>
     /// <param name="transforms">The picker that changes the text before it is pasted.</param>
-    /// <param name="sidebar">History, pinned clips and the boards, and which of them the list shows.</param>
+    /// <param name="sidebar">History, pinned clips, the boards and the snippets, and which of them the list shows.</param>
+    /// <param name="snippets">The list of snippets, and pasting one.</param>
     /// <param name="settings">The user's settings, such as the separator for joining clips.</param>
     /// <param name="dispatcher">Moves work to the UI thread.</param>
     /// <param name="timeProvider">The clock and timers, for the age shown and the search delay.</param>
-    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, TransformPickerViewModel transforms, SidebarViewModel sidebar, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
+    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, TransformPickerViewModel transforms, SidebarViewModel sidebar, SnippetsViewModel snippets, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(paste);
@@ -60,6 +63,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(collect);
         ArgumentNullException.ThrowIfNull(transforms);
         ArgumentNullException.ThrowIfNull(sidebar);
+        ArgumentNullException.ThrowIfNull(snippets);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -69,6 +73,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _collect = collect;
         _transforms = transforms;
         _sidebar = sidebar;
+        _snippets = snippets;
         _settings = settings;
         _dispatcher = dispatcher;
         _timeProvider = timeProvider;
@@ -80,6 +85,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _transforms.PropertyChanged += OnTransformsChanged;
         _sidebar.ScopeChanged += OnScopeChanged;
         _sidebar.PropertyChanged += OnSidebarChanged;
+        _snippets.PropertyChanged += OnSnippetsPropertyChanged;
+        _snippets.Changed += OnSnippetsChanged;
     }
 
     /// <summary>Raised when the popup should be hidden.</summary>
@@ -121,13 +128,14 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public IReadOnlyList<ClipId> MarkedIds => [.. _marks];
 
     /// <summary>True when there is nothing to list.</summary>
-    public bool ShowEmptyState => Rows.Count == 0;
+    public bool ShowEmptyState => ItemCount == 0;
 
     /// <summary>What to say when there is nothing to list.</summary>
     public string EmptyText => !string.IsNullOrWhiteSpace(SearchText)
-        ? "No clips match your search."
+        ? (_sidebar.Scope == PopupScope.Snippets ? "No snippets match your search." : "No clips match your search.")
         : _sidebar.Scope switch
         {
+            PopupScope.Snippets => "No snippets yet. Press Ctrl+E to make one.",
             PopupScope.Pinned => "No pinned clips yet. Press Ctrl+P on a clip to pin it.",
             PopupScope.Board => "This board is empty. Press Ctrl+D on a clip to add it.",
             _ => "Nothing copied yet. Copy something and it will show up here.",
@@ -143,6 +151,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
                 return _transforms.StatusText;
             }
 
+            if (_snippets.IsPrompting)
+            {
+                return string.Join(HintGap, "Enter paste", "Tab next value", "Esc cancel");
+            }
+
             if (_sidebar.IsEditing)
             {
                 return string.Join(HintGap, "Enter save", "Esc cancel");
@@ -156,6 +169,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             if (IsConfirmingDelete)
             {
                 return "Press Delete again to remove this pinned clip" + HintGap + "Esc cancels";
+            }
+
+            if (_sidebar.Scope == PopupScope.Snippets)
+            {
+                return string.Join(HintGap, "Enter paste", "Ctrl+E edit snippets", "Esc close");
             }
 
             if (MarkedCount > 0)
@@ -195,6 +213,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         _marks.Clear();
         _transforms.Close();
+        _snippets.CancelPrompt();
         _sidebar.Reset();
         _open = true;
         IsOpen = true;
@@ -212,6 +231,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _open = false;
         IsOpen = false;
         _transforms.Close();
+        _snippets.CancelPrompt();
         _ = _sidebar.Cancel();
         _ = _searchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         SetSearchTextFromCode(string.Empty);
@@ -239,6 +259,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _transforms.PropertyChanged -= OnTransformsChanged;
         _sidebar.ScopeChanged -= OnScopeChanged;
         _sidebar.PropertyChanged -= OnSidebarChanged;
+        _snippets.PropertyChanged -= OnSnippetsPropertyChanged;
+        _snippets.Changed -= OnSnippetsChanged;
         _searchTimer.Dispose();
     }
 
@@ -257,6 +279,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         IsConfirmingDelete = false;
         OnPropertyChanged(nameof(Current));
+        OnPropertyChanged(nameof(CurrentSnippet));
         OnPropertyChanged(nameof(StatusText));
     }
 
@@ -269,9 +292,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         ErrorMessage = null;
         IsConfirmingDelete = false;
-        if (Rows.Count > 0)
+        if (ItemCount > 0)
         {
-            SelectedIndex = SelectedIndex < 0 ? 0 : (SelectedIndex + 1) % Rows.Count;
+            SelectedIndex = SelectedIndex < 0 ? 0 : (SelectedIndex + 1) % ItemCount;
         }
     }
 
@@ -280,9 +303,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     {
         ErrorMessage = null;
         IsConfirmingDelete = false;
-        if (Rows.Count > 0)
+        if (ItemCount > 0)
         {
-            SelectedIndex = SelectedIndex <= 0 ? Rows.Count - 1 : SelectedIndex - 1;
+            SelectedIndex = SelectedIndex <= 0 ? ItemCount - 1 : SelectedIndex - 1;
         }
     }
 
@@ -333,6 +356,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (_snippets.IsPrompting)
+        {
+            _snippets.CancelPrompt();
+            return;
+        }
+
         if (_sidebar.Cancel())
         {
             return;
@@ -353,6 +382,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task PasteAsync(CancellationToken cancellationToken)
     {
+        if (_sidebar.Scope == PopupScope.Snippets)
+        {
+            await PasteSnippetAsync(cancellationToken);
+            return;
+        }
+
         if (_marks.Count > 0)
         {
             await PasteMarkedAsync(cancellationToken);
@@ -462,6 +497,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
     private void Refresh(bool keepSelection)
     {
+        if (_sidebar.Scope == PopupScope.Snippets)
+        {
+            RefreshSnippets(keepSelection);
+            return;
+        }
+
         var previousId = Current?.Id;
         var previousIndex = SelectedIndex;
         var wasConfirming = IsConfirmingDelete;
@@ -511,6 +552,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     private void NotifyListChanged()
     {
         OnPropertyChanged(nameof(Current));
+        OnPropertyChanged(nameof(CurrentSnippet));
+        OnPropertyChanged(nameof(ItemCount));
         OnPropertyChanged(nameof(MarkedCount));
         OnPropertyChanged(nameof(PasteLabel));
         OnPropertyChanged(nameof(ShowEmptyState));

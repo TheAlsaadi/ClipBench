@@ -1,5 +1,6 @@
 using ClipBench.Core.Boards;
 using ClipBench.Core.History;
+using ClipBench.Core.Snippets;
 using ClipBench.Presentation.Boards;
 
 namespace ClipBench.Presentation.Tests.Support;
@@ -8,8 +9,8 @@ namespace ClipBench.Presentation.Tests.Support;
 internal static class TestSidebars
 {
     public static SidebarViewModel New(ClipLibrary library, FakeBoardStore? store = null) =>
-        New(library, new BoardCatalog(library, store ?? new FakeBoardStore()));
+        New(library, new BoardCatalog(library, store ?? new FakeBoardStore()), new SnippetCatalog(new FakeSnippetStore()));
 
-    public static SidebarViewModel New(ClipLibrary library, BoardCatalog catalog) =>
-        new(catalog, library, new ImmediateDispatcher());
+    public static SidebarViewModel New(ClipLibrary library, BoardCatalog catalog, SnippetCatalog snippets) =>
+        new(catalog, snippets, library, new ImmediateDispatcher());
 }

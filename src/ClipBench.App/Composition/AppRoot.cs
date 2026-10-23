@@ -18,6 +18,7 @@ using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Queue;
+using ClipBench.Presentation.Snippets;
 using ClipBench.Presentation.Transforms;
 using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
@@ -314,6 +315,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<ISnippetStore>(new SnippetStore(storage.Repository));
         _ = services.AddSingleton<SnippetCatalog>();
         _ = services.AddSingleton<SnippetEngine>();
+        _ = services.AddSingleton<SnippetsViewModel>();
         _ = services.AddSingleton<SidebarViewModel>();
         _ = services.AddSingleton<CollectController>();
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
