@@ -110,4 +110,13 @@ public enum ErrorCode
 
     /// <summary>The clip is not on a board, so there is no place in a board to move it from.</summary>
     ClipNotOnBoard,
+
+    /// <summary>A snippet is too long, or asks for more values than the limit.</summary>
+    InvalidSnippet,
+
+    /// <summary>A snippet asks for a value that was not given.</summary>
+    SnippetInputMissing,
+
+    /// <summary>A value given to a snippet is longer than the limit.</summary>
+    SnippetInputTooLong,
 }
