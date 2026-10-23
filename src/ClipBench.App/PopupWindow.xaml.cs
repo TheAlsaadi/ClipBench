@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.System;
 using Windows.UI.Core;
@@ -293,7 +294,7 @@ public sealed partial class PopupWindow : Window
                 _customSeparatorChosen = false;
                 ShowCustomSeparatorBox();
             }
-            else
+            else if (ViewModel.IsOpen)
             {
                 _ = SearchBox.Focus(FocusState.Programmatic);
             }
@@ -320,7 +321,13 @@ public sealed partial class PopupWindow : Window
             }
         };
         flyout.Opened += (_, _) => _ = box.Focus(FocusState.Programmatic);
-        flyout.Closed += (_, _) => _ = SearchBox.Focus(FocusState.Programmatic);
+        flyout.Closed += (_, _) =>
+        {
+            if (ViewModel.IsOpen)
+            {
+                _ = SearchBox.Focus(FocusState.Programmatic);
+            }
+        };
         flyout.ShowAt(SeparatorButton);
     }
 
@@ -333,9 +340,10 @@ public sealed partial class PopupWindow : Window
         var control = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
         var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
 
-        // On a button, Enter and Space press the button, as they do everywhere else. In an open menu every key is the menu's.
+        // On a button, Enter and Space press the button, as they do everywhere else. In a menu or a flyout every key is its
+        // own: its content sits outside the popup's, yet the keys still tunnel through here first.
         var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
-        if (focused is MenuFlyoutItem || (e.Key is VirtualKey.Enter or VirtualKey.Space && focused is ButtonBase))
+        if ((focused is DependencyObject element && !IsInsideFrame(element)) || (e.Key is VirtualKey.Enter or VirtualKey.Space && focused is ButtonBase))
         {
             return;
         }
@@ -465,6 +473,19 @@ public sealed partial class PopupWindow : Window
             default:
                 break;
         }
+    }
+
+    private bool IsInsideFrame(DependencyObject element)
+    {
+        for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, Frame))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // While a snippet asks for values, Enter goes to the next value and pastes after the last. Tab walks the values too.
