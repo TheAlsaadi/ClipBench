@@ -18,8 +18,11 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
     private const uint WmNcCalcSize = 0x0083;
     private const nuint SubclassId = 1;
 
-    // The windows whose frame was removed, with the callback that does it.
-    private readonly Dictionary<long, SUBCLASSPROC> _subclasses = [];
+    // Asked how large the client area of a window is whenever its frame is worked out, it answers that it is the whole
+    // window. It holds no state, so one callback serves every window, and it stays alive for as long as this object does.
+    private readonly SUBCLASSPROC _answerWithWholeWindow =
+        (HWND handle, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data) =>
+            message == WmNcCalcSize && wParam.Value != 0 ? new LRESULT(0) : PInvoke.DefSubclassProc(handle, message, wParam, lParam);
 
     /// <inheritdoc/>
     public Result ExcludeFromCapture(WindowHandle window)
@@ -90,23 +93,12 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
             return Failure("That window does not exist.");
         }
 
+        // Installing the same callback on a window again changes nothing, and the handle of a closed window that is given to
+        // a new one gets it too, so there is nothing to remember per window.
         var hwnd = ToHwnd(window);
-        lock (_subclasses)
+        if (!PInvoke.SetWindowSubclass(hwnd, _answerWithWholeWindow, SubclassId, 0))
         {
-            if (!_subclasses.ContainsKey(window.Value))
-            {
-                // The window is asked how large its client area is whenever its frame is worked out, and answers that it is
-                // the whole window. The styles of the window are left alone: the presenter of a WinUI window puts them back.
-                SUBCLASSPROC callback = (HWND handle, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data) =>
-                    message == WmNcCalcSize && wParam.Value != 0 ? new LRESULT(0) : PInvoke.DefSubclassProc(handle, message, wParam, lParam);
-                if (!PInvoke.SetWindowSubclass(hwnd, callback, SubclassId, 0))
-                {
-                    return Failure("Windows would not remove the window frame.");
-                }
-
-                // The callback has to stay alive for as long as the window is subclassed.
-                _subclasses[window.Value] = callback;
-            }
+            return Failure("Windows would not remove the window frame.");
         }
 
         // The frame is worked out again, which asks the window for its client area.

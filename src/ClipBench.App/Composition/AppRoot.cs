@@ -248,7 +248,6 @@ internal sealed class AppRoot : IAsyncDisposable
         // Opening records the window that has focus now, so it has to come before the popup takes focus.
         _popupViewModel.Open(pasteIntoPreviousWindow: !fromTray);
         _popup.ShowAt(bounds);
-
     }
 
     /// <summary>Shows the snippet editor, making the window the first time.</summary>

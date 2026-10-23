@@ -2,6 +2,7 @@ using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Snippets;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -20,16 +21,35 @@ public sealed partial class PopupWindow
 
     private void Row_PointerExited(object sender, PointerRoutedEventArgs e) => ShowRowActions(sender, show: false);
 
-    // The buttons take the place of the marks and icons of the row while the pointer is over it. The row is a grid of the
-    // icon, the text and one cell that holds the marks and, over them, the buttons: names are not found inside a template
-    // that is bound with x:Bind, so the parts are taken by their place.
+    // The buttons are laid over the row while the pointer is over it, and the marks under them are hidden but keep their
+    // room, so nothing moves. The parts are found by their automation id: names are not found inside a template that is
+    // bound with x:Bind, and the place of a part in the template is not something to depend on.
     private static void ShowRowActions(object sender, bool show)
     {
-        if (sender is Grid { Children: [_, _, Grid { Children: [UIElement status, UIElement actions] }] })
+        if (sender is DependencyObject root && FindById(root, "RowActions") is { } actions && FindById(root, "RowStatus") is { } status)
         {
             actions.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            status.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+            status.Opacity = show ? 0 : 1;
         }
+    }
+
+    private static UIElement? FindById(DependencyObject parent, string automationId)
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is UIElement element && AutomationProperties.GetAutomationId(element) == automationId)
+            {
+                return element;
+            }
+
+            if (FindById(child, automationId) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private void RowMark_Click(object sender, RoutedEventArgs e)

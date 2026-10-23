@@ -216,7 +216,7 @@
             <Button
                 Grid.Column="0"
                 AutomationProperties.AutomationId="SidebarToggleButton"
-                AutomationProperties.Name="Views and boards"
+                AutomationProperties.Name="Show or hide the views and boards"
                 Command="{x:Bind ViewModel.Sidebar.ToggleCommand}"
                 IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
                 ToolTipService.ToolTip="Show or hide the views and boards (Ctrl+B)">
@@ -293,9 +293,10 @@
                                 Text="{x:Bind Details}" />
                         </StackPanel>
 
-                        <Grid Grid.Column="2" VerticalAlignment="Top">
                         <StackPanel
-                            x:Name="RowStatus"
+                            Grid.Column="2"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="RowStatus"
                             Orientation="Horizontal"
                             Spacing="6">
                             <Border
@@ -321,9 +322,18 @@
                                 Glyph="&#xE718;"
                                 Visibility="{x:Bind IsPinned}" />
                         </StackPanel>
+
+                        <!-- Laid over the row while the pointer is over it, so that showing them changes no width. -->
                         <StackPanel
-                            x:Name="RowActions"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
                             HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="RowActions"
+                            Background="{ThemeResource ControlSolidFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
                             Orientation="Horizontal"
                             Spacing="2"
                             Visibility="Collapsed">
@@ -333,7 +343,7 @@
                                 Click="RowMark_Click"
                                 Style="{StaticResource RowActionButtonStyle}"
                                 ToolTipService.ToolTip="Select, to paste several clips (Space)">
-                                <FontIcon FontSize="12" Glyph="&#xE739;" />
+                                <FontIcon FontSize="12" Glyph="{x:Bind local:Glyphs.MarkGlyph(IsMarked), Mode=OneWay}" />
                             </Button>
                             <Button
                                 AutomationProperties.AutomationId="RowPinButton"
@@ -360,7 +370,6 @@
                                 <FontIcon FontSize="12" Glyph="&#xE74D;" />
                             </Button>
                         </StackPanel>
-                        </Grid>
                     </Grid>
                 </DataTemplate>
             </ListView.ItemTemplate>

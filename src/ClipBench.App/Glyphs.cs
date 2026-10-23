@@ -40,6 +40,11 @@ internal static class Glyphs
     /// <returns>An unpin icon for a pinned clip and a pin for the others.</returns>
     public static string PinGlyph(bool pinned) => ((char)(pinned ? 0xE77A : 0xE718)).ToString();
 
+    /// <summary>The icon of the button that selects a clip for a multi-paste.</summary>
+    /// <param name="marked">True when the clip is selected now.</param>
+    /// <returns>A box with a check mark for a selected clip and an empty box for the others.</returns>
+    public static string MarkGlyph(bool marked) => ((char)(marked ? 0xE73A : 0xE739)).ToString();
+
     /// <summary>The tip of the button that pins a clip or lets it go.</summary>
     /// <param name="pinned">True when the clip is pinned now.</param>
     /// <returns>What the button does.</returns>

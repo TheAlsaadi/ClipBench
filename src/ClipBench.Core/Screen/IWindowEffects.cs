@@ -33,9 +33,10 @@ public interface IWindowEffects
     Result HideSystemBorder(WindowHandle window);
 
     /// <summary>
-    /// Takes the frame off a window: the caption, the dialog frame and the borders that Windows keeps around a window that
-    /// has none of its own. The area for the window's content then fills the whole window; with the frame, a window loses a
-    /// few pixels on each side to a line that cannot be styled.
+    /// Makes the area for a window's content fill the whole window. A window that has no border or title bar can still keep
+    /// a dialog frame, which takes a few pixels on every side and cannot be styled, so the content is smaller than the layout
+    /// was made for. No style of the window is changed; the window answers that its content area is all of it. Call it on the
+    /// thread that owns the window, once the window exists.
     /// </summary>
     /// <param name="window">The window.</param>
     /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/> when Windows refused or the window does not exist.</returns>
