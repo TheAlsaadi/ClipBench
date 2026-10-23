@@ -100,6 +100,7 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
         Thread.Sleep(500);
 
         Keyboard.Type(VirtualKeyShort.F24);
+        AppUnderTest.WaitFor(() => !target.IsInFront, 10_000).ShouldBeTrue("the shortcut did not bring the locked popup to the front");
         AppUnderTest.WaitFor(() => AppUnderTest.SearchBox(popup).Properties.HasKeyboardFocus.ValueOrDefault, 10_000)
             .ShouldBeTrue("the shortcut did not take up the locked popup");
 
@@ -109,9 +110,9 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
 
         // Unlocking makes it an ordinary popup again: it has the focus, and a click elsewhere puts it away.
         Keyboard.Type(VirtualKeyShort.F24);
-        AppUnderTest.WaitFor(() => AppUnderTest.SearchBox(popup).Properties.HasKeyboardFocus.ValueOrDefault, 10_000).ShouldBeTrue();
+        AppUnderTest.WaitFor(() => !target.IsInFront, 10_000).ShouldBeTrue("the shortcut did not bring the locked popup to the front a second time");
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_K);
-        AppUnderTest.WaitFor(() => !IsLocked(popup), 10_000).ShouldBeTrue("Ctrl+K did not unlock the popup");
+        AppUnderTest.WaitFor(() => !IsLocked(popup), 10_000).ShouldBeTrue("Ctrl+K did not unlock the popup. " + app.Describe() + "; target in front: " + target.IsInFront);
         target.TryActivate().ShouldBeTrue();
         AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue("an unlocked popup stayed after another window was used");
     }

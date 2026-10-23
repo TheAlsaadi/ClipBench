@@ -102,5 +102,4 @@ WM_NULL
 SetWindowPos
 SetWindowSubclass
 DefSubclassProc
-SendMessage
-ReleaseCapture
+SwitchToThisWindow

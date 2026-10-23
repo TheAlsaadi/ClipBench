@@ -1,7 +1,5 @@
 using System.Drawing;
 using System.Windows.Forms;
-using Windows.Win32;
-using Windows.Win32.Foundation;
 
 namespace ClipBench.Platform.Windows.IntegrationTests.Support;
 
@@ -33,7 +31,32 @@ internal sealed class TestEditForm : IDisposable
 
     /// <summary>What the window answers when asked whether a click should make it the window with focus (WM_MOUSEACTIVATE).</summary>
     public nint AnswerToMouseActivate() => (nint)_form!.Invoke(() =>
-        PInvoke.SendMessage(new HWND(_form.Handle), 0x0021, default, default).Value);
+        SendMessage(_form.Handle, 0x0021, 0, 0));
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern nint SendMessage(nint window, uint message, nint wParam, nint lParam);
+
+    /// <summary>Waits until Windows says this window is the one in front.</summary>
+    public bool WaitUntilInFront(TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if ((bool)_form!.Invoke(() => GetForegroundWindow() == _form.Handle))
+            {
+                return true;
+            }
+
+            Thread.Sleep(50);
+        }
+
+        return false;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern nint GetForegroundWindow();
 
     /// <summary>Runs something on the thread that owns the window, which some calls on a window must be made from.</summary>
     /// <typeparam name="T">What it returns.</typeparam>

@@ -17,8 +17,6 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
 
     private const uint WmNcCalcSize = 0x0083;
     private const uint WmMouseActivate = 0x0021;
-    private const uint WmSysCommand = 0x0112;
-    private const nuint ScMoveFromTitleBar = 0xF012;   // SC_MOVE | HTCAPTION: the move that a press on a title bar starts
     private const int MaNoActivate = 3;
     private const nuint SubclassId = 1;
     private const nuint KeepFocusId = 2;
@@ -140,17 +138,16 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
     }
 
     /// <inheritdoc/>
-    public Result BeginMove(WindowHandle window)
+    public Result BringToFront(WindowHandle window)
     {
         if (window.IsNone || !PInvoke.IsWindow(ToHwnd(window)))
         {
             return Failure("That window does not exist.");
         }
 
-        // The pointer is let go of by the program first: the move loop has to own it. Sending the command is what a press on a
-        // title bar does, and it does not return until the button is up. The window is not activated by it.
-        _ = PInvoke.ReleaseCapture();
-        _ = PInvoke.SendMessage(ToHwnd(window), WmSysCommand, new WPARAM(ScMoveFromTitleBar), new LPARAM(0));
+        // SetForegroundWindow is refused for a window that is already visible unless the program has just had the user's input,
+        // and the shortcut does not count. Switching to a window, as the task switcher does, is allowed.
+        PInvoke.SwitchToThisWindow(ToHwnd(window), true);
         return Result.Success();
     }
 

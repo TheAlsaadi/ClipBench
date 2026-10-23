@@ -53,10 +53,11 @@ public interface IWindowEffects
     Result SetActivatesOnClick(WindowHandle window, bool activates);
 
     /// <summary>
-    /// Starts moving a window with the mouse, as if its title bar had been pressed: the window follows the pointer until the
-    /// button is let go. It returns when the move is over. Call it from the press of a mouse button, on the window's thread.
+    /// Makes a window that is already on screen the window with focus, as when the user switches to it. Windows does not let a
+    /// program take the focus whenever it likes, and refuses silently when a window is already visible, so callers check
+    /// which window has focus afterwards.
     /// </summary>
     /// <param name="window">The window.</param>
-    /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/> when the window does not exist.</returns>
-    Result BeginMove(WindowHandle window);
+    /// <returns>Success when the request was made, or <see cref="ErrorCode.PlatformFailure"/> when the window does not exist.</returns>
+    Result BringToFront(WindowHandle window);
 }

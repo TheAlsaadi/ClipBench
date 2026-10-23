@@ -141,11 +141,15 @@ public class RealWindowEffectsTests
     }
 
     [Fact]
-    public void A_missing_window_cannot_be_moved()
+    public void A_visible_window_can_be_brought_to_the_front_and_a_missing_one_cannot()
     {
-        // A real move waits for the mouse, so only the refusal can be tested without a person at the mouse.
-        _effects.BeginMove(new WindowHandle(0x7FFF_FFF0)).IsFailure.ShouldBeTrue();
-        _effects.BeginMove(WindowHandle.None).IsFailure.ShouldBeTrue();
+        using var form = TestEditForm.Create();
+
+        _effects.BringToFront(new WindowHandle(form.Handle)).IsSuccess.ShouldBeTrue();
+
+        form.WaitUntilInFront(TimeSpan.FromSeconds(5)).ShouldBeTrue("the window was not brought to the front");
+        _effects.BringToFront(new WindowHandle(0x7FFF_FFF0)).IsFailure.ShouldBeTrue();
+        _effects.BringToFront(WindowHandle.None).IsFailure.ShouldBeTrue();
     }
 
     [Fact]
