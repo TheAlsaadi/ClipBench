@@ -105,6 +105,8 @@ internal sealed class FakeForegroundTracker : IForegroundTracker
     public Result<ForegroundTarget> Capture() => HasFocusWindow
         ? Result.Success(new ForegroundTarget(Window, 77, "form.exe", BlocksInputFromUs: false))
         : Result.Failure<ForegroundTarget>(new ResultError(ErrorCode.TargetNotFound, "nothing has focus"));
+
+    public bool Restore(WindowHandle window) => HasFocusWindow;
 }
 
 /// <summary>Collects the notices shown to the user.</summary>

@@ -48,6 +48,25 @@ internal sealed class ForegroundTracker : IForegroundTracker, ITargetInspector
     }
 
     /// <inheritdoc/>
+    public bool Restore(WindowHandle window)
+    {
+        var handle = (nint)window.Value;
+        if (window.IsNone || !_windows.IsWindow(handle))
+        {
+            return false;
+        }
+
+        if (_windows.GetForegroundWindow() == handle)
+        {
+            return true;
+        }
+
+        // Windows may say no, or yes without doing it. Only the foreground window itself is believed.
+        _ = _windows.SetForegroundWindow(handle);
+        return _windows.GetForegroundWindow() == handle;
+    }
+
+    /// <inheritdoc/>
     public Result<ForegroundTarget> Describe(WindowHandle window)
     {
         var handle = (nint)window.Value;

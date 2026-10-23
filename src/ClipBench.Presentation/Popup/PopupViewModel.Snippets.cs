@@ -37,7 +37,7 @@ public sealed partial class PopupViewModel
         // The editor is a window of its own and goes away with the popup. It is asked for first, while the popup still has
         // the focus: once the popup is hidden Windows gives the focus to another program, and refuses it to the editor.
         EditSnippetsRequested?.Invoke(this, EventArgs.Empty);
-        Close();
+        Dismiss();
     }
 
     [RelayCommand]

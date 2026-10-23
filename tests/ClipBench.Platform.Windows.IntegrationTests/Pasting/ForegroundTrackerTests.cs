@@ -101,6 +101,45 @@ public class ForegroundTrackerTests
     }
 
     [Fact]
+    public void A_window_can_be_brought_back_to_the_front()
+    {
+        _input.Foreground = 0x900;
+
+        Tracker.Restore(new WindowHandle(0x100)).ShouldBeTrue();
+
+        _input.FocusRequests.ShouldBe([(nint)0x100]);
+    }
+
+    [Fact]
+    public void A_window_that_is_already_in_front_is_not_asked_again()
+    {
+        Tracker.Restore(new WindowHandle(0x100)).ShouldBeTrue();
+
+        _input.FocusRequests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_window_that_is_gone_cannot_be_brought_back()
+    {
+        _input.Foreground = 0x900;
+        _input.Windows.Remove(0x100);
+
+        Tracker.Restore(new WindowHandle(0x100)).ShouldBeFalse();
+        Tracker.Restore(WindowHandle.None).ShouldBeFalse();
+
+        _input.FocusRequests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_refusal_from_Windows_is_reported_because_only_the_window_in_front_is_believed()
+    {
+        _input.Foreground = 0x900;
+        _input.FocusMovesAfterPolls = -1;
+
+        Tracker.Restore(new WindowHandle(0x100)).ShouldBeFalse();
+    }
+
+    [Fact]
     public void A_program_Windows_will_not_name_is_still_a_target_just_without_a_name()
     {
         _processes.ImagePath = null;

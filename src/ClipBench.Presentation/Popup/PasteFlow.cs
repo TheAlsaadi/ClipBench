@@ -13,6 +13,9 @@ public sealed record PasteFlowOptions
 {
     /// <summary>How long to wait after Ctrl+V before the clipboard is put back.</summary>
     public TimeSpan RestoreDelay { get; init; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>The id of this program's process, so its own windows are never taken for a place to paste into.</summary>
+    public int OwnProcessId { get; init; } = Environment.ProcessId;
 }
 
 /// <summary>
@@ -33,6 +36,7 @@ public sealed class PasteFlow : IPasteFlow
     private readonly PasteFlowOptions _options;
     private readonly Lock _gate = new();
     private WindowHandle? _target;
+    private bool _held;
 
     /// <summary>Creates the flow.</summary>
     /// <param name="tracker">Finds the window that has focus.</param>
@@ -81,6 +85,30 @@ public sealed class PasteFlow : IPasteFlow
     }
 
     /// <inheritdoc/>
+    public void Hold(bool hold)
+    {
+        lock (_gate)
+        {
+            _held = hold;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void ReturnToTarget()
+    {
+        WindowHandle? target;
+        lock (_gate)
+        {
+            target = _target;
+        }
+
+        if (target is { } window)
+        {
+            _ = _tracker.Restore(window);
+        }
+    }
+
+    /// <inheritdoc/>
     public Task PasteAsync(Clip clip, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(clip);
@@ -92,12 +120,28 @@ public sealed class PasteFlow : IPasteFlow
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        // A window on record is good for one paste: the next popup records its own.
+        // A window on record is good for one paste: the next popup records its own. A held flow belongs to a popup that stays
+        // on screen, so it keeps the window, and it follows the user to another program: the popup does not take the focus
+        // when it is clicked, so the program in front is the one the user is working in.
         WindowHandle? target;
+        bool held;
         lock (_gate)
         {
+            held = _held;
             target = _target;
-            _target = null;
+            if (!held)
+            {
+                _target = null;
+            }
+        }
+
+        if (held && _tracker.Capture() is { IsSuccess: true, Value: var front } && front.ProcessId != _options.OwnProcessId)
+        {
+            target = front.Window;
+            lock (_gate)
+            {
+                _target = target;
+            }
         }
 
         var request = new PasteRequest

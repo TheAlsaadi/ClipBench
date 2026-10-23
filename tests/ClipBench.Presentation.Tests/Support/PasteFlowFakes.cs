@@ -19,6 +19,15 @@ internal sealed class FakeForegroundTracker : IForegroundTracker
         Captures++;
         return Next;
     }
+
+    /// <summary>The windows that were asked to come to the front.</summary>
+    public List<WindowHandle> Restored { get; } = [];
+
+    public bool Restore(WindowHandle window)
+    {
+        Restored.Add(window);
+        return true;
+    }
 }
 
 internal sealed class FakePasteInjector : IPasteInjector
