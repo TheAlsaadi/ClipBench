@@ -306,6 +306,23 @@ public sealed class PopupTransformTests : IDisposable
     }
 
     [Fact]
+    public async Task The_list_behind_the_picker_cannot_be_used_while_it_is_open()
+    {
+        await AddAsync(TestClips.Text("hello"));
+        _vm.Open();
+        _vm.IsMainEnabled.ShouldBeTrue();
+        var changes = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        _vm.OpenTransformsCommand.Execute(null);
+        _vm.IsMainEnabled.ShouldBeFalse();
+        changes.ShouldContain(nameof(PopupViewModel.IsMainEnabled));
+
+        _vm.EscapeCommand.Execute(null);
+        _vm.IsMainEnabled.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task Reopening_the_popup_does_not_bring_back_an_old_picker()
     {
         await AddAsync(TestClips.Text("hello"));

@@ -2,6 +2,7 @@ using ClipBench.Core.Pasting;
 using ClipBench.Core.Screen;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
+using ClipBench.Presentation.Transforms;
 using Microsoft.UI.Input;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -49,6 +50,7 @@ public sealed partial class PopupWindow : Window
         Activated += OnActivated;
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        ViewModel.Transforms.PropertyChanged += OnTransformsPropertyChanged;
         BuildSeparatorMenu();
     }
 
@@ -80,7 +82,39 @@ public sealed partial class PopupWindow : Window
         {
             ClipList.ScrollIntoView(current);
         }
+        else if (e.PropertyName == nameof(PopupViewModel.IsTransformsOpen))
+        {
+            // The cursor goes into the picker when it opens and back to the search box when it closes. The focus is
+            // moved after the layout has caught up with the panel being shown or hidden.
+            var open = ViewModel.IsTransformsOpen;
+            _ = DispatcherQueue.TryEnqueue(() => _ = (open ? TransformFilterBox : SearchBox).Focus(FocusState.Programmatic));
+        }
     }
+
+    private void OnTransformsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        var picker = ViewModel.Transforms;
+        if (e.PropertyName == nameof(TransformPickerViewModel.SelectedIndex) && picker.Current is { } current)
+        {
+            TransformList.ScrollIntoView(current);
+        }
+        else if (e.PropertyName == nameof(TransformPickerViewModel.IsAskingFindReplace) && picker.IsOpen)
+        {
+            var asking = picker.IsAskingFindReplace;
+            _ = DispatcherQueue.TryEnqueue(() => _ = (asking ? FindBox : TransformFilterBox).Focus(FocusState.Programmatic));
+        }
+    }
+
+    private void TransformList_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is TransformItemViewModel item)
+        {
+            ViewModel.Transforms.SelectedIndex = ViewModel.Transforms.Items.IndexOf(item);
+            ViewModel.ConfirmTransformCommand.Execute(null);
+        }
+    }
+
+    private void TransformBack_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.Execute(null);
 
     private void ClipList_ItemClick(object sender, ItemClickEventArgs e)
     {
@@ -152,15 +186,26 @@ public sealed partial class PopupWindow : Window
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var control = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
+        var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
 
-        // On a footer button, Enter and Space press the button, as they do everywhere else.
+        // On a button, Enter and Space press the button, as they do everywhere else.
         if (e.Key is VirtualKey.Enter or VirtualKey.Space && FocusManager.GetFocusedElement(Content.XamlRoot) is ButtonBase)
         {
             return;
         }
 
+        if (ViewModel.IsTransformsOpen)
+        {
+            HandleTransformKey(e, control);
+            return;
+        }
+
         switch (e.Key)
         {
+            case VirtualKey.Enter when shift:
+                ViewModel.OpenTransformsCommand.Execute(null);
+                e.Handled = true;
+                break;
             case VirtualKey.Down:
                 ViewModel.MoveDownCommand.Execute(null);
                 e.Handled = true;
@@ -196,7 +241,6 @@ public sealed partial class PopupWindow : Window
                 e.Handled = true;
                 break;
             case VirtualKey.T when control:
-                var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
                 ViewModel.PasteTableCommand.Execute(shift ? TableLayout.Row : TableLayout.Column);
                 e.Handled = true;
                 break;
@@ -210,6 +254,42 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.S when control:
                 ViewModel.NextSeparatorCommand.Execute(null);
+                e.Handled = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    // While the picker is open the keys belong to it. Tab is left alone so the find-and-replace fields can be walked.
+    private void HandleTransformKey(KeyRoutedEventArgs e, bool control)
+    {
+        var picker = ViewModel.Transforms;
+        var choosing = picker.IsChoosing;
+        switch (e.Key)
+        {
+            case VirtualKey.Down when choosing:
+                picker.MoveDownCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Up when choosing:
+                picker.MoveUpCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Enter:
+                (choosing ? ViewModel.ConfirmTransformCommand : ViewModel.SubmitFindReplaceCommand).Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Escape:
+                ViewModel.EscapeCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Space when control && choosing:
+                picker.AddToChainCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Back when choosing && TransformFilterBox.Text.Length == 0:
+                picker.RemoveLastFromChainCommand.Execute(null);
                 e.Handled = true;
                 break;
             default:

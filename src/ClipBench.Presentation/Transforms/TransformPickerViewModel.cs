@@ -112,6 +112,12 @@ public sealed partial class TransformPickerViewModel : ObservableObject
     /// <summary>True while there is an <see cref="ErrorMessage"/> to show.</summary>
     public bool HasError => ErrorMessage is not null;
 
+    /// <summary>True while the list is shown, which is whenever the find-and-replace fields are not.</summary>
+    public bool IsChoosing => !IsAskingFindReplace;
+
+    /// <summary>True when <see cref="Preview"/> is a result and not a reason.</summary>
+    public bool PreviewIsResult => !PreviewIsError;
+
     /// <summary>The highlighted line, or null.</summary>
     public TransformItemViewModel? Current => SelectedIndex >= 0 && SelectedIndex < Items.Count ? Items[SelectedIndex] : null;
 
@@ -271,7 +277,13 @@ public sealed partial class TransformPickerViewModel : ObservableObject
 
     partial void OnErrorMessageChanged(string? value) => OnPropertyChanged(nameof(HasError));
 
-    partial void OnIsAskingFindReplaceChanged(bool value) => OnPropertyChanged(nameof(StatusText));
+    partial void OnIsAskingFindReplaceChanged(bool value)
+    {
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(IsChoosing));
+    }
+
+    partial void OnPreviewIsErrorChanged(bool value) => OnPropertyChanged(nameof(PreviewIsResult));
 
     [RelayCommand]
     private void MoveDown()

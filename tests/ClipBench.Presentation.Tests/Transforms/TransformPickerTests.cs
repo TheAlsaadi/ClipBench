@@ -468,6 +468,39 @@ public class TransformPickerTests
     }
 
     [Fact]
+    public void The_list_and_the_find_and_replace_fields_take_turns_on_screen()
+    {
+        var changes = new List<string?>();
+        _picker.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        _picker.Open("x", isSensitive: false);
+        _picker.IsChoosing.ShouldBeTrue();
+
+        Highlight("Find and replace\u2026");
+        _picker.TryConfirm(out _).ShouldBeFalse();
+        _picker.IsChoosing.ShouldBeFalse();
+        changes.ShouldContain(nameof(TransformPickerViewModel.IsChoosing));
+
+        _picker.Cancel();
+        _picker.IsChoosing.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_preview_says_whether_it_is_a_result_or_a_reason()
+    {
+        var changes = new List<string?>();
+        _picker.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        _picker.Open("this is not json", isSensitive: false);
+        _picker.PreviewIsResult.ShouldBeTrue();
+
+        Highlight("JSON format");
+        _picker.PreviewIsResult.ShouldBeFalse();
+        changes.ShouldContain(nameof(TransformPickerViewModel.PreviewIsResult));
+
+        Highlight("Trim");
+        _picker.PreviewIsResult.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Missing_arguments_are_bugs()
     {
         Should.Throw<ArgumentNullException>(() => new TransformPickerViewModel(null!, new TransformPipeline(), _log));

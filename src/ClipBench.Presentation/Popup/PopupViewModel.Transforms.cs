@@ -15,6 +15,9 @@ public sealed partial class PopupViewModel
     /// <summary>True while the transform picker is shown over the list.</summary>
     public bool IsTransformsOpen => _transforms.IsOpen;
 
+    /// <summary>False while the picker covers the list, so nothing behind it can be used.</summary>
+    public bool IsMainEnabled => !_transforms.IsOpen;
+
     // What would be pasted without a transform is what the picker works on: the marked clips joined, or the highlighted clip.
     [RelayCommand]
     private void OpenTransforms()
@@ -83,6 +86,7 @@ public sealed partial class PopupViewModel
         if (e.PropertyName == nameof(TransformPickerViewModel.IsOpen))
         {
             OnPropertyChanged(nameof(IsTransformsOpen));
+            OnPropertyChanged(nameof(IsMainEnabled));
             OnPropertyChanged(nameof(StatusText));
         }
         else if (e.PropertyName == nameof(TransformPickerViewModel.StatusText))

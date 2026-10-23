@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:ClipBench.App"
     xmlns:rows="using:ClipBench.Presentation.Rows"
+    xmlns:transforms="using:ClipBench.Presentation.Transforms"
     Title="ClipBench">
 
     <Window.SystemBackdrop>
@@ -26,6 +27,7 @@
             Grid.Row="0"
             AutomationProperties.AutomationId="SearchBox"
             AutomationProperties.Name="Search clips"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
             PlaceholderText="Search clips"
             Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
@@ -34,6 +36,7 @@
             Grid.Row="1"
             AutomationProperties.AutomationId="ClipList"
             AutomationProperties.Name="Clipboard history"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
             IsItemClickEnabled="True"
             IsTabStop="False"
             ItemClick="ClipList_ItemClick"
@@ -114,7 +117,12 @@
             TextWrapping="Wrap"
             Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}" />
 
-        <StackPanel Grid.Row="2" Spacing="4">
+        <!-- A UserControl, because a panel has no IsEnabled: the buttons are switched off while the picker covers them. -->
+        <UserControl
+            Grid.Row="2"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+            IsTabStop="False">
+        <StackPanel Spacing="4">
             <Grid ColumnSpacing="6">
                 <Grid.Resources>
                     <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
@@ -123,6 +131,7 @@
                     </Style>
                 </Grid.Resources>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -180,7 +189,16 @@
                 </DropDownButton>
 
                 <Button
-                    Grid.Column="5"
+                    Grid.Column="4"
+                    AutomationProperties.AutomationId="TransformButton"
+                    AutomationProperties.Name="Transform"
+                    Command="{x:Bind ViewModel.OpenTransformsCommand}"
+                    ToolTipService.ToolTip="Change the text before pasting (Shift+Enter)">
+                    <FontIcon FontSize="14" Glyph="&#xE70F;" />
+                </Button>
+
+                <Button
+                    Grid.Column="6"
                     AutomationProperties.AutomationId="CollectButton"
                     Command="{x:Bind ViewModel.ToggleCollectCommand}"
                     Content="{x:Bind ViewModel.CollectLabel, Mode=OneWay}"
@@ -199,5 +217,151 @@
                 Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                 TextTrimming="CharacterEllipsis" />
         </StackPanel>
+        </UserControl>
+
+        <Grid
+            x:Name="TransformPanel"
+            Grid.Row="0"
+            Grid.RowSpan="3"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            RowSpacing="6"
+            Visibility="{x:Bind ViewModel.IsTransformsOpen, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBox
+                x:Name="TransformFilterBox"
+                Grid.Row="0"
+                AutomationProperties.AutomationId="TransformFilterBox"
+                AutomationProperties.Name="Filter transforms"
+                IsEnabled="{x:Bind ViewModel.Transforms.IsChoosing, Mode=OneWay}"
+                PlaceholderText="Change the text before pasting"
+                Text="{x:Bind ViewModel.Transforms.FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock
+                Grid.Row="1"
+                AutomationProperties.AutomationId="TransformChain"
+                AutomationProperties.Name="Chosen transforms"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{x:Bind ViewModel.Transforms.ChainText, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis" />
+
+            <ListView
+                x:Name="TransformList"
+                Grid.Row="2"
+                AutomationProperties.AutomationId="TransformList"
+                AutomationProperties.Name="Transforms"
+                IsItemClickEnabled="True"
+                IsTabStop="False"
+                ItemClick="TransformList_ItemClick"
+                ItemsSource="{x:Bind ViewModel.Transforms.Items}"
+                SelectedIndex="{x:Bind ViewModel.Transforms.SelectedIndex, Mode=TwoWay}"
+                SelectionMode="Single"
+                Visibility="{x:Bind ViewModel.Transforms.IsChoosing, Mode=OneWay}">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="transforms:TransformItemViewModel">
+                        <StackPanel
+                            Padding="2,4"
+                            AutomationProperties.HelpText="{x:Bind Description}"
+                            AutomationProperties.Name="{x:Bind Name}">
+                            <TextBlock Text="{x:Bind Name}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind Description}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <StackPanel
+                Grid.Row="2"
+                Spacing="8"
+                Visibility="{x:Bind ViewModel.Transforms.IsAskingFindReplace, Mode=OneWay}">
+                <TextBox
+                    x:Name="FindBox"
+                    AutomationProperties.AutomationId="FindBox"
+                    AutomationProperties.Name="Find"
+                    Header="Find"
+                    Text="{x:Bind ViewModel.Transforms.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBox
+                    x:Name="ReplaceBox"
+                    AutomationProperties.AutomationId="ReplaceBox"
+                    AutomationProperties.Name="Replace with"
+                    Header="Replace with"
+                    Text="{x:Bind ViewModel.Transforms.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox
+                    AutomationProperties.AutomationId="RegexCheck"
+                    Content="Use a pattern (regular expression)"
+                    IsChecked="{x:Bind ViewModel.Transforms.UseRegex, Mode=TwoWay}" />
+                <CheckBox
+                    AutomationProperties.AutomationId="IgnoreCaseCheck"
+                    Content="Ignore capital letters"
+                    IsChecked="{x:Bind ViewModel.Transforms.IgnoreCase, Mode=TwoWay}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button
+                        AutomationProperties.AutomationId="FindReplaceApplyButton"
+                        Command="{x:Bind ViewModel.SubmitFindReplaceCommand}"
+                        Content="OK"
+                        Style="{StaticResource AccentButtonStyle}" />
+                    <Button
+                        AutomationProperties.AutomationId="FindReplaceBackButton"
+                        Click="TransformBack_Click"
+                        Content="Back" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border
+                Grid.Row="3"
+                MinHeight="48"
+                MaxHeight="120"
+                Padding="10,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <Grid>
+                    <TextBlock
+                        AutomationProperties.AutomationId="TransformPreview"
+                        AutomationProperties.Name="Preview"
+                        MaxLines="4"
+                        Text="{x:Bind ViewModel.Transforms.Preview, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.Transforms.PreviewIsResult, Mode=OneWay}" />
+                    <TextBlock
+                        AutomationProperties.AutomationId="TransformPreviewError"
+                        AutomationProperties.Name="Preview problem"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        MaxLines="4"
+                        Text="{x:Bind ViewModel.Transforms.Preview, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.Transforms.PreviewIsError, Mode=OneWay}" />
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="4" Spacing="4">
+                <TextBlock
+                    AutomationProperties.AutomationId="TransformError"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.Transforms.ErrorMessage, Mode=OneWay}"
+                    TextWrapping="Wrap"
+                    Visibility="{x:Bind ViewModel.Transforms.HasError, Mode=OneWay}" />
+                <TextBlock
+                    AutomationProperties.AutomationId="TransformStatusText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.Transforms.StatusText, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
