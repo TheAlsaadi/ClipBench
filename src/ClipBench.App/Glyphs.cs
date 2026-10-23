@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using ClipBench.Core.Clips;
+using ClipBench.Presentation.Boards;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
 
@@ -21,6 +22,16 @@ internal static class Glyphs
         ClipFormat.Image => "",
         ClipFormat.Files => "",
         _ => "",
+    };
+
+    /// <summary>The Segoe Fluent Icons character for an entry of the sidebar.</summary>
+    /// <param name="scope">What the entry shows.</param>
+    /// <returns>The glyph: a clock for the history, a pin for the pinned clips and a library for a board.</returns>
+    public static string ForScope(PopupScope scope) => scope switch
+    {
+        PopupScope.History => ((char)0xE81C).ToString(),
+        PopupScope.Pinned => ((char)0xE718).ToString(),
+        _ => ((char)0xE8F1).ToString(),
     };
 
     /// <summary>Decodes a picture at thumbnail size, so a large screenshot does not cost a full-size bitmap per row.</summary>

@@ -1,5 +1,6 @@
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Screen;
+using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Transforms;
@@ -23,10 +24,13 @@ namespace ClipBench.App;
 public sealed partial class PopupWindow : Window
 {
     /// <summary>The width of the popup in device-independent pixels.</summary>
-    public const double WidthDip = 420;
+    public const double WidthDip = 440;
 
     /// <summary>The height of the popup in device-independent pixels.</summary>
     public const double HeightDip = 520;
+
+    /// <summary>How much wider the popup is while the sidebar is shown, in device-independent pixels.</summary>
+    public const double SidebarWidthDip = 148;
 
     private bool _customSeparatorChosen;
 
@@ -51,11 +55,15 @@ public sealed partial class PopupWindow : Window
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         ViewModel.Transforms.PropertyChanged += OnTransformsPropertyChanged;
+        ViewModel.Sidebar.PropertyChanged += OnSidebarPropertyChanged;
         BuildSeparatorMenu();
     }
 
     /// <summary>What the window shows.</summary>
     public PopupViewModel ViewModel { get; }
+
+    /// <summary>The width the popup has now, in device-independent pixels: wider while the sidebar is shown.</summary>
+    public double CurrentWidthDip => WidthDip + (ViewModel.Sidebar.IsOpen ? SidebarWidthDip : 0);
 
     /// <summary>Places the window, shows it and puts the cursor in the search box.</summary>
     /// <param name="bounds">Where the window goes, in device pixels.</param>
@@ -89,6 +97,71 @@ public sealed partial class PopupWindow : Window
             var open = ViewModel.IsTransformsOpen;
             _ = DispatcherQueue.TryEnqueue(() => _ = (open ? TransformFilterBox : SearchBox).Focus(FocusState.Programmatic));
         }
+    }
+
+    private void OnSidebarPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (!ViewModel.IsOpen)
+        {
+            return;
+        }
+
+        if (e.PropertyName == nameof(SidebarViewModel.IsOpen))
+        {
+            ResizeForSidebar();
+        }
+        else if (e.PropertyName == nameof(SidebarViewModel.IsEditing))
+        {
+            // The cursor goes into the name box while a name is typed and back to the search box afterwards.
+            var editing = ViewModel.Sidebar.IsEditing;
+            _ = DispatcherQueue.TryEnqueue(() => _ = (editing ? BoardNameBox : SearchBox).Focus(FocusState.Programmatic));
+        }
+        else if (e.PropertyName == nameof(SidebarViewModel.SelectedIndex) && SidebarList.Items.Count > 0)
+        {
+            SidebarList.ScrollIntoView(ViewModel.Sidebar.Current);
+        }
+    }
+
+    // The window grows to the right to make room for the sidebar, and is moved left if that would take it off the screen.
+    private void ResizeForSidebar()
+    {
+        var scale = Content.XamlRoot?.RasterizationScale ?? 1.0;
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        var width = Math.Min((int)Math.Round(CurrentWidthDip * scale), area.Width);
+        var position = AppWindow.Position;
+        var x = Math.Max(area.X, Math.Min(position.X, area.X + area.Width - width));
+        AppWindow.MoveAndResize(new RectInt32(x, position.Y, width, AppWindow.Size.Height));
+    }
+
+    // The menu is made fresh each time it opens, so it lists the boards as they are now.
+    private void BoardMenu_Opening(object? sender, object e)
+    {
+        BoardMenu.Items.Clear();
+        var boards = ViewModel.Sidebar.BoardEntries;
+        foreach (var entry in boards)
+        {
+            var item = new MenuFlyoutItem { Text = entry.Name };
+            var id = entry.Board!.Value;
+            item.Click += (_, _) => ViewModel.AddToBoardCommand.Execute(id);
+            BoardMenu.Items.Add(item);
+        }
+
+        if (boards.Count > 0)
+        {
+            BoardMenu.Items.Add(new MenuFlyoutSeparator());
+        }
+
+        var create = new MenuFlyoutItem { Text = "New board\u2026" };
+        create.Click += (_, _) => StartNewBoard();
+        BoardMenu.Items.Add(create);
+    }
+
+    private void ShowBoardMenu() => BoardMenu.ShowAt(BoardButton);
+
+    private void StartNewBoard()
+    {
+        ViewModel.Sidebar.IsOpen = true;
+        ViewModel.Sidebar.StartNewCommand.Execute(null);
     }
 
     private void OnTransformsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -200,10 +273,60 @@ public sealed partial class PopupWindow : Window
             return;
         }
 
+        if (ViewModel.Sidebar.IsEditing)
+        {
+            HandleBoardNameKey(e);
+            return;
+        }
+
         switch (e.Key)
         {
             case VirtualKey.Enter when shift:
                 ViewModel.OpenTransformsCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.B when control:
+                ViewModel.Sidebar.ToggleCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.N when control:
+                StartNewBoard();
+                e.Handled = true;
+                break;
+            case VirtualKey.F2:
+                ViewModel.Sidebar.StartRenameCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Delete when control && shift:
+                ViewModel.Sidebar.DeleteBoardCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.D when control && shift:
+                ViewModel.RemoveFromBoardCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.D when control:
+                ShowBoardMenu();
+                e.Handled = true;
+                break;
+            case VirtualKey.Up when control:
+                ViewModel.MoveUpInBoardCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Down when control:
+                ViewModel.MoveDownInBoardCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.PageDown when control:
+                ViewModel.Sidebar.NextCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.PageUp when control:
+                ViewModel.Sidebar.PreviousCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case >= VirtualKey.Number1 and <= VirtualKey.Number9 when control:
+                ViewModel.Sidebar.SelectEntryCommand.Execute(e.Key - VirtualKey.Number1);
                 e.Handled = true;
                 break;
             case VirtualKey.Down:
@@ -254,6 +377,24 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.S when control:
                 ViewModel.NextSeparatorCommand.Execute(null);
+                e.Handled = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    // While a board name is typed, Enter saves it and Esc gives it up. Everything else is typing.
+    private void HandleBoardNameKey(KeyRoutedEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case VirtualKey.Enter:
+                ViewModel.Sidebar.SubmitEditCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.Escape:
+                ViewModel.EscapeCommand.Execute(null);
                 e.Handled = true;
                 break;
             default:

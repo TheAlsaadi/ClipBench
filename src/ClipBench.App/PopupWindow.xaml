@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:ClipBench.App"
+    xmlns:boards="using:ClipBench.Presentation.Boards"
     xmlns:rows="using:ClipBench.Presentation.Rows"
     xmlns:transforms="using:ClipBench.Presentation.Transforms"
     Title="ClipBench">
@@ -12,10 +13,120 @@
     </Window.SystemBackdrop>
 
     <Grid
-        x:Name="Root"
+        x:Name="Frame"
         Padding="8"
-        RowSpacing="6"
+        ColumnSpacing="8"
         PreviewKeyDown="Root_PreviewKeyDown">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- A UserControl, because a panel has no IsEnabled: the sidebar is switched off while the transform picker covers the list. -->
+        <UserControl
+            x:Name="SidebarHost"
+            Grid.Column="0"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+            IsTabStop="False"
+            Visibility="{x:Bind ViewModel.Sidebar.IsOpen, Mode=OneWay}">
+            <Grid Width="140" RowSpacing="6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <ListView
+                    x:Name="SidebarList"
+                    Grid.Row="0"
+                    AutomationProperties.AutomationId="SidebarList"
+                    AutomationProperties.Name="Views and boards"
+                    IsTabStop="False"
+                    ItemsSource="{x:Bind ViewModel.Sidebar.Entries}"
+                    SelectedIndex="{x:Bind ViewModel.Sidebar.SelectedIndex, Mode=TwoWay}"
+                    SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="boards:SidebarEntryViewModel">
+                            <Grid
+                                Padding="0,4"
+                                AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
+                                ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    Grid.Column="0"
+                                    FontSize="14"
+                                    Glyph="{x:Bind local:Glyphs.ForScope(Scope)}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Text="{x:Bind Name}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind Count, Mode=OneWay}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <StackPanel
+                    Grid.Row="1"
+                    Spacing="4"
+                    Visibility="{x:Bind ViewModel.Sidebar.IsEditing, Mode=OneWay}">
+                    <TextBox
+                        x:Name="BoardNameBox"
+                        AutomationProperties.AutomationId="BoardNameBox"
+                        AutomationProperties.Name="Board name"
+                        PlaceholderText="Board name"
+                        Text="{x:Bind ViewModel.Sidebar.EditText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock
+                        AutomationProperties.AutomationId="BoardNameError"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="{x:Bind ViewModel.Sidebar.EditError, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Row="2"
+                    Orientation="Horizontal"
+                    Spacing="4">
+                    <Button
+                        AutomationProperties.AutomationId="NewBoardButton"
+                        AutomationProperties.Name="New board"
+                        Command="{x:Bind ViewModel.Sidebar.StartNewCommand}"
+                        ToolTipService.ToolTip="New board (Ctrl+N)">
+                        <FontIcon FontSize="14" Glyph="&#xE710;" />
+                    </Button>
+                    <Button
+                        AutomationProperties.AutomationId="RenameBoardButton"
+                        AutomationProperties.Name="Rename board"
+                        Command="{x:Bind ViewModel.Sidebar.StartRenameCommand}"
+                        IsEnabled="{x:Bind ViewModel.Sidebar.Current.IsBoard, Mode=OneWay}"
+                        ToolTipService.ToolTip="Rename the board (F2)">
+                        <FontIcon FontSize="14" Glyph="&#xE70F;" />
+                    </Button>
+                    <Button
+                        AutomationProperties.AutomationId="DeleteBoardButton"
+                        AutomationProperties.Name="Delete board"
+                        Command="{x:Bind ViewModel.Sidebar.DeleteBoardCommand}"
+                        IsEnabled="{x:Bind ViewModel.Sidebar.Current.IsBoard, Mode=OneWay}"
+                        ToolTipService.ToolTip="Delete the board, its clips stay (Ctrl+Shift+Delete)">
+                        <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </UserControl>
+
+    <Grid
+        x:Name="Root"
+        Grid.Column="1"
+        RowSpacing="6">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -123,7 +234,7 @@
             IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
             IsTabStop="False">
         <StackPanel Spacing="4">
-            <Grid ColumnSpacing="6">
+            <Grid ColumnSpacing="4">
                 <Grid.Resources>
                     <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
                         <Setter Property="FontSize" Value="12" />
@@ -131,6 +242,7 @@
                     </Style>
                 </Grid.Resources>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -198,7 +310,19 @@
                 </Button>
 
                 <Button
-                    Grid.Column="6"
+                    x:Name="BoardButton"
+                    Grid.Column="5"
+                    AutomationProperties.AutomationId="BoardButton"
+                    AutomationProperties.Name="Add to board"
+                    ToolTipService.ToolTip="Add the clip to a board (Ctrl+D)">
+                    <FontIcon FontSize="14" Glyph="&#xE8F1;" />
+                    <Button.Flyout>
+                        <MenuFlyout x:Name="BoardMenu" Opening="BoardMenu_Opening" Placement="Top" />
+                    </Button.Flyout>
+                </Button>
+
+                <Button
+                    Grid.Column="7"
                     AutomationProperties.AutomationId="CollectButton"
                     Command="{x:Bind ViewModel.ToggleCollectCommand}"
                     Content="{x:Bind ViewModel.CollectLabel, Mode=OneWay}"
@@ -363,5 +487,6 @@
                     TextTrimming="CharacterEllipsis" />
             </StackPanel>
         </Grid>
+    </Grid>
     </Grid>
 </Window>

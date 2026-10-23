@@ -227,7 +227,7 @@ internal sealed class AppRoot : IAsyncDisposable
 
         var focused = fromTray ? default : _platform.ForegroundTracker.Capture();
         var anchor = _platform.ScreenLocator.Locate(focused.IsSuccess ? focused.Value.Window : null);
-        var bounds = PopupPlacement.Compute(anchor, PopupWindow.WidthDip, PopupWindow.HeightDip);
+        var bounds = PopupPlacement.Compute(anchor, _popup.CurrentWidthDip, PopupWindow.HeightDip);
 
         // Opening records the window that has focus now, so it has to come before the popup takes focus.
         _popupViewModel.Open(pasteIntoPreviousWindow: !fromTray);
