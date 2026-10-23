@@ -86,4 +86,13 @@ public enum ErrorCode
 
     /// <summary>A Windows service ClipBench needs (a window, a message loop, a lock) could not be set up.</summary>
     PlatformFailure,
+
+    /// <summary>The text given to a transform is not in the form the transform needs, such as JSON that does not parse.</summary>
+    TransformInputInvalid,
+
+    /// <summary>A find-and-replace pattern is not valid, or is too long.</summary>
+    PatternInvalid,
+
+    /// <summary>A find-and-replace pattern took too long to match, so the paste was not changed.</summary>
+    PatternTimedOut,
 }
