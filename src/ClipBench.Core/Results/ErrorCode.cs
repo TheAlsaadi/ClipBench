@@ -86,4 +86,49 @@ public enum ErrorCode
 
     /// <summary>A Windows service ClipBench needs (a window, a message loop, a lock) could not be set up.</summary>
     PlatformFailure,
+
+    /// <summary>The text given to a transform is not in the form the transform needs, such as JSON that does not parse.</summary>
+    TransformInputInvalid,
+
+    /// <summary>A find-and-replace pattern is not valid, or is too long.</summary>
+    PatternInvalid,
+
+    /// <summary>A find-and-replace pattern took too long to match, so the paste was not changed.</summary>
+    PatternTimedOut,
+
+    /// <summary>No board with the given id exists.</summary>
+    BoardNotFound,
+
+    /// <summary>A board name is empty, too long or holds control characters.</summary>
+    InvalidBoardName,
+
+    /// <summary>Another board already has that name, ignoring capital letters.</summary>
+    BoardNameTaken,
+
+    /// <summary>The most boards that can exist already do.</summary>
+    TooManyBoards,
+
+    /// <summary>The clip is not on a board, so there is no place in a board to move it from.</summary>
+    ClipNotOnBoard,
+
+    /// <summary>A snippet is too long, or asks for more values than the limit.</summary>
+    InvalidSnippet,
+
+    /// <summary>A snippet asks for a value that was not given.</summary>
+    SnippetInputMissing,
+
+    /// <summary>A value given to a snippet is longer than the limit.</summary>
+    SnippetInputTooLong,
+
+    /// <summary>No snippet with the given id exists.</summary>
+    SnippetNotFound,
+
+    /// <summary>A snippet name is empty, too long or holds control characters.</summary>
+    InvalidSnippetName,
+
+    /// <summary>Another snippet already has that name, ignoring capital letters.</summary>
+    SnippetNameTaken,
+
+    /// <summary>The most snippets that can exist already do.</summary>
+    TooManySnippets,
 }

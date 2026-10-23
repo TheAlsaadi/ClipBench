@@ -19,7 +19,7 @@ public sealed class PopupSeparatorTests : IDisposable
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), new FakeClipStore());
         _settings = new SettingsService(_settingsStore);
-        _vm = new PopupViewModel(_library, new FakePasteFlow(), new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), _settings, new ImmediateDispatcher(), _time);
+        _vm = new PopupViewModel(_library, new FakePasteFlow(), new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), TestSidebars.New(_library), TestSnippets.New(), _settings, new ImmediateDispatcher(), _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -170,6 +170,6 @@ public sealed class PopupSeparatorTests : IDisposable
     [Fact]
     public void Missing_settings_are_a_bug()
     {
-        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, new FakePasteFlow(), new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), null!, new ImmediateDispatcher(), _time));
+        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, new FakePasteFlow(), new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), TestSidebars.New(_library), TestSnippets.New(), null!, new ImmediateDispatcher(), _time));
     }
 }

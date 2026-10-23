@@ -1,6 +1,8 @@
 using System.Text;
+using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
+using ClipBench.Core.Snippets;
 using ClipBench.Storage.Tests.Support;
 
 namespace ClipBench.Storage.Tests;
@@ -22,9 +24,12 @@ public sealed class PlaintextLeakTests : IAsyncDisposable
     private const string FilePath = "LEAKFILE-0e7b52a9";
     private const string Image = "LEAKIMAGE-9c3d17f4";
     private const string Source = "LEAKSOURCE-18fa6b2d";
+    private const string BoardName = "LEAKBOARD-c47d92e0";
+    private const string SnippetName = "LEAKSNIPNAME-2e8b4f61";
+    private const string SnippetBody = "LEAKSNIPBODY-90d3a7c5";
     private const string Arabic = "\u0633\u0631\u0651-\u0645\u0643\u0634\u0648\u0641-\u0661\u0662\u0663";
 
-    private static readonly string[] _markers = [Text, Html, HtmlText, Rtf, RtfText, FilePath, Image, Source, Arabic];
+    private static readonly string[] _markers = [Text, Html, HtmlText, Rtf, RtfText, FilePath, Image, Source, BoardName, SnippetName, SnippetBody, Arabic];
 
     private static readonly string[] _filesWhileOpen = ["clipbench.db", "clipbench.db-shm", "clipbench.db-wal", "key.bin"];
 
@@ -61,6 +66,9 @@ public sealed class PlaintextLeakTests : IAsyncDisposable
         {
             (await opened.Value.Repository.SaveAsync(clip, Ct)).IsSuccess.ShouldBeTrue();
         }
+
+        (await opened.Value.Repository.SaveBoardAsync(new Board(BoardId.New(), $"{BoardName} plans", 0), Ct)).IsSuccess.ShouldBeTrue();
+        (await opened.Value.Repository.SaveSnippetAsync(new Snippet(SnippetId.New(), $"{SnippetName} reply", $"Dear {{input:Name}}, {SnippetBody}", 0), Ct)).IsSuccess.ShouldBeTrue();
 
         return opened.Value;
     }
@@ -137,6 +145,65 @@ public sealed class PlaintextLeakTests : IAsyncDisposable
         await second.Repository.SaveAsync(TestClips.Text($"a new one with {Text}"), Ct);
 
         AssertNoMarkerOnDisk();
+    }
+
+    [Fact]
+    public async Task A_board_name_is_gone_from_the_files_once_the_board_is_renamed_or_deleted_even_while_the_database_is_open()
+    {
+        await using var storage = await OpenWithClipsAsync();
+        var board = (await storage.Repository.LoadBoardsAsync(Ct)).Value.Items.Single();
+
+        await storage.Repository.RenameBoardAsync(board.Id, "a different name", Ct);
+        DiskScan.FilesContaining(_directory.Path, BoardName).ShouldBeEmpty("the old name is still readable after a rename");
+
+        await storage.Repository.RenameBoardAsync(board.Id, $"{BoardName} again", Ct);
+        await storage.Repository.DeleteBoardAsync(board.Id, Ct);
+        DiskScan.FilesContaining(_directory.Path, BoardName).ShouldBeEmpty("the name is still readable after the board is deleted");
+    }
+
+    [Fact]
+    public async Task A_snippet_is_gone_from_the_files_once_it_is_edited_or_deleted_even_while_the_database_is_open()
+    {
+        await using var storage = await OpenWithClipsAsync();
+        var snippet = (await storage.Repository.LoadSnippetsAsync(Ct)).Value.Items.Single();
+
+        await storage.Repository.SaveSnippetAsync(snippet with { Name = "other", Body = "other" }, Ct);
+        DiskScan.FilesContaining(_directory.Path, SnippetName).ShouldBeEmpty("the old name is still readable after an edit");
+        DiskScan.FilesContaining(_directory.Path, SnippetBody).ShouldBeEmpty("the old text is still readable after an edit");
+
+        await storage.Repository.SaveSnippetAsync(snippet, Ct);
+        await storage.Repository.DeleteSnippetAsync(snippet.Id, Ct);
+        DiskScan.FilesContaining(_directory.Path, SnippetName).ShouldBeEmpty("the name is still readable after the snippet is deleted");
+        DiskScan.FilesContaining(_directory.Path, SnippetBody).ShouldBeEmpty("the text is still readable after the snippet is deleted");
+    }
+
+    [Fact]
+    public async Task Printing_a_snippet_never_shows_its_name_or_text()
+    {
+        await using var storage = await OpenWithClipsAsync();
+        var loaded = (await storage.Repository.LoadSnippetsAsync(Ct)).Value;
+
+        string.Join("\n", loaded.Items.Select(snippet => snippet.ToString()).Append(loaded.ToString()))
+            .ShouldNotContain("LEAKSNIP");
+    }
+
+    [Fact]
+    public async Task A_board_name_is_gone_from_the_files_after_a_wipe()
+    {
+        await using var storage = await OpenWithClipsAsync();
+
+        await storage.Repository.WipeAsync(Ct);
+
+        AssertNoMarkerOnDisk();
+    }
+
+    [Fact]
+    public async Task Printing_a_board_never_shows_its_name()
+    {
+        await using var storage = await OpenWithClipsAsync();
+        var boards = (await storage.Repository.LoadBoardsAsync(Ct)).Value;
+
+        string.Join("\n", boards.Items.Select(board => board.ToString()).Append(boards.ToString())).ShouldNotContain(BoardName);
     }
 
     [Fact]

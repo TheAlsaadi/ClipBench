@@ -61,6 +61,13 @@ public class ClipRowViewModelTests
     }
 
     [Fact]
+    public void A_clip_on_a_board_makes_a_row_that_says_so()
+    {
+        Row(TestClips.Text("filed", pinned: true) with { OnBoard = ClipBench.Core.Boards.BoardId.New() }).IsOnBoard.ShouldBeTrue();
+        Row(TestClips.Text("loose", pinned: true)).IsOnBoard.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Marking_a_row_is_announced()
     {
         var row = Row(TestClips.Text("mark me"));

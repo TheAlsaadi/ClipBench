@@ -113,6 +113,64 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 - [ ] `%LOCALAPPDATA%\ClipBench\settings.json` holds only the separator choice, the custom separator and two switches, never any copied text.
 - [ ] Replace its contents with nonsense and restart: ClipBench starts with the defaults and keeps the bad file beside it as `settings.json.bad`.
 
+## Phase 6: transforms, boards and snippets
+
+### Transforms (Shift+Enter)
+
+- [ ] Copy `  hello world  `. Open the popup, press **Shift+Enter**: a list of transforms covers the list, with a preview under it. Type `case` to narrow the list, move to **UPPER CASE** and press **Enter**: `  HELLO WORLD  ` is pasted. The clip in the history is unchanged.
+- [ ] Press **Shift+Enter** again, **Ctrl+Space** on **Trim**, **Ctrl+Space** on **Title Case**: the line above the list says "Trim → Title Case" and the preview shows `Hello World`. **Backspace** (with the filter empty) takes Title Case off. **Enter** pastes the chain.
+- [ ] Mark three clips (Space) and press **Shift+Enter**, choose **Remove line breaks**: the three are joined by the separator, then put on one line.
+- [ ] Copy rich text from Word, open the popup, **Shift+Enter**, **Plain text**: it pastes without the formatting.
+- [ ] Copy `{"a":1,"b":[1,2]}`: **JSON format** pastes it over several lines with two-space indents, **JSON minify** puts it on one line again. Copy `not json`: the preview says "JSON format: The text is not valid JSON (line 1)." and **Enter** pastes nothing.
+- [ ] **URL encode** on `a b&c` gives `a%20b%26c`; **URL decode** reverses it. **Base64 encode** on `hello` gives `aGVsbG8=`; **Base64 decode** reverses it, with or without the `=`. A broken escape such as `100%` is refused with a message.
+- [ ] **Find and replace…**: Enter asks for the text to find and the text to put in its place. With "Use a pattern" ticked, `item (\d+)` and `#$1` turn `item 12` into `#12`. An invalid pattern such as `(` shows a message and keeps asking. Esc goes back to the list.
+- [ ] A pattern that would hang a simpler engine, such as `(a+)+$` on a long line of `a`s, finishes at once. Nothing you typed in the find and replace boxes is there the next time.
+- [ ] A copied token or card number shows dots in the preview, and the transform still works on Enter.
+- [ ] A picture cannot be transformed: the popup stays open and says so.
+- [ ] Narrator reads the list, the chain and the preview; everything can be done without the mouse.
+
+### Boards and the sidebar
+
+- [ ] **Ctrl+B** shows a sidebar with **History**, **Pinned** and **Snippets**; the popup grows to the right and moves left if it would leave the screen. Ctrl+B again hides it and the popup shrinks.
+- [ ] **Ctrl+N** opens a name box: type `Work`, **Enter**: the board appears and is chosen. A blank name, a name that is already used (in other letters too) and a name over 64 characters each show a reason and keep the box open. **Esc** gives up.
+- [ ] Select a clip and press **Ctrl+D**: a menu lists the boards and "New board…". Choose `Work`: the clip is pinned, the count in the sidebar goes up, and **Ctrl+3** shows the board with the clip.
+- [ ] Put three clips on the board, then **Ctrl+Up** and **Ctrl+Down** move the highlighted clip, and the highlight goes with it. **Ctrl+Shift+D** takes the highlighted clip off the board; it stays pinned.
+- [ ] **Ctrl+2** shows only pinned clips; unpinning one there (Ctrl+P) makes it leave, and leave its board.
+- [ ] **F2** renames the board. **Ctrl+Shift+Delete** asks "Delete the board … Its clips stay pinned" and a second press deletes it: the clips are still pinned, on no board.
+- [ ] Quit and start ClipBench again: the boards, their order and the order of the clips on them are as you left them.
+- [ ] High DPI and a narrow screen: the footer buttons all fit; with the sidebar open nothing is cut off.
+- [ ] Narrator reads the sidebar entries with their counts ("Board Work, 3 clips").
+
+### Snippets
+
+- [ ] Tray menu → **Snippets…** (or **Ctrl+E** in the popup's Snippets view) opens the Snippets window. **New snippet**: name `Reply`, text `Dear {input:Name}, today is {date:dddd}.` The warnings list stays empty, and the preview shows `Dear <Name>, today is Saturday.` (the weekday of the day you test). **Ctrl+S** saves.
+- [ ] Type `{nope} and {date` in a snippet: two warnings with their line numbers appear, and the snippet still saves.
+- [ ] Change the text without saving, then click another snippet: it refuses and says to save or discard. **Esc** discards. Delete asks first.
+- [ ] Open the popup in Word, press **Ctrl+B** and choose **Snippets** in the sidebar (Ctrl+PageDown walks the entries), highlight `Reply`, **Enter**: a small form asks for Name. Type `Sam`, **Enter**: `Dear Sam, today is …` is pasted into Word. **Esc** in the form pastes nothing.
+- [ ] `{clipboard}` pastes the text you copied last. A password copied from a password manager is not pasted by a snippet.
+- [ ] The Snippets window and the popup's snippet list are not in screenshots or screen sharing.
+- [ ] Quit and start again: the snippets are there.
+
+### The mouse
+
+- [ ] Open the popup and use only the mouse for this whole list. The button beside the search box (three lines) shows and hides the sidebar; the **X** closes the popup.
+- [ ] Move the pointer over a clip: four small buttons appear on the right of its row (select, pin, board, delete). **Pin** pins it (its icon turns into an unpin icon); **board** opens the list of boards; **delete** deletes an unpinned clip, and on a pinned one asks you to press it again.
+- [ ] Right-click a clip: a menu lists Paste, Change the text then paste, Select, Pin, Add to a board, Delete (and Take off its board, Move up and Move down inside a board, Show or Hide for a secret), each with its shortcut. Each does what its shortcut does.
+- [ ] Highlight a clip with the arrow keys and press the **Menu** key (or **Shift+F10**): the same menu opens, and **Esc** closes only the menu.
+- [ ] Right-click an entry in the sidebar: a board offers Rename and Delete, and any entry offers New board. Delete shows **Delete** and **Keep** buttons in the sidebar. Making a board shows **Save** and **Cancel** buttons beside its name.
+- [ ] Click an entry in the sidebar, then type: the text goes to the search box, and the arrow keys move in the list.
+- [ ] Open the transform picker from the right-click menu: the **Paste**, **Add to chain**, **Remove last** and **Back** buttons do what Enter, Ctrl+Space, Backspace and Esc do.
+- [ ] **Separator** → **Custom…**, type `|`, **Enter**: the box closes and nothing is pasted.
+
+### Looks on every screen
+
+- [ ] Open the popup with the sidebar shown, on every monitor you use, at its display scale (try 100% and 125%). Nothing is cut off: the last footer button (Collect) and the right edge of the list show with an even margin, and the corners are rounded with a thin border and no bright outline.
+- [ ] With monitors at different scales, the text is the same size relative to the screen on each. (Seen while testing on a second monitor at 125%: the popup's contents looked drawn at 100% inside a larger window. That is older than this phase and is not fixed here.)
+
+### The database
+
+- [ ] After making boards and snippets, open `%LOCALAPPDATA%\ClipBench\clipbench.db` in a hex editor: neither a board name nor any snippet text can be found in it, or in the `-wal` file.
+
 ## Tests that need a person
 
 These send real keys or use the real clipboard, so nobody may type while they run. The smoke tests also run batch, table, queue and collect paste; the collect test saves what is on your clipboard first and puts it back afterwards.

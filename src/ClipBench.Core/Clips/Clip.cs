@@ -15,6 +15,12 @@ public sealed record Clip(ClipId Id, ClipContent Content, DateTimeOffset Capture
         init => field = value ?? throw new ArgumentNullException(nameof(value));
     } = Content ?? throw new ArgumentNullException(nameof(Content));
 
+    /// <summary>The board the clip is on, or null. A clip on a board is always pinned.</summary>
+    public Boards.BoardId? OnBoard { get; init; }
+
+    /// <summary>Where the clip comes in its board, counting from 0. Only meaningful while <see cref="OnBoard"/> is set.</summary>
+    public int BoardPosition { get; init; }
+
     /// <summary>The size of the content in bytes.</summary>
     public long SizeInBytes => Content.SizeInBytes;
 

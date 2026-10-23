@@ -21,7 +21,7 @@ public sealed class PopupQueueTests : IDisposable
     public PopupQueueTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), new FakeClipStore());
-        _vm = new PopupViewModel(_library, _paste, _queue, new CollectToggle(new FakeCollectControl(), new FakeNotifier()), _settings, new ImmediateDispatcher(), _time);
+        _vm = new PopupViewModel(_library, _paste, _queue, new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), TestSidebars.New(_library), TestSnippets.New(), _settings, new ImmediateDispatcher(), _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -117,6 +117,6 @@ public sealed class PopupQueueTests : IDisposable
     [Fact]
     public void A_missing_queue_is_a_bug()
     {
-        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, _paste, null!, new CollectToggle(new FakeCollectControl(), new FakeNotifier()), _settings, new ImmediateDispatcher(), _time));
+        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, _paste, null!, new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), TestSidebars.New(_library), TestSnippets.New(), _settings, new ImmediateDispatcher(), _time));
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using ClipBench.Core.Clips;
+using ClipBench.Presentation.Boards;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
 
@@ -22,6 +23,32 @@ internal static class Glyphs
         ClipFormat.Files => "",
         _ => "",
     };
+
+    /// <summary>The Segoe Fluent Icons character for an entry of the sidebar.</summary>
+    /// <param name="scope">What the entry shows.</param>
+    /// <returns>The glyph: a clock for the history, a pin for the pinned clips, a paste icon for the snippets and a library for a board.</returns>
+    public static string ForScope(PopupScope scope) => scope switch
+    {
+        PopupScope.History => ((char)0xE81C).ToString(),
+        PopupScope.Pinned => ((char)0xE718).ToString(),
+        PopupScope.Snippets => ((char)0xE77F).ToString(),
+        _ => ((char)0xE8F1).ToString(),
+    };
+
+    /// <summary>The icon of the button that pins a clip or lets it go.</summary>
+    /// <param name="pinned">True when the clip is pinned now.</param>
+    /// <returns>An unpin icon for a pinned clip and a pin for the others.</returns>
+    public static string PinGlyph(bool pinned) => ((char)(pinned ? 0xE77A : 0xE718)).ToString();
+
+    /// <summary>The icon of the button that selects a clip for a multi-paste.</summary>
+    /// <param name="marked">True when the clip is selected now.</param>
+    /// <returns>A box with a check mark for a selected clip and an empty box for the others.</returns>
+    public static string MarkGlyph(bool marked) => ((char)(marked ? 0xE73A : 0xE739)).ToString();
+
+    /// <summary>The tip of the button that pins a clip or lets it go.</summary>
+    /// <param name="pinned">True when the clip is pinned now.</param>
+    /// <returns>What the button does.</returns>
+    public static string PinTip(bool pinned) => pinned ? "Unpin the clip (Ctrl+P)" : "Pin the clip (Ctrl+P)";
 
     /// <summary>Decodes a picture at thumbnail size, so a large screenshot does not cost a full-size bitmap per row.</summary>
     /// <param name="png">The PNG data, or empty for no picture.</param>

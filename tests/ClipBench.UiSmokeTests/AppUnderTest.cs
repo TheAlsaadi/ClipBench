@@ -93,6 +93,31 @@ public sealed class AppUnderTest : IAsyncLifetime
         .GetAllTopLevelWindows(_automation!)
         .FirstOrDefault(window => window.Title == "ClipBench" && !window.Properties.IsOffscreen.ValueOrDefault);
 
+    /// <summary>Another window of the app (the snippets window, say) when it is on screen, or null.</summary>
+    /// <param name="title">The title of the window.</param>
+    public Window? FindWindow(string title) => _application!
+        .GetAllTopLevelWindows(_automation!)
+        .FirstOrDefault(window => window.Title == title && !window.Properties.IsOffscreen.ValueOrDefault);
+
+    /// <summary>
+    /// A menu item of the app, or null. A menu that does not fit inside the popup opens in a window of its own, so every top-level
+    /// element of the app's process is searched, and nothing else: a search of the whole desktop takes seconds.
+    /// </summary>
+    /// <param name="name">The text of the item.</param>
+    public AutomationElement? FindMenuItem(string name) => _automation!
+        .GetDesktop()
+        .FindAllChildren(cf => cf.ByProcessId(Process.Id))
+        .Select(window => window.FindFirstDescendant(cf => cf.ByControlType(ControlType.MenuItem).And(cf.ByName(name))))
+        .FirstOrDefault(item => item is not null);
+
+    /// <summary>What is on screen for the app, for the message of a test that fails: the pointer, the windows, the menu items.</summary>
+    public string Describe()
+    {
+        var top = _automation!.GetDesktop().FindAllChildren(cf => cf.ByProcessId(Process.Id));
+        var items = top.SelectMany(window => window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))).Select(item => item.Name);
+        return $"pointer {Mouse.Position}; app windows: {string.Join(" | ", top.Select(window => window.Name + "@" + window.BoundingRectangle))}; menu items: {string.Join(", ", items)}; focused: {_automation.FocusedElement()?.Name}";
+    }
+
     /// <summary>The queue window when it is on screen, or null.</summary>
     public Window? FindQueueWindow() => _application!
         .GetAllTopLevelWindows(_automation!)
@@ -124,25 +149,48 @@ public sealed class AppUnderTest : IAsyncLifetime
         }
 
         // The window draws itself into the picture, which works on any monitor at any scale; a copy of the screen
-        // misses windows on a second monitor with another scale.
+        // misses windows on a second monitor with another scale. The size is asked of Windows in real pixels: the
+        // rectangle that UI Automation gives is scaled for a program that does not know about the display scale, and the
+        // picture would show only the top left of a window on a monitor above 100%.
         _ = Directory.CreateDirectory(folder);
-        var bounds = window.BoundingRectangle;
-        using var image = new System.Drawing.Bitmap(Math.Max(bounds.Width, 1), Math.Max(bounds.Height, 1));
-        using (var graphics = System.Drawing.Graphics.FromImage(image))
+        var handle = window.Properties.NativeWindowHandle.ValueOrDefault;
+        var previous = SetThreadDpiAwarenessContext(_perMonitorAwareV2);
+        try
         {
-            var context = graphics.GetHdc();
-            _ = PrintWindow(window.Properties.NativeWindowHandle.ValueOrDefault, context, PrintFullContent);
-            graphics.ReleaseHdc(context);
-        }
+            _ = GetWindowRect(handle, out var rect);
+            using var image = new System.Drawing.Bitmap(Math.Max(rect.Right - rect.Left, 1), Math.Max(rect.Bottom - rect.Top, 1));
+            using (var graphics = System.Drawing.Graphics.FromImage(image))
+            {
+                var context = graphics.GetHdc();
+                _ = PrintWindow(handle, context, PrintFullContent);
+                graphics.ReleaseHdc(context);
+            }
 
-        image.Save(Path.Combine(folder, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+            image.Save(Path.Combine(folder, name + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+        finally
+        {
+            _ = SetThreadDpiAwarenessContext(previous);
+        }
     }
 
     private const uint PrintFullContent = 2;
+    private static readonly nint _perMonitorAwareV2 = -4;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private readonly record struct NativeRect(int Left, int Top, int Right, int Bottom);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
     private static extern bool PrintWindow(nint window, nint context, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern bool GetWindowRect(nint window, out NativeRect rect);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern nint SetThreadDpiAwarenessContext(nint context);
 
     public Window OpenPopup()
     {
@@ -164,12 +212,49 @@ public sealed class AppUnderTest : IAsyncLifetime
         if (FindPopup() is not null)
         {
             Keyboard.Type(VirtualKeyShort.ESCAPE);
-            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("Escape did not close the popup");
+            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("Escape did not close the popup. " + Describe());
         }
     }
 
     public static AutomationElement SearchBox(Window popup) => popup.FindFirstDescendant(cf => cf.ByAutomationId("SearchBox"))
         ?? throw new InvalidOperationException("The popup has no search box.");
+
+    /// <summary>The entries of the sidebar, or none while it is closed.</summary>
+    public static AutomationElement[] SidebarEntries(Window popup) =>
+        popup.FindFirstDescendant(cf => cf.ByAutomationId("SidebarList"))?.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem)) ?? [];
+
+    /// <summary>Opens the sidebar with its shortcut when it is closed: it stays open or closed as it was left.</summary>
+    public static void EnsureSidebar(Window popup)
+    {
+        if (SidebarEntries(popup).Length == 0)
+        {
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_B);
+        }
+
+        WaitFor(() => SidebarEntries(popup).Length > 0, 10_000).ShouldBeTrue("the sidebar did not appear");
+    }
+
+    /// <summary>
+    /// Moves the mouse pointer onto a point the way a hand does: the pointer is put there, and then moved a little with real
+    /// mouse input. Setting the position alone sends the app no pointer event, so nothing under it would react to the
+    /// pointer, and a click could land on nothing.
+    /// </summary>
+    /// <param name="point">Where to put the pointer.</param>
+    public static void PointAt(System.Drawing.Point point)
+    {
+        Mouse.MoveTo(point);
+        Thread.Sleep(100);
+        MouseEvent(MouseEventMove, 3, 0, 0, 0);
+        Thread.Sleep(100);
+        MouseEvent(MouseEventMove, -3, 0, 0, 0);
+        Thread.Sleep(250);
+    }
+
+    private const uint MouseEventMove = 0x0001;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "mouse_event")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern void MouseEvent(uint flags, int dx, int dy, uint data, nuint extraInfo);
 
     public static AutomationElement[] Rows(Window popup) =>
         popup.FindFirstDescendant(cf => cf.ByAutomationId("ClipList"))?.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem))

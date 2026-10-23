@@ -41,13 +41,19 @@ internal sealed class PasteTargetWindow : IDisposable
     }
 
     /// <summary>Asks Windows to put the window in front. Windows protects the window the user is working in, so this can be refused.</summary>
-    /// <returns>True when the window is now the active one.</returns>
+    /// <returns>True when the window is now the one in front, the one that gets the keys.</returns>
     public bool TryActivate() => (bool)_form!.Invoke(() =>
     {
         _form.Activate();
         _ = _box!.Focus();
-        return Form.ActiveForm == _form;
+
+        // Form.ActiveForm only says the window is active on its own thread, which it can be while another program is in front.
+        return Form.ActiveForm == _form && GetForegroundWindow() == _form.Handle;
     });
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern nint GetForegroundWindow();
 
     public void Dispose()
     {

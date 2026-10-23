@@ -45,6 +45,9 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     /// <summary>Raised once when the menu asks to quit.</summary>
     public event EventHandler? ExitRequested;
 
+    /// <summary>Raised when the user chose Snippets in the menu.</summary>
+    public event EventHandler? EditSnippetsRequested;
+
     /// <summary>True while capture is paused.</summary>
     [ObservableProperty]
     public partial bool IsPaused { get; set; }
@@ -136,6 +139,9 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void Open() => OpenRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void EditSnippets() => EditSnippetsRequested?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
     private void Exit()

@@ -41,6 +41,7 @@ public sealed class TrayMenuTests : IDisposable
             (0, string.Empty, false),
             (5, "Start collecting", false),
             (7, "Restore clipboard after paste", false),
+            (8, "Snippets\u2026", false),
             (2, "Pause capturing", false),
             (3, "Exit", false),
         ]);
@@ -54,7 +55,7 @@ public sealed class TrayMenuTests : IDisposable
 
         var model = TrayMenu.Build(tray);
 
-        model.ToolTip.ShouldBe("ClipBench · paused");
+        model.ToolTip.ShouldBe("ClipBench \u00B7 paused");
         model.Menu.Single(item => item.Id == TrayMenu.PauseId).Text.ShouldBe("Resume capturing");
     }
 
@@ -110,9 +111,22 @@ public sealed class TrayMenuTests : IDisposable
             (TrayMenu.StopQueueId, "Stop paste queue"),
             (TrayMenu.CollectId, "Start collecting"),
             (TrayMenu.RestoreId, "Restore clipboard after paste"),
+            (TrayMenu.SnippetsId, "Snippets\u2026"),
             (TrayMenu.PauseId, "Pause capturing"),
             (TrayMenu.ExitId, "Exit"),
         ]);
+    }
+
+    [Fact]
+    public void Choosing_snippets_asks_for_the_snippet_editor_once()
+    {
+        var tray = Create();
+        var asked = 0;
+        tray.EditSnippetsRequested += (_, _) => asked++;
+
+        TrayMenu.Execute(tray, TrayMenu.SnippetsId);
+
+        asked.ShouldBe(1);
     }
 
     [Fact]
@@ -143,6 +157,7 @@ public sealed class TrayMenuTests : IDisposable
             (TrayMenu.CollectId, "Finish collecting (2)"),
             (TrayMenu.CancelCollectId, "Cancel collecting"),
             (TrayMenu.RestoreId, "Restore clipboard after paste"),
+            (TrayMenu.SnippetsId, "Snippets\u2026"),
             (TrayMenu.PauseId, "Pause capturing"),
             (TrayMenu.ExitId, "Exit"),
         ]);

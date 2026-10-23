@@ -26,6 +26,7 @@ public sealed partial class ClipRowViewModel : ObservableObject
         Format = clip.Content.Format;
         IsSensitive = sensitivity != SensitiveKind.None;
         IsPinned = clip.IsPinned;
+        IsOnBoard = clip.OnBoard is not null;
         ImagePng = clip.Content is ImageContent image ? image.Png : [];
         _preview = PreviewText.For(clip.Content);
         _age = RelativeTime.Format(clip.CapturedAt, now);
@@ -43,6 +44,9 @@ public sealed partial class ClipRowViewModel : ObservableObject
 
     /// <summary>True when the history limits do not apply to the clip.</summary>
     public bool IsPinned { get; }
+
+    /// <summary>True when the clip is on a board.</summary>
+    public bool IsOnBoard { get; }
 
     /// <summary>True when the user marked the row for a multi-paste.</summary>
     [ObservableProperty]

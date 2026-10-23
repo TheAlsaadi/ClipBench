@@ -99,3 +99,6 @@ TrackPopupMenuEx
 TRACK_POPUP_MENU_FLAGS
 DestroyMenu
 WM_NULL
+SetWindowPos
+SetWindowSubclass
+DefSubclassProc

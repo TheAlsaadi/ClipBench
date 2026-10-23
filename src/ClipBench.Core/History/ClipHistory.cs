@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
 using ClipBench.Core.Results;
 
@@ -106,6 +107,116 @@ public sealed class ClipHistory
     /// <returns>The unpinned clip, or a failure when the id is unknown.</returns>
     public Result<Clip> Unpin(ClipId id) => SetPinned(id, pinned: false);
 
+    /// <summary>
+    /// Puts a clip on a board, at the end, or takes it off its board. Putting a clip on a board pins it; taking it off
+    /// leaves it pinned. Putting it on the board it is already on changes nothing.
+    /// </summary>
+    /// <param name="id">The clip id.</param>
+    /// <param name="board">The board, or null to take the clip off its board.</param>
+    /// <returns>The updated clip, or a failure when the id is unknown.</returns>
+    public Result<Clip> SetBoard(ClipId id, BoardId? board)
+    {
+        lock (_gate)
+        {
+            var index = IndexOf(id);
+            if (index < 0)
+            {
+                return NotFound<Clip>();
+            }
+
+            var current = _clips[index];
+            if (current.OnBoard == board)
+            {
+                return Result.Success(current);
+            }
+
+            var updated = board is { } target
+                ? current with { IsPinned = true, OnBoard = target, BoardPosition = NextPositionOn(target, id) }
+                : current with { OnBoard = null, BoardPosition = 0 };
+            _clips = _clips.SetItem(index, updated);
+            return Result.Success(updated);
+        }
+    }
+
+    /// <summary>Moves a clip to a place in its board and numbers the board's clips again from 0.</summary>
+    /// <param name="id">The clip id.</param>
+    /// <param name="newIndex">Where the clip should come, counting from 0. A place past the end means the end.</param>
+    /// <returns>The clips whose place changed, or a failure when the id is unknown or the clip is on no board.</returns>
+    public Result<ImmutableArray<Clip>> MoveInBoard(ClipId id, int newIndex)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(newIndex);
+
+        lock (_gate)
+        {
+            var index = IndexOf(id);
+            if (index < 0)
+            {
+                return NotFound<ImmutableArray<Clip>>();
+            }
+
+            if (_clips[index].OnBoard is not { } board)
+            {
+                return Result.Failure<ImmutableArray<Clip>>(new ResultError(ErrorCode.ClipNotOnBoard, "That clip is not on a board."));
+            }
+
+            var order = ClipsOnBoardLocked(board).Select(clip => clip.Id).ToList();
+            _ = order.Remove(id);
+            order.Insert(Math.Min(newIndex, order.Count), id);
+
+            var changed = ImmutableArray.CreateBuilder<Clip>();
+            for (var place = 0; place < order.Count; place++)
+            {
+                var at = IndexOf(order[place]);
+                if (_clips[at].BoardPosition != place)
+                {
+                    var updated = _clips[at] with { BoardPosition = place };
+                    _clips = _clips.SetItem(at, updated);
+                    changed.Add(updated);
+                }
+            }
+
+            return Result.Success(changed.ToImmutable());
+        }
+    }
+
+    /// <summary>Takes every clip off a board. The clips stay pinned.</summary>
+    /// <param name="board">The board.</param>
+    /// <returns>The clips that were on it.</returns>
+    public ImmutableArray<Clip> ReleaseBoard(BoardId board)
+    {
+        lock (_gate)
+        {
+            return TakeOffBoards(clip => clip.OnBoard == board);
+        }
+    }
+
+    /// <summary>
+    /// Takes clips off a board that does not exist, and clips that are on a board without being pinned, which only a
+    /// damaged database can produce.
+    /// </summary>
+    /// <param name="known">The boards that exist.</param>
+    /// <returns>The clips that were changed.</returns>
+    public ImmutableArray<Clip> ReconcileBoards(IReadOnlySet<BoardId> known)
+    {
+        ArgumentNullException.ThrowIfNull(known);
+
+        lock (_gate)
+        {
+            return TakeOffBoards(clip => clip.OnBoard is { } board && (!known.Contains(board) || !clip.IsPinned));
+        }
+    }
+
+    /// <summary>The clips on a board, in their order on it.</summary>
+    /// <param name="board">The board.</param>
+    /// <returns>The clips.</returns>
+    public ImmutableArray<Clip> ClipsOnBoard(BoardId board)
+    {
+        lock (_gate)
+        {
+            return ClipsOnBoardLocked(board);
+        }
+    }
+
     /// <summary>Removes a clip, pinned or not.</summary>
     /// <param name="id">The clip id.</param>
     /// <returns>The removed clip, or null when it was not in the history.</returns>
@@ -158,10 +269,50 @@ public sealed class ClipHistory
                 return Result.Failure<Clip>(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."));
             }
 
-            var updated = _clips[index] with { IsPinned = pinned };
+            // A board holds pinned clips only, so a clip that is let go of leaves its board.
+            var updated = pinned
+                ? _clips[index] with { IsPinned = true }
+                : _clips[index] with { IsPinned = false, OnBoard = null, BoardPosition = 0 };
             _clips = _clips.SetItem(index, updated);
             return Result.Success(updated);
         }
+    }
+
+    private static Result<T> NotFound<T>() =>
+        Result.Failure<T>(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."));
+
+    private int NextPositionOn(BoardId board, ClipId except)
+    {
+        var last = -1;
+        foreach (var clip in _clips)
+        {
+            if (clip.OnBoard == board && clip.Id != except)
+            {
+                last = Math.Max(last, clip.BoardPosition);
+            }
+        }
+
+        return last + 1;
+    }
+
+    // By place on the board; two clips with one place (never made by this class) keep the order of the history.
+    private ImmutableArray<Clip> ClipsOnBoardLocked(BoardId board) =>
+        [.. _clips.Index().Where(entry => entry.Item.OnBoard == board).OrderBy(entry => entry.Item.BoardPosition).ThenBy(entry => entry.Index).Select(entry => entry.Item)];
+
+    private ImmutableArray<Clip> TakeOffBoards(Func<Clip, bool> selector)
+    {
+        var changed = ImmutableArray.CreateBuilder<Clip>();
+        for (var i = 0; i < _clips.Length; i++)
+        {
+            if (selector(_clips[i]))
+            {
+                var updated = _clips[i] with { OnBoard = null, BoardPosition = 0 };
+                _clips = _clips.SetItem(i, updated);
+                changed.Add(updated);
+            }
+        }
+
+        return changed.ToImmutable();
     }
 
     private int IndexOf(ClipId id)

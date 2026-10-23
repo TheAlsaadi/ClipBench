@@ -244,6 +244,8 @@ public sealed class FileActivityLogTests : IDisposable
 
         public Task<Result> SetPinnedAsync(ClipId id, bool pinned, CancellationToken cancellationToken) => Task.FromResult(Result.Success());
 
+        public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken) => Task.FromResult(Result.Success());
+
         public Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken) => Task.FromResult(Result.Success());
     }
 

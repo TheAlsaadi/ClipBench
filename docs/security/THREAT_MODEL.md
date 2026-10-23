@@ -84,6 +84,10 @@ binding (DPAPI, current user, ClipBench's own entropy) was built first in Phase 
 | D | Hostile or damaged stored bytes crash the decoder | Counts and lengths are checked before anything is allocated; invalid UTF-8 and trailing bytes are rejected | 2 | Truncation, trailing-byte, huge-count and random-input tests |
 
 Residual: the in-memory search index is decrypted while the app runs.
+| I | Board names, snippet names and snippet texts reveal what the user does | Sealed with AES-256-GCM like clip content, each bound to its record kind (`CB1B` for a board, `CB1S` for a snippet), its id and its column, so a value moved to another row, another column or another kind fails to open. Only ids, positions, and the board a clip is on and its place there are plain (visible metadata, like the pin flag) | 6 | Repository tests: not stored as text, a byte changed, copied between rows, between columns and between kinds; leak tests over every file |
+| I | An old board name or snippet text stays in the write-ahead log after a rename, an edit or a delete | The log is emptied (checkpoint with truncate) after a board is renamed or deleted and after a snippet is saved or deleted; `secure_delete` zeroes freed pages; a wipe removes both tables | 6 | Leak tests for rename, delete, edit and wipe while the database is open |
+| T | Someone with the file changes which board a clip is on, its place, or the order of the boards | **Accepted**, like the pin flag: the metadata is not authenticated, and they cannot read or forge a name. A clip on a board that does not exist, or one that is not pinned, is taken off the board when the boards load | 6 | History, library and catalog reconcile tests |
+| T | Moving to schema step 2 loses saved clips | Step 2 only adds tables and columns, inside the same transaction as the other steps; a test applies it to a version 1 database that holds clips | 6 | Migration tests |
 
 ## 3. Popup (UI)
 
@@ -100,6 +104,9 @@ Residual: the in-memory search index is decrypted while the app runs.
 | T, D | A damaged, huge or hostile settings file | Read with a 64 KiB cap and a depth limit; anything that is not a JSON object gives the defaults and is set aside as `settings.json.bad`; a value of the wrong kind keeps its default; the result is normalized (an unknown separator or an unreadable custom one becomes a line break). Written through a temporary file and moved into place | 5 | Settings store and settings tests |
 | D | A second copy opens the same history | One running copy per data folder (a named mutex derived from the folder); a second launch opens the first copy's popup | 3, 4 | Guard tests; the smoke test starts the app on its own folder next to a running one |
 | T | The tray icon is spoofed or lost | The icon lives on a hidden top-level window of the app, is added again when Explorer restarts, and is removed on exit | 4 | Fake-window tests; a real icon is added, changed and removed; manual QA |
+| I | Board names show in the sidebar and snippet names and texts in the popup | The same exposure as clip rows: the popup is hidden from screen capture and sharing. Names are never written to the log, to a notice or to a message, which say "the board" or "the snippet" | 6 | View model tests of messages and printing; manual QA |
+| I | The Snippets window shows snippet texts | It is hidden from screen capture like the popup (the `--allow-screen-capture` switch is for tests only), closing it only hides it, and unsaved changes are dropped when it is shown again | 6 | Manual QA |
+| D | Very many boards, snippets or clips on a board | At most 100 boards and 500 snippets; names of at most 64 characters; a board view and the pinned view show at most 1,000 clips | 6 | Catalog tests for the limits; popup tests |
 
 ## 4. Paste (focus, clipboard write, key injection)
 
@@ -116,6 +123,9 @@ Residual: the in-memory search index is decrypted while the app runs.
 | D | Esc and Ctrl+V do nothing in other programs while a queue runs | **Accepted** (owner's choice, ADR 0015): the queue window says "Esc to stop", and the queue ends by itself after the last clip | 5 | Manual QA |
 | I | The queue window shows what is being pasted | It shows counts only ("Queue 2/5 · Esc to stop"), never clip text, and is hidden from screen capture | 5 | Queue window view model tests; manual QA |
 | D | A batch or a table paste grows without bound | The composer refuses more than 10 million characters and any picture, and the popup stays open with the reason; nothing is pasted | 1, 5 | Composer tests; popup tests for an image and for oversize text |
+| I | A snippet pastes something through `{clipboard}` that the user did not mean to share | `{clipboard}` is the text of the newest text clip in the history and never the live clipboard, so a copy that a password manager marked private, which is never recorded, cannot be pasted by a snippet. A secret that looks like a token and was recorded can be: the user wrote the snippet | 6 | Popup snippet tests (the newest text clip; pictures and file lists skipped) |
+| D | A snippet expands without bound or into itself | One pass from left to right; whatever is put in is never read again, so a snippet cannot expand into itself. A text of at most 10,000 characters, at most 20 different values of at most 10,000 characters each, and a result of at most 100,000 characters; going over is a refusal and not a cut-off paste | 6 | Snippet engine tests (one pass, every limit, a large value repeated) |
+| I | What the user types into the prompt of a snippet lingers | It lives in the fields until the paste, is cleared when the prompt is cancelled or the popup closes, never reaches the log (which records the event, the number of values and the size), and no message repeats it | 6 | Snippets view model and popup tests |
 
 ## 5. OCR (Phase 8)
 
@@ -147,6 +157,18 @@ download a new one, which is an accepted cost of having no network code.
 | I | Secrets in the repository | `.gitignore` for keys and `.env`; deny rules for reading them; none are used | 0 | Review |
 | I | Runtime or test-runner telemetry | CI and contributors opt out of the test runner's; the Windows App SDK terms allow usage data, so Phase 9 tests that the running app opens no network connections | 0, 9 | CI env; Phase 9 test |
 | R | Authorship of the history is falsified | Commit hook plus a CI guard on messages, identities and pull request text | 0 | Guard tests |
+
+## 8. Transforms (Phase 6)
+
+| STRIDE | Threat | Mitigation | Phase | Evidence |
+|---|---|---|---|---|
+| D | A find-and-replace pattern that takes exponential time (ReDoS) | Patterns run on .NET's non-backtracking engine whenever the pattern allows it. The rest (look-around, back references) run with a one-second match timeout. A pattern is at most 1,000 characters and a replacement 10,000. A timeout is a refusal and the text is not changed | 6 | A classic catastrophic pattern on 200,000 characters finishes; a backtracking-only pattern times out and says so |
+| D | JSON that is nested very deeply or is very large | It is read as a stream of tokens with no document tree, nesting beyond 64 levels is refused, and text over 10 million characters is refused before any change | 6 | JSON tests: the depth limit, 200,000 levels, 100,000 items |
+| D | A transform makes the text huge | The chain checks the size going in and after every step, and a find and replace checks the size it would produce before building it | 6 | Pipeline and find-and-replace tests |
+| T | A transform changes what the user did not choose | It changes the text being pasted only, never the stored clip. A transform that fails pastes nothing and says why | 6 | Pipeline and popup tests |
+| T | A decoder accepts bad input and quietly changes it | URL and Base64 decoding are strict UTF-8: a broken escape, half of a surrogate pair or bytes that are not text are refused, never replaced | 6 | Encoding tests |
+| I | A message or the log repeats the text, a pattern or a replacement | Messages are written by the app and name the transform, a line or a position, never the text. The log gets the number of transforms in the chain and an error code. The find-and-replace options print as their type name and are never saved | 6 | Transform, picker and options tests |
+| I | A secret is shown in the preview of a transform | The preview shows the same mask as the list for a clip that looks like a secret, and the transform still runs on Enter | 6 | Picker and popup tests |
 
 ## Open questions
 

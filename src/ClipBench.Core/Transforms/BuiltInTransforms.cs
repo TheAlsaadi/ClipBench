@@ -1,0 +1,49 @@
+using ClipBench.Core.Results;
+
+namespace ClipBench.Core.Transforms;
+
+/// <summary>The transforms that come with ClipBench.</summary>
+public static class BuiltInTransforms
+{
+    /// <summary>The deepest nesting of arrays and objects that the JSON transforms accept.</summary>
+    public const int JsonMaxDepth = JsonTransforms.MaxDepth;
+
+    /// <summary>Keeps the text and drops the formatting. The text of an HTML or rich text clip is what comes in.</summary>
+    public static TextTransform PlainText { get; } = new("text.plain", "Plain text", "Keep the text, drop formatting", Result.Success);
+
+    /// <summary>Changes every letter to upper case.</summary>
+    public static TextTransform Upper { get; } = new("case.upper", "UPPER CASE", "Change every letter to upper case", text => Result.Success(text.ToUpperInvariant()));
+
+    /// <summary>Changes every letter to lower case.</summary>
+    public static TextTransform Lower { get; } = new("case.lower", "lower case", "Change every letter to lower case", text => Result.Success(text.ToLowerInvariant()));
+
+    /// <summary>Capitalises the first letter of each word and lower-cases the rest.</summary>
+    public static TextTransform Title { get; } = new("case.title", "Title Case", "Capitalise each word", text => Result.Success(TextConversion.Title(text)));
+
+    /// <summary>Capitalises the first letter of each sentence and lower-cases the rest.</summary>
+    public static TextTransform Sentence { get; } = new("case.sentence", "Sentence case", "Capitalise each sentence", text => Result.Success(TextConversion.Sentence(text)));
+
+    /// <summary>Removes white space from both ends of the text.</summary>
+    public static TextTransform Trim { get; } = new("text.trim", "Trim", "Remove white space at the start and end", text => Result.Success(text.Trim()));
+
+    /// <summary>Lays JSON out over several lines with two-space indents.</summary>
+    public static TextTransform JsonFormat { get; } = new("json.format", "JSON format", "Lay JSON out over several lines", JsonTransforms.Format);
+
+    /// <summary>Writes JSON on one line with no extra white space.</summary>
+    public static TextTransform JsonMinify { get; } = new("json.minify", "JSON minify", "Write JSON on one line", JsonTransforms.Minify);
+
+    /// <summary>Escapes the text for use in a web address.</summary>
+    public static TextTransform UrlEncode { get; } = new("url.encode", "URL encode", "Escape the text for a web address", TextEncoding.UrlEncode);
+
+    /// <summary>Turns a percent-escaped text back into plain text.</summary>
+    public static TextTransform UrlDecode { get; } = new("url.decode", "URL decode", "Turn %20 style escapes back into text", TextEncoding.UrlDecode);
+
+    /// <summary>Writes the text as Base64.</summary>
+    public static TextTransform Base64Encode { get; } = new("base64.encode", "Base64 encode", "Write the text as Base64", TextEncoding.Base64Encode);
+
+    /// <summary>Reads Base64 back into text.</summary>
+    public static TextTransform Base64Decode { get; } = new("base64.decode", "Base64 decode", "Read Base64 back into text", TextEncoding.Base64Decode);
+
+    /// <summary>Joins the lines into one, with a single space where a line break was.</summary>
+    public static TextTransform RemoveLineBreaks { get; } = new("text.single-line", "Remove line breaks", "Join all lines into one", text => Result.Success(TextConversion.RemoveLineBreaks(text)));
+}

@@ -1,5 +1,7 @@
 using System.Text;
+using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
+using ClipBench.Core.Snippets;
 
 namespace ClipBench.Storage.Clips;
 
@@ -7,12 +9,14 @@ namespace ClipBench.Storage.Clips;
 /// The associated data that binds a sealed value to the place it was written. A value moved to another row,
 /// another column or another format fails authentication. The layout is part of the stored format and is
 /// pinned by tests: <c>"CB1C" || id(16, big-endian) || length(1) || column || format(1)</c> for a clip, and
-/// <c>"CB1M" || length(1) || name</c> for a meta row.
+/// <c>"CB1M" || length(1) || name</c> for a meta row, <c>"CB1B" || id(16, big-endian) || length(1) || column</c> for a board, and the same with <c>"CB1S"</c> for a snippet.
 /// </summary>
 internal static class RecordAad
 {
     private static readonly byte[] _clipTag = "CB1C"u8.ToArray();
     private static readonly byte[] _metaTag = "CB1M"u8.ToArray();
+    private static readonly byte[] _boardTag = "CB1B"u8.ToArray();
+    private static readonly byte[] _snippetTag = "CB1S"u8.ToArray();
 
     /// <summary>The data for one encrypted column of a clip row.</summary>
     /// <param name="id">The clip id.</param>
@@ -28,6 +32,36 @@ internal static class RecordAad
         aad[_clipTag.Length + 16] = (byte)name.Length;
         name.CopyTo(aad, _clipTag.Length + 16 + 1);
         aad[^1] = (byte)format;
+        return aad;
+    }
+
+    /// <summary>The data for one encrypted column of a board row.</summary>
+    /// <param name="id">The board id.</param>
+    /// <param name="column">The column name.</param>
+    /// <returns>The bytes to pass as associated data.</returns>
+    public static byte[] ForBoard(BoardId id, string column)
+    {
+        var name = Name(column);
+        var aad = new byte[_boardTag.Length + 16 + 1 + name.Length];
+        _boardTag.CopyTo(aad, 0);
+        id.Value.TryWriteBytes(aad.AsSpan(_boardTag.Length, 16), bigEndian: true, out _);
+        aad[_boardTag.Length + 16] = (byte)name.Length;
+        name.CopyTo(aad, _boardTag.Length + 16 + 1);
+        return aad;
+    }
+
+    /// <summary>The data for one encrypted column of a snippet row.</summary>
+    /// <param name="id">The snippet id.</param>
+    /// <param name="column">The column name.</param>
+    /// <returns>The bytes to pass as associated data.</returns>
+    public static byte[] ForSnippet(SnippetId id, string column)
+    {
+        var name = Name(column);
+        var aad = new byte[_snippetTag.Length + 16 + 1 + name.Length];
+        _snippetTag.CopyTo(aad, 0);
+        id.Value.TryWriteBytes(aad.AsSpan(_snippetTag.Length, 16), bigEndian: true, out _);
+        aad[_snippetTag.Length + 16] = (byte)name.Length;
+        name.CopyTo(aad, _snippetTag.Length + 16 + 1);
         return aad;
     }
 

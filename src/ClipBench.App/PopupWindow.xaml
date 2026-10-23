@@ -3,49 +3,278 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:ClipBench.App"
+    xmlns:boards="using:ClipBench.Presentation.Boards"
     xmlns:rows="using:ClipBench.Presentation.Rows"
+    xmlns:snippets="using:ClipBench.Presentation.Snippets"
+    xmlns:transforms="using:ClipBench.Presentation.Transforms"
     Title="ClipBench">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
+    <!-- Windows draws no border of its own (see HideSystemBorder), so this one follows the theme and the corner radius of the window. -->
+    <Border
+        x:Name="Chrome"
+        BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="8">
+    <Grid
+        x:Name="Frame"
+        Padding="8"
+        PreviewKeyDown="Root_PreviewKeyDown">
+        <Grid.Resources>
+            <!-- Clicking a control must not take the cursor out of the box that is typed in. Moving with Tab still reaches them. -->
+            <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <Style x:Key="NoFocusAccentButtonStyle" BasedOn="{StaticResource AccentButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <Style x:Key="NoFocusItemStyle" BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <!-- The small buttons that show on a row while the pointer is over it. -->
+            <!-- The row fills the whole list item, so hover and the menu on the right button work on the whole of it. -->
+            <Style x:Key="WholeRowItemStyle" BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            </Style>
+            <Style x:Key="RowActionButtonStyle" BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="MinHeight" Value="28" />
+                <Setter Property="MinWidth" Value="28" />
+                <Setter Property="Padding" Value="4" />
+            </Style>
+        </Grid.Resources>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- A UserControl, because a panel has no IsEnabled: the sidebar is switched off while the transform picker covers the list. -->
+        <UserControl
+            x:Name="SidebarHost"
+            Grid.Column="0"
+            Margin="0,0,8,0"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+            IsTabStop="False"
+            Visibility="{x:Bind ViewModel.Sidebar.IsOpen, Mode=OneWay}">
+            <Grid Width="160" RowSpacing="6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <ListView
+                    x:Name="SidebarList"
+                    Grid.Row="0"
+                    AutomationProperties.AutomationId="SidebarList"
+                    AutomationProperties.Name="Views and boards"
+                    IsTabStop="False"
+                    ItemContainerStyle="{StaticResource WholeRowItemStyle}"
+                    ItemsSource="{x:Bind ViewModel.Sidebar.Entries}"
+                    SelectedIndex="{x:Bind ViewModel.Sidebar.SelectedIndex, Mode=TwoWay}"
+                    SelectionMode="Single">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="boards:SidebarEntryViewModel">
+                            <Grid
+                                Padding="12,4"
+                                AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
+                                Background="Transparent"
+                                ColumnSpacing="8"
+                                ContextRequested="SidebarEntry_ContextRequested"
+                                ToolTipService.ToolTip="{x:Bind Name}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    Grid.Column="0"
+                                    FontSize="14"
+                                    Glyph="{x:Bind local:Glyphs.ForScope(Scope)}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Text="{x:Bind Name}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind Count, Mode=OneWay}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <StackPanel
+                    Grid.Row="1"
+                    Spacing="4"
+                    Visibility="{x:Bind ViewModel.Sidebar.IsEditing, Mode=OneWay}">
+                    <TextBox
+                        x:Name="BoardNameBox"
+                        AutomationProperties.AutomationId="BoardNameBox"
+                        AutomationProperties.Name="Board name"
+                        PlaceholderText="Board name"
+                        Text="{x:Bind ViewModel.Sidebar.EditText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button
+                            AutomationProperties.AutomationId="BoardNameSaveButton"
+                            AutomationProperties.Name="Save the name"
+                            Command="{x:Bind ViewModel.Sidebar.SubmitEditCommand}"
+                            ToolTipService.ToolTip="Save (Enter)">
+                            <FontIcon FontSize="14" Glyph="&#xE73E;" />
+                        </Button>
+                        <Button
+                            AutomationProperties.AutomationId="BoardNameCancelButton"
+                            AutomationProperties.Name="Cancel"
+                            Command="{x:Bind ViewModel.Sidebar.CancelEditCommand}"
+                            ToolTipService.ToolTip="Cancel (Esc)">
+                            <FontIcon FontSize="14" Glyph="&#xE711;" />
+                        </Button>
+                    </StackPanel>
+                    <TextBlock
+                        AutomationProperties.AutomationId="BoardNameError"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="{x:Bind ViewModel.Sidebar.EditError, Mode=OneWay}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Row="2"
+                    Spacing="6">
+                <StackPanel
+                    Spacing="4"
+                    Visibility="{x:Bind ViewModel.Sidebar.IsConfirmingDelete, Mode=OneWay}">
+                    <TextBlock
+                        AutomationProperties.AutomationId="DeleteBoardQuestion"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="Delete this board? Its clips stay pinned."
+                        TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button
+                            AutomationProperties.AutomationId="DeleteBoardConfirmButton"
+                            Command="{x:Bind ViewModel.Sidebar.DeleteBoardCommand}"
+                            Content="Delete"
+                            Style="{StaticResource NoFocusAccentButtonStyle}" />
+                        <Button
+                            AutomationProperties.AutomationId="DeleteBoardKeepButton"
+                            Click="KeepBoard_Click"
+                            Content="Keep" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel
+                    Orientation="Horizontal"
+                    Spacing="4">
+                    <Button
+                        AutomationProperties.AutomationId="NewBoardButton"
+                        AutomationProperties.Name="New board"
+                        Command="{x:Bind ViewModel.Sidebar.StartNewCommand}"
+                        ToolTipService.ToolTip="New board (Ctrl+N)">
+                        <FontIcon FontSize="14" Glyph="&#xE710;" />
+                    </Button>
+                    <Button
+                        AutomationProperties.AutomationId="RenameBoardButton"
+                        AutomationProperties.Name="Rename board"
+                        Command="{x:Bind ViewModel.Sidebar.StartRenameCommand}"
+                        IsEnabled="{x:Bind ViewModel.Sidebar.Current.IsBoard, Mode=OneWay}"
+                        ToolTipService.ToolTip="Rename the board (F2)">
+                        <FontIcon FontSize="14" Glyph="&#xE70F;" />
+                    </Button>
+                    <Button
+                        AutomationProperties.AutomationId="DeleteBoardButton"
+                        AutomationProperties.Name="Delete board"
+                        Command="{x:Bind ViewModel.Sidebar.DeleteBoardCommand}"
+                        IsEnabled="{x:Bind ViewModel.Sidebar.Current.IsBoard, Mode=OneWay}"
+                        ToolTipService.ToolTip="Delete the board, its clips stay (Ctrl+Shift+Delete)">
+                        <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                    </Button>
+                    <Button
+                        AutomationProperties.AutomationId="EditSnippetsButton"
+                        AutomationProperties.Name="Edit snippets"
+                        Command="{x:Bind ViewModel.EditSnippetsCommand}"
+                        ToolTipService.ToolTip="Edit the snippets (Ctrl+E)"
+                        Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
+                        <FontIcon FontSize="14" Glyph="&#xE713;" />
+                    </Button>
+                </StackPanel>
+                </StackPanel>
+            </Grid>
+        </UserControl>
+
     <Grid
         x:Name="Root"
-        Padding="8"
-        RowSpacing="6"
-        PreviewKeyDown="Root_PreviewKeyDown">
+        Grid.Column="1"
+        RowSpacing="6">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBox
-            x:Name="SearchBox"
-            Grid.Row="0"
-            AutomationProperties.AutomationId="SearchBox"
-            AutomationProperties.Name="Search clips"
-            PlaceholderText="Search clips"
-            Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+        <Grid Grid.Row="0" ColumnSpacing="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button
+                Grid.Column="0"
+                AutomationProperties.AutomationId="SidebarToggleButton"
+                AutomationProperties.Name="Show or hide the views and boards"
+                Command="{x:Bind ViewModel.Sidebar.ToggleCommand}"
+                IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+                ToolTipService.ToolTip="Show or hide the views and boards (Ctrl+B)">
+                <FontIcon FontSize="14" Glyph="&#xE700;" />
+            </Button>
+            <TextBox
+                x:Name="SearchBox"
+                Grid.Column="1"
+                AutomationProperties.AutomationId="SearchBox"
+                AutomationProperties.Name="Search clips"
+                IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+                PlaceholderText="Search clips"
+                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            <Button
+                Grid.Column="2"
+                AutomationProperties.AutomationId="CloseButton"
+                AutomationProperties.Name="Close"
+                Command="{x:Bind ViewModel.CloseNowCommand}"
+                ToolTipService.ToolTip="Close (Esc)">
+                <FontIcon FontSize="14" Glyph="&#xE711;" />
+            </Button>
+        </Grid>
 
         <ListView
             x:Name="ClipList"
             Grid.Row="1"
             AutomationProperties.AutomationId="ClipList"
             AutomationProperties.Name="Clipboard history"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
             IsItemClickEnabled="True"
             IsTabStop="False"
             ItemClick="ClipList_ItemClick"
+            ItemContainerStyle="{StaticResource WholeRowItemStyle}"
+            Visibility="{x:Bind ViewModel.IsClipsView, Mode=OneWay}"
             ItemsSource="{x:Bind ViewModel.Rows}"
-            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=TwoWay}"
+            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=OneWay}"
             SelectionMode="Single">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="rows:ClipRowViewModel">
                     <Grid
-                        Padding="2,6"
+                        Padding="14,6"
                         AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
-                        ColumnSpacing="10">
+                        Background="Transparent"
+                        ColumnSpacing="10"
+                        ContextRequested="Row_ContextRequested"
+                        PointerEntered="Row_PointerEntered"
+                        PointerExited="Row_PointerExited">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -77,6 +306,8 @@
 
                         <StackPanel
                             Grid.Column="2"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="RowStatus"
                             Orientation="Horizontal"
                             Spacing="6">
                             <Border
@@ -95,10 +326,102 @@
                             </Border>
                             <FontIcon
                                 FontSize="12"
+                                Glyph="&#xE8F1;"
+                                Visibility="{x:Bind IsOnBoard}" />
+                            <FontIcon
+                                FontSize="12"
                                 Glyph="&#xE718;"
                                 Visibility="{x:Bind IsPinned}" />
                         </StackPanel>
+
+                        <!-- Laid over the row while the pointer is over it, so that showing them changes no width. -->
+                        <StackPanel
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            AutomationProperties.AutomationId="RowActions"
+                            Background="{ThemeResource ControlSolidFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            Visibility="Collapsed">
+                            <Button
+                                AutomationProperties.AutomationId="RowMarkButton"
+                                AutomationProperties.Name="Select for a multi-paste"
+                                Click="RowMark_Click"
+                                Style="{StaticResource RowActionButtonStyle}"
+                                ToolTipService.ToolTip="Select, to paste several clips (Space)">
+                                <FontIcon FontSize="12" Glyph="{x:Bind local:Glyphs.MarkGlyph(IsMarked), Mode=OneWay}" />
+                            </Button>
+                            <Button
+                                AutomationProperties.AutomationId="RowPinButton"
+                                AutomationProperties.Name="Pin or unpin"
+                                Click="RowPin_Click"
+                                Style="{StaticResource RowActionButtonStyle}"
+                                ToolTipService.ToolTip="{x:Bind local:Glyphs.PinTip(IsPinned)}">
+                                <FontIcon FontSize="12" Glyph="{x:Bind local:Glyphs.PinGlyph(IsPinned)}" />
+                            </Button>
+                            <Button
+                                AutomationProperties.AutomationId="RowBoardButton"
+                                AutomationProperties.Name="Add to a board"
+                                Click="RowBoard_Click"
+                                Style="{StaticResource RowActionButtonStyle}"
+                                ToolTipService.ToolTip="Add to a board (Ctrl+D)">
+                                <FontIcon FontSize="12" Glyph="&#xE8F1;" />
+                            </Button>
+                            <Button
+                                AutomationProperties.AutomationId="RowDeleteButton"
+                                AutomationProperties.Name="Delete"
+                                Click="RowDelete_Click"
+                                Style="{StaticResource RowActionButtonStyle}"
+                                ToolTipService.ToolTip="Delete the clip (Del)">
+                                <FontIcon FontSize="12" Glyph="&#xE74D;" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <ListView
+            x:Name="SnippetList"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="SnippetList"
+            AutomationProperties.Name="Snippets"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+            IsItemClickEnabled="True"
+            IsTabStop="False"
+            ItemClick="SnippetList_ItemClick"
+            ItemContainerStyle="{StaticResource WholeRowItemStyle}"
+            ItemsSource="{x:Bind ViewModel.Snippets.Rows}"
+            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=OneWay}"
+            SelectionMode="Single"
+            Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="snippets:SnippetRowViewModel">
+                    <StackPanel
+                        Padding="14,6"
+                        AutomationProperties.Name="{x:Bind AutomationName}"
+                        Background="Transparent"
+                        ContextRequested="SnippetRow_ContextRequested"
+                        Spacing="2">
+                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            MaxLines="2"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind Preview}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind Details}"
+                            Visibility="{x:Bind HasDetails}" />
+                    </StackPanel>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
@@ -114,15 +437,23 @@
             TextWrapping="Wrap"
             Visibility="{x:Bind ViewModel.ShowEmptyState, Mode=OneWay}" />
 
-        <StackPanel Grid.Row="2" Spacing="4">
-            <Grid ColumnSpacing="6">
+        <!-- A UserControl, because a panel has no IsEnabled: the buttons are switched off while the picker covers them. -->
+        <UserControl
+            Grid.Row="2"
+            IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+            IsTabStop="False">
+        <StackPanel Spacing="4">
+            <Grid ColumnSpacing="4">
                 <Grid.Resources>
                     <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                        <Setter Property="AllowFocusOnInteraction" Value="False" />
                         <Setter Property="FontSize" Value="12" />
                         <Setter Property="Padding" Value="8,3" />
                     </Style>
                 </Grid.Resources>
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
@@ -138,10 +469,11 @@
                     Command="{x:Bind ViewModel.PasteCommand}"
                     Content="{x:Bind ViewModel.PasteLabel, Mode=OneWay}"
                     FontSize="12"
-                    Style="{StaticResource AccentButtonStyle}"
+                    Style="{StaticResource NoFocusAccentButtonStyle}"
                     ToolTipService.ToolTip="Paste (Enter)" />
 
                 <DropDownButton
+                    AllowFocusOnInteraction="False"
                     x:Name="SeparatorButton"
                     Grid.Column="1"
                     MaxWidth="128"
@@ -165,6 +497,7 @@
                     ToolTipService.ToolTip="Paste one clip with each Ctrl+V (Ctrl+Q)" />
 
                 <DropDownButton
+                    AllowFocusOnInteraction="False"
                     Grid.Column="3"
                     AutomationProperties.AutomationId="TableButton"
                     FontSize="12"
@@ -180,7 +513,33 @@
                 </DropDownButton>
 
                 <Button
+                    Grid.Column="4"
+                    AutomationProperties.AutomationId="TransformButton"
+                    AutomationProperties.Name="Transform"
+                    Command="{x:Bind ViewModel.OpenTransformsCommand}"
+                    ToolTipService.ToolTip="Change the text before pasting (Shift+Enter)">
+                    <FontIcon FontSize="14" Glyph="&#xE70F;" />
+                </Button>
+
+                <Button
+                    x:Name="BoardButton"
                     Grid.Column="5"
+                    AutomationProperties.AutomationId="BoardButton"
+                    AutomationProperties.Name="Add to board"
+                    ToolTipService.ToolTip="Add the clip to a board (Ctrl+D)">
+                    <FontIcon FontSize="14" Glyph="&#xE8F1;" />
+                    <Button.Flyout>
+                        <MenuFlyout
+                            x:Name="BoardMenu"
+                            Closed="BoardMenu_Closed"
+                            Opened="BoardMenu_Opened"
+                            Opening="BoardMenu_Opening"
+                            Placement="Top" />
+                    </Button.Flyout>
+                </Button>
+
+                <Button
+                    Grid.Column="7"
                     AutomationProperties.AutomationId="CollectButton"
                     Command="{x:Bind ViewModel.ToggleCollectCommand}"
                     Content="{x:Bind ViewModel.CollectLabel, Mode=OneWay}"
@@ -199,5 +558,246 @@
                 Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                 TextTrimming="CharacterEllipsis" />
         </StackPanel>
+        </UserControl>
+
+        <Grid
+            x:Name="TransformPanel"
+            Grid.Row="0"
+            Grid.RowSpan="3"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            RowSpacing="6"
+            Visibility="{x:Bind ViewModel.IsTransformsOpen, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBox
+                x:Name="TransformFilterBox"
+                Grid.Row="0"
+                AutomationProperties.AutomationId="TransformFilterBox"
+                AutomationProperties.Name="Filter transforms"
+                IsEnabled="{x:Bind ViewModel.Transforms.IsChoosing, Mode=OneWay}"
+                PlaceholderText="Change the text before pasting"
+                Text="{x:Bind ViewModel.Transforms.FilterText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock
+                Grid.Row="1"
+                AutomationProperties.AutomationId="TransformChain"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Style="{StaticResource CaptionTextBlockStyle}"
+                Text="{x:Bind ViewModel.Transforms.ChainText, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis" />
+
+            <ListView
+                x:Name="TransformList"
+                Grid.Row="2"
+                AutomationProperties.AutomationId="TransformList"
+                AutomationProperties.Name="Transforms"
+                IsItemClickEnabled="True"
+                IsTabStop="False"
+                ItemClick="TransformList_ItemClick"
+                ItemContainerStyle="{StaticResource NoFocusItemStyle}"
+                ItemsSource="{x:Bind ViewModel.Transforms.Items}"
+                SelectedIndex="{x:Bind ViewModel.Transforms.SelectedIndex, Mode=TwoWay}"
+                SelectionMode="Single"
+                Visibility="{x:Bind ViewModel.Transforms.IsChoosing, Mode=OneWay}">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="transforms:TransformItemViewModel">
+                        <StackPanel
+                            Padding="2,4"
+                            AutomationProperties.HelpText="{x:Bind Description}"
+                            AutomationProperties.Name="{x:Bind Name}">
+                            <TextBlock Text="{x:Bind Name}" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind Description}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <StackPanel
+                Grid.Row="2"
+                Spacing="8"
+                Visibility="{x:Bind ViewModel.Transforms.IsAskingFindReplace, Mode=OneWay}">
+                <TextBox
+                    x:Name="FindBox"
+                    AutomationProperties.AutomationId="FindBox"
+                    AutomationProperties.Name="Find"
+                    Header="Find"
+                    Text="{x:Bind ViewModel.Transforms.FindText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBox
+                    x:Name="ReplaceBox"
+                    AutomationProperties.AutomationId="ReplaceBox"
+                    AutomationProperties.Name="Replace with"
+                    Header="Replace with"
+                    Text="{x:Bind ViewModel.Transforms.ReplaceText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox
+                    AutomationProperties.AutomationId="RegexCheck"
+                    Content="Use a pattern (regular expression)"
+                    IsChecked="{x:Bind ViewModel.Transforms.UseRegex, Mode=TwoWay}" />
+                <CheckBox
+                    AutomationProperties.AutomationId="IgnoreCaseCheck"
+                    Content="Ignore capital letters"
+                    IsChecked="{x:Bind ViewModel.Transforms.IgnoreCase, Mode=TwoWay}" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button
+                        AutomationProperties.AutomationId="FindReplaceApplyButton"
+                        Command="{x:Bind ViewModel.SubmitFindReplaceCommand}"
+                        Content="OK"
+                        Style="{StaticResource NoFocusAccentButtonStyle}" />
+                    <Button
+                        AutomationProperties.AutomationId="FindReplaceBackButton"
+                        Click="TransformBack_Click"
+                        Content="Back" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border
+                Grid.Row="3"
+                MinHeight="48"
+                MaxHeight="120"
+                Padding="10,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+                <Grid>
+                    <TextBlock
+                        AutomationProperties.AutomationId="TransformPreview"
+                        AutomationProperties.Name="Preview"
+                        MaxLines="4"
+                        Text="{x:Bind ViewModel.Transforms.Preview, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.Transforms.PreviewIsResult, Mode=OneWay}" />
+                    <TextBlock
+                        AutomationProperties.AutomationId="TransformPreviewError"
+                        AutomationProperties.Name="Preview problem"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        MaxLines="4"
+                        Text="{x:Bind ViewModel.Transforms.Preview, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
+                        Visibility="{x:Bind ViewModel.Transforms.PreviewIsError, Mode=OneWay}" />
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="4" Spacing="4">
+                <StackPanel
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    Visibility="{x:Bind ViewModel.Transforms.IsChoosing, Mode=OneWay}">
+                    <Button
+                        AutomationProperties.AutomationId="TransformApplyButton"
+                        Command="{x:Bind ViewModel.ConfirmTransformCommand}"
+                        Content="Paste"
+                        Style="{StaticResource NoFocusAccentButtonStyle}"
+                        ToolTipService.ToolTip="Paste the text with the chosen changes (Enter)" />
+                    <Button
+                        AutomationProperties.AutomationId="TransformAddButton"
+                        Command="{x:Bind ViewModel.Transforms.AddToChainCommand}"
+                        Content="Add to chain"
+                        ToolTipService.ToolTip="Run this change first, then choose another (Ctrl+Space)" />
+                    <Button
+                        AutomationProperties.AutomationId="TransformRemoveButton"
+                        Command="{x:Bind ViewModel.Transforms.RemoveLastFromChainCommand}"
+                        Content="Remove last"
+                        ToolTipService.ToolTip="Take the last change off the chain (Backspace)" />
+                    <Button
+                        AutomationProperties.AutomationId="TransformBackButton"
+                        Click="TransformBack_Click"
+                        Content="Back"
+                        ToolTipService.ToolTip="Back to the list (Esc)" />
+                </StackPanel>
+                <TextBlock
+                    AutomationProperties.AutomationId="TransformError"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.Transforms.ErrorMessage, Mode=OneWay}"
+                    TextWrapping="Wrap"
+                    Visibility="{x:Bind ViewModel.Transforms.HasError, Mode=OneWay}" />
+                <TextBlock
+                    AutomationProperties.AutomationId="TransformStatusText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.Transforms.StatusText, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Grid>
+
+        <Grid
+            x:Name="SnippetPromptPanel"
+            Grid.Row="0"
+            Grid.RowSpan="3"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            RowSpacing="8"
+            Visibility="{x:Bind ViewModel.IsPromptingSnippet, Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock
+                Grid.Row="0"
+                AutomationProperties.AutomationId="SnippetPromptTitle"
+                Style="{StaticResource SubtitleTextBlockStyle}"
+                Text="{x:Bind ViewModel.Snippets.PromptTitle, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis" />
+
+            <ScrollViewer Grid.Row="1" IsTabStop="False">
+                <ItemsControl
+                    AutomationProperties.AutomationId="SnippetFields"
+                    AutomationProperties.Name="Values for the snippet"
+                    IsTabStop="False"
+                    ItemsSource="{x:Bind ViewModel.Snippets.Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="snippets:SnippetFieldViewModel">
+                            <TextBox
+                                Margin="0,0,0,8"
+                                AutomationProperties.Name="{x:Bind Name}"
+                                Header="{x:Bind Name}"
+                                Loaded="SnippetField_Loaded"
+                                MaxLength="10000"
+                                Text="{x:Bind Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Spacing="6">
+                <TextBlock
+                    AutomationProperties.AutomationId="SnippetPromptError"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.Snippets.PromptError, Mode=OneWay}"
+                    TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Button
+                        AutomationProperties.AutomationId="SnippetPromptPasteButton"
+                        Command="{x:Bind ViewModel.SubmitSnippetPromptCommand}"
+                        Content="Paste"
+                        Style="{StaticResource NoFocusAccentButtonStyle}" />
+                    <Button
+                        AutomationProperties.AutomationId="SnippetPromptCancelButton"
+                        Click="SnippetPromptCancel_Click"
+                        Content="Cancel" />
+                </StackPanel>
+                <TextBlock
+                    AutomationProperties.AutomationId="SnippetPromptStatusText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Grid>
     </Grid>
+    </Grid>
+    </Border>
 </Window>

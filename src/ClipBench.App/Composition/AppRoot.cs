@@ -1,3 +1,4 @@
+using ClipBench.Core.Boards;
 using ClipBench.Core.Capture;
 using ClipBench.Core.Diagnostics;
 using ClipBench.Core.History;
@@ -7,17 +8,24 @@ using ClipBench.Core.Notifications;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
+using ClipBench.Core.Snippets;
+using ClipBench.Core.Transforms;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
+using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Queue;
+using ClipBench.Presentation.Snippets;
+using ClipBench.Presentation.Transforms;
 using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
+using ClipBench.Storage.Boards;
 using ClipBench.Storage.Clips;
 using ClipBench.Storage.Settings;
+using ClipBench.Storage.Snippets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 
@@ -45,6 +53,8 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly IActivityLog _log;
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
+    private readonly StartupOptions _options;
+    private SnippetsWindow? _snippetsWindow;
     private HotkeyId? _hotkey;
     private HotkeyId? _collectHotkey;
     private bool _disposed;
@@ -60,8 +70,10 @@ internal sealed class AppRoot : IAsyncDisposable
         ITrayIcon? tray,
         IActivityLog log,
         ISingleInstanceGuard guard,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        StartupOptions options)
     {
+        _options = options;
         _services = services;
         _platform = platform;
         _storage = storage;
@@ -150,6 +162,20 @@ internal sealed class AppRoot : IAsyncDisposable
                 log.Write(ActivityLevel.Warning, ActivityEvent.HistorySkipped, new ActivityDetails { Count = loaded.Value.Unreadable });
             }
 
+            // The boards come after the clips, because loading them takes clips off boards that no longer exist. Without
+            // them the app still pastes what is saved.
+            var boardsLoad = await services.GetRequiredService<BoardCatalog>().LoadAsync(cancellationToken);
+            if (boardsLoad.IsFailure)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = boardsLoad.Error.Code });
+            }
+
+            var snippetsLoad = await services.GetRequiredService<SnippetCatalog>().LoadAsync(cancellationToken);
+            if (snippetsLoad.IsFailure)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = snippetsLoad.Error.Code });
+            }
+
             // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
             _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
 
@@ -161,10 +187,13 @@ internal sealed class AppRoot : IAsyncDisposable
                 _ = platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
             }
 
+            _ = platform.WindowEffects.RemoveFrame(new Core.Pasting.WindowHandle(handle));
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
+            _ = platform.WindowEffects.HideSystemBorder(new Core.Pasting.WindowHandle(handle));
 
             hud = CreateQueueWindow(services, platform, options);
-            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
+            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
+            popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSnippetEditor();
             await root.ShowTrayAsync(cancellationToken);
             root._hotkey = await root.RegisterShortcutAsync(
                 options.Hotkey ?? Hotkey.Default,
@@ -214,11 +243,34 @@ internal sealed class AppRoot : IAsyncDisposable
 
         var focused = fromTray ? default : _platform.ForegroundTracker.Capture();
         var anchor = _platform.ScreenLocator.Locate(focused.IsSuccess ? focused.Value.Window : null);
-        var bounds = PopupPlacement.Compute(anchor, PopupWindow.WidthDip, PopupWindow.HeightDip);
+        var bounds = PopupPlacement.Compute(anchor, _popup.CurrentWidthDip, PopupWindow.HeightDip);
 
         // Opening records the window that has focus now, so it has to come before the popup takes focus.
         _popupViewModel.Open(pasteIntoPreviousWindow: !fromTray);
         _popup.ShowAt(bounds);
+    }
+
+    /// <summary>Shows the snippet editor, making the window the first time.</summary>
+    public void OpenSnippetEditor()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_snippetsWindow is null)
+        {
+            _snippetsWindow = new SnippetsWindow(_services.GetRequiredService<SnippetEditorViewModel>());
+
+            // It shows what the user wrote in their snippets, so it is kept out of screen captures like the popup.
+            if (!_options.AllowScreenCapture)
+            {
+                var handle = WinRT.Interop.WindowNative.GetWindowHandle(_snippetsWindow);
+                _ = _platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
+            }
+        }
+
+        _snippetsWindow.ShowEditor();
     }
 
     /// <summary>Stops everything in the order that keeps data safe: no new clips, then the history, then Windows.</summary>
@@ -238,6 +290,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _popupViewModel.Close();
         _popup.Close();
         _hud.Close();
+        _snippetsWindow?.Shutdown();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
@@ -288,6 +341,14 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
+        _ = services.AddSingleton<IBoardStore>(new BoardStore(storage.Repository));
+        _ = services.AddSingleton<BoardCatalog>();
+        _ = services.AddSingleton<ISnippetStore>(new SnippetStore(storage.Repository));
+        _ = services.AddSingleton<SnippetCatalog>();
+        _ = services.AddSingleton<SnippetEngine>();
+        _ = services.AddSingleton<SnippetsViewModel>();
+        _ = services.AddSingleton<SnippetEditorViewModel>();
+        _ = services.AddSingleton<SidebarViewModel>();
         _ = services.AddSingleton<CollectController>();
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
@@ -296,6 +357,9 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
         _ = services.AddSingleton<QueueRunner>();
         _ = services.AddSingleton<IQueueControl>(provider => provider.GetRequiredService<QueueRunner>());
+        _ = services.AddSingleton(TransformRegistry.Default);
+        _ = services.AddSingleton(new TransformPipeline());
+        _ = services.AddSingleton<TransformPickerViewModel>();
         _ = services.AddSingleton<PopupViewModel>();
         _ = services.AddSingleton<QueueHudViewModel>();
         _ = services.AddSingleton<CollectToggle>();
@@ -352,6 +416,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray.OpenRequested += (_, _) => _dispatcher.Post(() => TogglePopup(fromTray: true));
         _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
+        _trayViewModel.EditSnippetsRequested += (_, _) => OpenSnippetEditor();
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly

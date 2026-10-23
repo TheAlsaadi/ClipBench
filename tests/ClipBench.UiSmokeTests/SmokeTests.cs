@@ -1,3 +1,4 @@
+using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
 
@@ -103,6 +104,31 @@ public sealed class SmokeTests(AppUnderTest app) : IClassFixture<AppUnderTest>
         AppUnderTest.WaitFor(() => AppUnderTest.Rows(reopened).Length == before, 10_000).ShouldBeTrue("the full list did not come back");
         app.ClosePopup();
     }
+
+    [Fact]
+    public void Enter_in_the_custom_separator_box_closes_the_box_and_does_not_paste()
+    {
+        app.ClosePopup();
+        var popup = app.OpenPopup();
+        var pastesBefore = Pastes();
+
+        popup.FindFirstDescendant(cf => cf.ByAutomationId("SeparatorButton"))!.AsButton().Invoke();
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByName("Custom…")) is not null, 10_000).ShouldBeTrue("the separator menu did not open");
+        popup.FindFirstDescendant(cf => cf.ByName("Custom…"))!.Patterns.Invoke.Pattern.Invoke();
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByName("Custom separator"))?.Properties.HasKeyboardFocus.ValueOrDefault == true, 10_000)
+            .ShouldBeTrue("the custom separator box did not get the focus");
+
+        Keyboard.Type("|");
+        Keyboard.Type(VirtualKeyShort.RETURN);
+
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByName("Custom separator")) is null, 10_000).ShouldBeTrue("the box did not close");
+        Thread.Sleep(1000);
+        app.FindPopup().ShouldNotBeNull("Enter in the box must not paste, which closes the popup");
+        Pastes().ShouldBe(pastesBefore);
+        app.ClosePopup();
+    }
+
+    private int Pastes() => app.ReadLog().Split("PasteSucceeded").Length - 1;
 
     [Fact]
     public void Down_moves_the_highlight_to_the_next_clip()

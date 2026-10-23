@@ -26,6 +26,15 @@ internal sealed class TestEditForm : IDisposable
     /// <summary>What the text box holds now.</summary>
     public string Text => (string)_form!.Invoke(() => _box!.Text);
 
+    /// <summary>True when the client area is as large as the whole window, which a window with a frame never has.</summary>
+    public bool ClientFillsWindow => (bool)_form!.Invoke(() => _form.ClientSize == _form.Size);
+
+    /// <summary>Runs something on the thread that owns the window, which some calls on a window must be made from.</summary>
+    /// <typeparam name="T">What it returns.</typeparam>
+    /// <param name="work">What to run.</param>
+    /// <returns>What it returned.</returns>
+    public T OnWindowThread<T>(Func<T> work) => (T)_form!.Invoke(work);
+
     public static TestEditForm Create()
     {
         var window = new TestEditForm();

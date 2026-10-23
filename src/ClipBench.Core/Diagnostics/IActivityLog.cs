@@ -115,6 +115,24 @@ public enum ActivityEvent
 
     /// <summary>A finished collect session could not be saved or put on the clipboard, with the reason as an error code.</summary>
     CollectFailed,
+
+    /// <summary>
+    /// Text was changed by a chain of transforms and handed on to be pasted, with the length of the chain as the count.
+    /// Whether the paste itself worked is recorded by the paste events.
+    /// </summary>
+    TransformApplied,
+
+    /// <summary>A chain of transforms could not change the text, with the reason as an error code.</summary>
+    TransformFailed,
+
+    /// <summary>
+    /// A snippet was filled in and handed on to be pasted, with the number of values it asked for as the count and the size
+    /// of the text. Whether the paste itself worked is recorded by the paste events.
+    /// </summary>
+    SnippetPasted,
+
+    /// <summary>A snippet could not be filled in, with the reason as an error code.</summary>
+    SnippetFailed,
 }
 
 /// <summary>
