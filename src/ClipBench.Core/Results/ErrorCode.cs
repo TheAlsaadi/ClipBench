@@ -119,4 +119,16 @@ public enum ErrorCode
 
     /// <summary>A value given to a snippet is longer than the limit.</summary>
     SnippetInputTooLong,
+
+    /// <summary>No snippet with the given id exists.</summary>
+    SnippetNotFound,
+
+    /// <summary>A snippet name is empty, too long or holds control characters.</summary>
+    InvalidSnippetName,
+
+    /// <summary>Another snippet already has that name, ignoring capital letters.</summary>
+    SnippetNameTaken,
+
+    /// <summary>The most snippets that can exist already do.</summary>
+    TooManySnippets,
 }

@@ -37,6 +37,32 @@ public class RecordAadTests
     }
 
     [Fact]
+    public void A_snippet_value_is_bound_to_a_tag_its_id_and_its_column()
+    {
+        var id = new ClipBench.Core.Snippets.SnippetId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+        byte[] expected =
+        [
+            .. "CB1S"u8,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+            4, .. "body"u8,
+        ];
+
+        RecordAad.ForSnippet(id, "body").ShouldBe(expected);
+    }
+
+    [Fact]
+    public void A_snippet_value_can_never_be_taken_for_a_board_or_clip_value_and_depends_on_id_and_column()
+    {
+        var guid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+        var snippet = new ClipBench.Core.Snippets.SnippetId(guid);
+
+        RecordAad.ForSnippet(snippet, "name").ShouldNotBe(RecordAad.ForBoard(new ClipBench.Core.Boards.BoardId(guid), "name"));
+        RecordAad.ForSnippet(snippet, "name").ShouldNotBe(RecordAad.ForClip(new ClipId(guid), "name", ClipFormat.Text));
+        RecordAad.ForSnippet(snippet, "body").ShouldNotBe(RecordAad.ForSnippet(snippet, "name"));
+        RecordAad.ForSnippet(new ClipBench.Core.Snippets.SnippetId(Guid.NewGuid()), "name").ShouldNotBe(RecordAad.ForSnippet(snippet, "name"));
+    }
+
+    [Fact]
     public void A_board_value_can_never_be_taken_for_a_clip_value_even_with_the_same_id_and_column()
     {
         var guid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");

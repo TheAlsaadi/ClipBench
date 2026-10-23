@@ -8,6 +8,7 @@ using ClipBench.Core.Notifications;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
+using ClipBench.Core.Snippets;
 using ClipBench.Core.Transforms;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
@@ -23,6 +24,7 @@ using ClipBench.Storage;
 using ClipBench.Storage.Boards;
 using ClipBench.Storage.Clips;
 using ClipBench.Storage.Settings;
+using ClipBench.Storage.Snippets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 
@@ -161,6 +163,12 @@ internal sealed class AppRoot : IAsyncDisposable
             if (boardsLoad.IsFailure)
             {
                 log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = boardsLoad.Error.Code });
+            }
+
+            var snippetsLoad = await services.GetRequiredService<SnippetCatalog>().LoadAsync(cancellationToken);
+            if (snippetsLoad.IsFailure)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = snippetsLoad.Error.Code });
             }
 
             // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
@@ -303,6 +311,9 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<ClipLibrary>();
         _ = services.AddSingleton<IBoardStore>(new BoardStore(storage.Repository));
         _ = services.AddSingleton<BoardCatalog>();
+        _ = services.AddSingleton<ISnippetStore>(new SnippetStore(storage.Repository));
+        _ = services.AddSingleton<SnippetCatalog>();
+        _ = services.AddSingleton<SnippetEngine>();
         _ = services.AddSingleton<SidebarViewModel>();
         _ = services.AddSingleton<CollectController>();
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
