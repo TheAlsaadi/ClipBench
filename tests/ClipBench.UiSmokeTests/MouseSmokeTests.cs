@@ -43,6 +43,7 @@ public sealed class MouseSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTe
         PointClick(Button(popup, "SidebarToggleButton").Center());
         AppUnderTest.WaitFor(() => (AppUnderTest.SidebarEntries(popup).Length > 0) == wasOpen, 10_000).ShouldBeTrue("the button did not toggle the sidebar back");
 
+        AppUnderTest.SearchBox(popup).Properties.HasKeyboardFocus.Value.ShouldBeTrue("a click on the sidebar button took the cursor out of the search box");
         PointClick(Button(popup, "CloseButton").Center());
         AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue("the close button did not close the popup");
     }
@@ -172,16 +173,50 @@ public sealed class MouseSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTe
         app.ClosePopup();
     }
 
+    // A click the way a hand makes it: the button is pressed, held for a moment and let go. A click that presses and lets go in
+    // the same instant hides anything that goes wrong while the button is held down.
+    [Fact]
+    public void The_buttons_of_the_footer_work_with_a_click_and_leave_the_cursor_in_the_search_box()
+    {
+        app.ClosePopup();
+        var popup = app.OpenPopup();
+
+        var transformButton = Button(popup, "TransformButton");
+        PointClick(transformButton.Center());
+        AppUnderTest.SaveScreenshot(popup, "footer-transform-click");
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByAutomationId("TransformApplyButton")) is not null, 10_000)
+            .ShouldBeTrue("the Transform button did not open the picker. " + app.Describe());
+        PointClick(Button(popup, "TransformBackButton").Center());
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByAutomationId("TransformApplyButton")) is null, 10_000).ShouldBeTrue("Back did not close the picker");
+
+        foreach (var (button, item) in new[] { ("SeparatorButton", "Custom…"), ("TableButton", "As a column (Ctrl+T)"), ("BoardButton", "New board…") })
+        {
+            PointClick(Button(popup, button).Center());
+            AppUnderTest.WaitFor(() => app.FindMenuItem(item) is not null, 10_000).ShouldBeTrue($"{button} did not open its menu");
+            Keyboard.Type(VirtualKeyShort.ESCAPE);
+            AppUnderTest.WaitFor(() => app.FindMenuItem(item) is null, 10_000).ShouldBeTrue($"Esc did not close the menu of {button}");
+            app.FindPopup().ShouldNotBeNull("Esc in a menu must not close the popup");
+        }
+
+        AppUnderTest.WaitFor(() => AppUnderTest.SearchBox(popup).Properties.HasKeyboardFocus.ValueOrDefault, 10_000)
+            .ShouldBeTrue("the buttons took the cursor out of the search box");
+        app.ClosePopup();
+    }
+
     private static void PointClick(System.Drawing.Point point)
     {
         AppUnderTest.PointAt(point);
-        Mouse.Click(point);
+        Mouse.Down(MouseButton.Left);
+        Thread.Sleep(150);
+        Mouse.Up(MouseButton.Left);
     }
 
     private static void PointRightClick(System.Drawing.Point point)
     {
         AppUnderTest.PointAt(point);
-        Mouse.RightClick(point);
+        Mouse.Down(MouseButton.Right);
+        Thread.Sleep(150);
+        Mouse.Up(MouseButton.Right);
     }
 
     private static AutomationElement Button(Window popup, string automationId) =>

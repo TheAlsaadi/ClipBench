@@ -212,7 +212,7 @@ public sealed class AppUnderTest : IAsyncLifetime
         if (FindPopup() is not null)
         {
             Keyboard.Type(VirtualKeyShort.ESCAPE);
-            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("Escape did not close the popup");
+            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("Escape did not close the popup. " + Describe());
         }
     }
 
