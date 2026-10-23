@@ -215,6 +215,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _transforms.Close();
         _snippets.CancelPrompt();
         _sidebar.Reset();
+
+        // Going back to the history is quiet, so the view is told that the list it shows may have changed kind.
+        OnPropertyChanged(nameof(IsSnippetsView));
+        OnPropertyChanged(nameof(IsClipsView));
         _open = true;
         IsOpen = true;
         Refresh(keepSelection: false);

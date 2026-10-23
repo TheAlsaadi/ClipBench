@@ -205,6 +205,38 @@ public sealed class PopupSnippetTests : IDisposable
     }
 
     [Fact]
+    public async Task The_editor_is_asked_for_while_the_popup_still_has_the_focus_so_Windows_lets_it_take_the_focus()
+    {
+        await AddSnippetAsync("Signature", "Regards");
+        _vm.Open();
+        bool? popupWasOpen = null;
+        _vm.EditSnippetsRequested += (_, _) => popupWasOpen = _vm.IsOpen;
+
+        _vm.EditSnippetsCommand.Execute(null);
+
+        popupWasOpen.ShouldBe(true);
+        _vm.IsOpen.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_popup_left_on_snippets_opens_on_the_history_and_tells_the_view_so()
+    {
+        _vm.Open();
+        ChooseSnippets();
+        _vm.IsSnippetsView.ShouldBeTrue();
+        _vm.Close();
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        _vm.Open();
+
+        _vm.IsSnippetsView.ShouldBeFalse();
+        _vm.IsClipsView.ShouldBeTrue();
+        changed.ShouldContain(nameof(PopupViewModel.IsSnippetsView));
+        changed.ShouldContain(nameof(PopupViewModel.IsClipsView));
+    }
+
+    [Fact]
     public void The_editor_can_be_asked_for_while_the_popup_is_closed_too()
     {
         var asked = 0;

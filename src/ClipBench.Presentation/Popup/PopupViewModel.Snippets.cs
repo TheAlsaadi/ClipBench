@@ -9,7 +9,7 @@ namespace ClipBench.Presentation.Popup;
 /// <summary>The Snippets view: a list of snippets, and pasting one with its variables filled in.</summary>
 public sealed partial class PopupViewModel
 {
-    /// <summary>Raised when the user asked to edit the snippets. The popup is hidden first.</summary>
+    /// <summary>Raised when the user asked to edit the snippets. The popup is hidden right after.</summary>
     public event EventHandler? EditSnippetsRequested;
 
     /// <summary>The snippets and the prompt for their values.</summary>
@@ -34,9 +34,10 @@ public sealed partial class PopupViewModel
     [RelayCommand]
     private void EditSnippets()
     {
-        // The editor is a window of its own, so the popup goes away before it opens.
-        Close();
+        // The editor is a window of its own and goes away with the popup. It is asked for first, while the popup still has
+        // the focus: once the popup is hidden Windows gives the focus to another program, and refuses it to the editor.
         EditSnippetsRequested?.Invoke(this, EventArgs.Empty);
+        Close();
     }
 
     [RelayCommand]
