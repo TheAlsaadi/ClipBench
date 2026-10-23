@@ -30,7 +30,7 @@ public sealed partial class PopupViewModel
         // One clip is pasted as it is, so rich text and pictures keep their formats.
         if (clips.Count == 1)
         {
-            Close();
+            Dismiss();
             await _paste.PasteAsync(clips[0], cancellationToken);
             return;
         }
@@ -43,7 +43,7 @@ public sealed partial class PopupViewModel
         }
 
         // Hide first: the paste needs the window underneath to have focus again.
-        Close();
+        Dismiss();
         await _paste.PasteContentAsync(new TextContent(joined.Value), cancellationToken);
     }
 
@@ -63,7 +63,7 @@ public sealed partial class PopupViewModel
             return;
         }
 
-        Close();
+        Dismiss();
         await _paste.PasteContentAsync(new TextContent(table.Value), cancellationToken);
     }
 
@@ -88,7 +88,7 @@ public sealed partial class PopupViewModel
         }
 
         // The queue pastes into whatever has focus once the popup is gone.
-        Close();
+        Dismiss(leaveFocus: true);
     }
 
     /// <summary>The label of the paste button: how many clips Enter pastes.</summary>
@@ -109,7 +109,7 @@ public sealed partial class PopupViewModel
         await _collect.ToggleAsync(cancellationToken);
         if (starting)
         {
-            Close();
+            Dismiss(leaveFocus: true);
         }
     }
 

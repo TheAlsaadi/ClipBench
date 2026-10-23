@@ -34,14 +34,27 @@ public sealed partial class PopupWindow : Window
     /// <summary>How much wider the popup is while the sidebar is shown, in device-independent pixels.</summary>
     public const double SidebarWidthDip = 168;
 
+    private readonly IWindowEffects _effects;
+    private readonly IForegroundTracker _tracker;
+    private readonly IScreenLocator _screens;
     private bool _customSeparatorChosen;
+    private (PixelPoint Cursor, PointInt32 Window)? _dragStart;
 
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
-    public PopupWindow(PopupViewModel viewModel)
+    /// <param name="effects">What Windows does with the window from outside: what a click on it does.</param>
+    /// <param name="tracker">Tells which window has focus.</param>
+    /// <param name="screens">Tells where the mouse pointer is, for moving the window.</param>
+    public PopupWindow(PopupViewModel viewModel, IWindowEffects effects, IForegroundTracker tracker, IScreenLocator screens)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(effects);
+        ArgumentNullException.ThrowIfNull(tracker);
+        ArgumentNullException.ThrowIfNull(screens);
         ViewModel = viewModel;
+        _effects = effects;
+        _tracker = tracker;
+        _screens = screens;
         InitializeComponent();
 
         var presenter = OverlappedPresenter.Create();
@@ -54,6 +67,14 @@ public sealed partial class PopupWindow : Window
         AppWindow.IsShownInSwitchers = false;
 
         Activated += OnActivated;
+
+        // The text boxes handle a press themselves, so the frame listens to it even when it is said to be done.
+        DragHandle.PointerPressed += DragHandle_PointerPressed;
+        DragHandle.PointerMoved += DragHandle_PointerMoved;
+        DragHandle.PointerReleased += DragHandle_DragEnded;
+        DragHandle.PointerCanceled += DragHandle_DragEnded;
+        DragHandle.PointerCaptureLost += DragHandle_DragEnded;
+        Frame.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Frame_PointerPressed), handledEventsToo: true);
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         ViewModel.Transforms.PropertyChanged += OnTransformsPropertyChanged;
@@ -73,22 +94,154 @@ public sealed partial class PopupWindow : Window
     {
         AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height));
         AppWindow.Show();
-        Activate();
+        TakeForeground();
         _ = SearchBox.Focus(FocusState.Programmatic);
+    }
+
+    /// <summary>
+    /// True while the popup is the window with focus. Windows is asked, because the window does not always report that it has
+    /// been put behind another one, for example when the shortcut has just given the focus back to a program.
+    /// </summary>
+    public bool IsActive => _tracker.IsForeground(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
+
+    /// <summary>
+    /// Takes up a locked popup that is on screen: the program in front is the one to paste into, and the cursor goes to the
+    /// search box. A popup that is not locked is opened with <see cref="ShowAt"/> instead.
+    /// </summary>
+    /// <param name="pasteIntoPreviousWindow">False when the tray icon was used and the window in front is the taskbar.</param>
+    public void TakeFocus(bool pasteIntoPreviousWindow)
+    {
+        ViewModel.Refocus(pasteIntoPreviousWindow);
+        KeepOnScreen();
+        TakeForeground();
+        _ = SearchBox.Focus(FocusState.Programmatic);
+    }
+
+    // A popup that was let go over the edge of a screen, or was left on a monitor that is gone, is moved back into the work area.
+    // One that is inside it is not touched.
+    private void KeepOnScreen()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        var position = AppWindow.Position;
+        var size = AppWindow.Size;
+        var x = Math.Clamp(position.X, area.X, Math.Max(area.X, area.X + area.Width - size.Width));
+        var y = Math.Clamp(position.Y, area.Y, Math.Max(area.Y, area.Y + area.Height - size.Height));
+        if (x != position.X || y != position.Y)
+        {
+            AppWindow.Move(new PointInt32(x, y));
+        }
+    }
+
+    // A window that is on screen already is not always given the focus by Activate: Windows only allows that to a program that has
+    // just had the user's input. The request is then made the way the task switcher makes it.
+    private void TakeForeground()
+    {
+        // The request lifts the style that keeps a locked popup from taking the focus; it is not lifted by Activate.
+        _ = _effects.BringToFront(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
+        Activate();
     }
 
     private void OnActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs args)
     {
-        // Clicking anywhere else, or switching to another window, puts the popup away.
-        if (args.WindowActivationState == WindowActivationState.Deactivated && ViewModel.IsOpen)
+        // Clicking anywhere else, or switching to another window, puts the popup away. A locked popup stays.
+        if (args.WindowActivationState == WindowActivationState.Deactivated && ViewModel.IsOpen && !ViewModel.IsLocked)
         {
             ViewModel.CloseNowCommand.Execute(null);
         }
     }
 
+    // A locked popup does not take the focus when it is clicked, so that a click on a clip pastes into the program the user
+    // was in. Keys and typing need the focus, so it is taken when something that is typed in is used.
+    private void NeedKeyboard()
+    {
+        if (ViewModel.IsOpen && ViewModel.IsLocked && !IsActive)
+        {
+            TakeFocus(pasteIntoPreviousWindow: true);
+        }
+    }
+
+    private void Frame_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        for (var element = e.OriginalSource as DependencyObject; element is not null && !ReferenceEquals(element, Frame); element = VisualTreeHelper.GetParent(element))
+        {
+            if (element is TextBox box)
+            {
+                // Only a locked popup that is not in front needs this: any other text box takes the focus by itself.
+                if (ViewModel.IsOpen && ViewModel.IsLocked && !IsActive)
+                {
+                    NeedKeyboard();
+                    _ = DispatcherQueue.TryEnqueue(() => _ = box.Focus(FocusState.Pointer));
+                }
+
+                return;
+            }
+        }
+    }
+
+    // The popup is moved by the pointer events of the handle, which is captured for as long as the button is down. The pointer is
+    // read on the whole desktop and the window is put where it was plus how far the pointer has gone, so a fast mouse cannot get
+    // ahead of the window: measuring the pointer inside a window that is still moving counts the same distance twice.
+    private void DragHandle_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(DragHandle).Properties.IsLeftButtonPressed && DragHandle.CapturePointer(e.Pointer))
+        {
+            _dragStart = (_screens.CursorPosition(), AppWindow.Position);
+        }
+    }
+
+    private void DragHandle_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_dragStart is not var (cursor, origin) || !e.GetCurrentPoint(DragHandle).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        var now = _screens.CursorPosition();
+        AppWindow.Move(new PointInt32(origin.X + (now.X - cursor.X), origin.Y + (now.Y - cursor.Y)));
+    }
+
+    private void DragHandle_DragEnded(object sender, PointerRoutedEventArgs e)
+    {
+        if (_dragStart is null)
+        {
+            return;
+        }
+
+        _dragStart = null;
+        DragHandle.ReleasePointerCaptures();
+        KeepOnScreen();
+
+        // Pressing something that cannot take the focus leaves it nowhere, and the keys would go nowhere. It is put back once
+        // the pointer events are over, or the press that is ending would take it again. A locked popup that is not in front
+        // keeps the focus out of the way of the program the user is in.
+        _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (ViewModel.IsOpen && IsActive)
+            {
+                _ = SearchBox.Focus(FocusState.Programmatic);
+            }
+        });
+    }
+
+    // Whether a click makes the popup the window with focus follows the lock. Letting go of the lock makes it an ordinary popup
+    // again, which has the focus, so that clicking elsewhere puts it away.
+    private void ApplyLock()
+    {
+        _ = _effects.SetActivatesOnClick(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)), activates: !ViewModel.IsLocked);
+        if (!ViewModel.IsLocked && ViewModel.IsOpen && !IsActive)
+        {
+            TakeForeground();
+            _ = SearchBox.Focus(FocusState.Programmatic);
+        }
+    }
+
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PopupViewModel.SelectedIndex) && ViewModel.Current is { } current)
+        if (e.PropertyName == nameof(PopupViewModel.IsLocked))
+        {
+            ApplyLock();
+        }
+        else if (e.PropertyName == nameof(PopupViewModel.SelectedIndex) && ViewModel.Current is { } current)
         {
             ClipList.ScrollIntoView(current);
         }
@@ -101,7 +254,11 @@ public sealed partial class PopupWindow : Window
             // The first value is focused by the field itself when it appears; going back puts the cursor in the search box.
             // Not once the popup is hidden, which is what a paste does right after the prompt closes: focusing a control in a
             // hidden window would take the focus back from the program the paste is going to.
-            if (!ViewModel.IsPromptingSnippet)
+            if (ViewModel.IsPromptingSnippet)
+            {
+                NeedKeyboard();
+            }
+            else
             {
                 _ = DispatcherQueue.TryEnqueue(() =>
                 {
@@ -118,6 +275,11 @@ public sealed partial class PopupWindow : Window
             // moved after the layout has caught up with the panel being shown or hidden.
             // A hidden popup is left alone, as with the snippet prompt.
             var open = ViewModel.IsTransformsOpen;
+            if (open)
+            {
+                NeedKeyboard();
+            }
+
             _ = DispatcherQueue.TryEnqueue(() =>
             {
                 if (ViewModel.IsOpen)
@@ -143,6 +305,11 @@ public sealed partial class PopupWindow : Window
         {
             // The cursor goes into the name box while a name is typed and back to the search box afterwards.
             var editing = ViewModel.Sidebar.IsEditing;
+            if (editing)
+            {
+                NeedKeyboard();
+            }
+
             _ = DispatcherQueue.TryEnqueue(() =>
             {
                 if (ViewModel.IsOpen)
@@ -320,7 +487,11 @@ public sealed partial class PopupWindow : Window
                 args.Handled = true;
             }
         };
-        flyout.Opened += (_, _) => _ = box.Focus(FocusState.Programmatic);
+        flyout.Opened += (_, _) =>
+        {
+            NeedKeyboard();
+            _ = box.Focus(FocusState.Programmatic);
+        };
         flyout.Closed += (_, _) =>
         {
             if (ViewModel.IsOpen)
@@ -375,6 +546,10 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.Enter when shift:
                 ViewModel.OpenTransformsCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.K when control:
+                ViewModel.ToggleLockCommand.Execute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.B when control:

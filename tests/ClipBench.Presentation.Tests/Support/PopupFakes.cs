@@ -50,6 +50,15 @@ internal sealed class FakePasteFlow : IPasteFlow
         return Task.CompletedTask;
     }
 
+    /// <summary>What each call to <see cref="Hold"/> asked for.</summary>
+    public List<bool> Holds { get; } = [];
+
+    public void Hold(bool hold) => Holds.Add(hold);
+
+    public int Returns { get; private set; }
+
+    public void ReturnToTarget() => Returns++;
+
     /// <summary>Content that was composed from several clips and pasted.</summary>
     public List<ClipContent> PastedContent { get; } = [];
 

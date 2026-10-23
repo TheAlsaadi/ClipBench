@@ -47,6 +47,10 @@ A name in braces inside a Snippet, such as `{date}`, `{time}`, `{clipboard}` or 
 The window that opens at the cursor from the global hotkey, for searching, selecting and pasting Clips.
 _Avoid_: picker, panel, launcher
 
+**Lock**:
+The state of a Popup that stays on screen, on top of other windows, after a paste and when another window is used. A click on a locked Popup does not take the focus from the program the user is in. Only its close button closes it.
+_Avoid_: pin (a pinned Clip is something else), sticky
+
 **Sidebar**:
 The strip at the side of the Popup that lists History, Pinned, the Boards and Snippets, and chooses what the list shows.
 

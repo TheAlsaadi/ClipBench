@@ -17,6 +17,13 @@ internal sealed class PasteTargetWindow : IDisposable
         _thread.SetApartmentState(ApartmentState.STA);
     }
 
+    /// <summary>Where the window is on the desktop, in device pixels.</summary>
+    public Rectangle Bounds => (Rectangle)_form!.Invoke(() => _form.Bounds);
+
+    /// <summary>Puts the window somewhere else, for tests that need two windows apart.</summary>
+    /// <param name="location">The new top-left corner.</param>
+    public void MoveTo(Point location) => _form!.Invoke(() => _form.Location = location);
+
     public string Text => (string)_form!.Invoke(() => _box!.Text);
 
     /// <summary>Empties the text box.</summary>
@@ -50,6 +57,9 @@ internal sealed class PasteTargetWindow : IDisposable
         // Form.ActiveForm only says the window is active on its own thread, which it can be while another program is in front.
         return Form.ActiveForm == _form && GetForegroundWindow() == _form.Handle;
     });
+
+    /// <summary>True while this window is the one in front, which gets the keys.</summary>
+    public bool IsInFront => (bool)_form!.Invoke(() => GetForegroundWindow() == _form.Handle);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]

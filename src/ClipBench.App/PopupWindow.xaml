@@ -223,6 +223,8 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <Button
                 Grid.Column="0"
@@ -241,8 +243,34 @@
                 IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
                 PlaceholderText="Search clips"
                 Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-            <Button
+
+            <!-- Pressing it starts the move that the system does for a title bar, so the popup can be put anywhere. -->
+            <Border
+                x:Name="DragHandle"
                 Grid.Column="2"
+                Width="24"
+                AutomationProperties.AutomationId="DragHandle"
+                AutomationProperties.Name="Move the popup"
+                Background="Transparent"
+                ToolTipService.ToolTip="Drag to move the popup">
+                <FontIcon
+                    FontSize="14"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE76F;" />
+            </Border>
+            <ToggleButton
+                x:Name="LockButton"
+                Grid.Column="3"
+                AllowFocusOnInteraction="False"
+                AutomationProperties.AutomationId="LockButton"
+                AutomationProperties.Name="Keep the popup on screen"
+                Command="{x:Bind ViewModel.ToggleLockCommand}"
+                IsChecked="{x:Bind ViewModel.IsLocked, Mode=OneWay}"
+                ToolTipService.ToolTip="{x:Bind local:Glyphs.LockTip(ViewModel.IsLocked), Mode=OneWay}">
+                <FontIcon FontSize="14" Glyph="{x:Bind local:Glyphs.LockGlyph(ViewModel.IsLocked), Mode=OneWay}" />
+            </ToggleButton>
+            <Button
+                Grid.Column="4"
                 AutomationProperties.AutomationId="CloseButton"
                 AutomationProperties.Name="Close"
                 Command="{x:Bind ViewModel.CloseNowCommand}"

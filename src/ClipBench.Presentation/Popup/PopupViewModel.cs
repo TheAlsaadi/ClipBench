@@ -107,6 +107,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsOpen { get; set; }
 
+    /// <summary>True while the popup is locked: it stays on screen after a paste and when another window is used.</summary>
+    [ObservableProperty]
+    public partial bool IsLocked { get; set; }
+
     /// <summary>True after Delete was pressed on a pinned clip, until the user confirms or backs out.</summary>
     [ObservableProperty]
     public partial bool IsConfirmingDelete { get; set; }
@@ -142,7 +146,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         };
 
     /// <summary>The key hints, or the question when a delete needs confirming.</summary>
-    public string StatusText
+    public string StatusText =>
+        IsLocked ? Hints.Replace("Esc close", "Esc back to the app" + HintGap + "Ctrl+K unlock", StringComparison.Ordinal) : Hints;
+
+    private string Hints
     {
         get
         {
@@ -234,6 +241,12 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
         _open = false;
         IsOpen = false;
+        if (IsLocked)
+        {
+            IsLocked = false;
+            _paste.Hold(false);
+        }
+
         _transforms.Close();
         _snippets.CancelPrompt();
         _ = _sidebar.Cancel();
@@ -246,6 +259,36 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         SelectedIndex = -1;
         NotifyListChanged();
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    // A paste or a hand-over puts the popup away, unless it is locked: then it only starts over, ready for the next clip.
+    private void Dismiss()
+    {
+        if (!IsLocked)
+        {
+            Close();
+            return;
+        }
+
+        _transforms.Close();
+        _snippets.CancelPrompt();
+        _ = _searchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        SetSearchTextFromCode(string.Empty);
+        IsConfirmingDelete = false;
+        ErrorMessage = null;
+        _marks.Clear();
+        Refresh(keepSelection: false);
+    }
+
+    // The same for work that goes on in the program the user was in, such as a queue that pastes there: a locked popup that
+    // has the focus gives it back, or the keys would go to the popup.
+    private void Dismiss(bool leaveFocus)
+    {
+        Dismiss();
+        if (leaveFocus && IsLocked)
+        {
+            _paste.ReturnToTarget();
+        }
     }
 
     /// <summary>Stops watching the library.</summary>
@@ -286,6 +329,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentSnippet));
         OnPropertyChanged(nameof(StatusText));
     }
+
+    partial void OnIsLockedChanged(bool value) => OnPropertyChanged(nameof(StatusText));
 
     partial void OnIsConfirmingDeleteChanged(bool value) => OnPropertyChanged(nameof(StatusText));
 
@@ -377,11 +422,46 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (IsLocked)
+        {
+            // A locked popup is not put away by Esc: the focus goes back to the program the user was in.
+            _paste.ReturnToTarget();
+            return;
+        }
+
         Close();
     }
 
     [RelayCommand]
     private void CloseNow() => Close();
+
+    [RelayCommand]
+    private void ToggleLock()
+    {
+        if (!_open)
+        {
+            return;
+        }
+
+        IsLocked = !IsLocked;
+        _paste.Hold(IsLocked);
+    }
+
+    /// <summary>Gives the focus back to the program the popup was opened from, and leaves the popup on screen.</summary>
+    public void ReturnToProgram() => _paste.ReturnToTarget();
+
+    /// <summary>
+    /// Takes up a locked popup again, as when the shortcut is pressed while it is on screen: the window that has focus is
+    /// the one to paste into, and the list is as it was.
+    /// </summary>
+    /// <param name="pasteIntoPreviousWindow">False when the tray icon was used, as for <see cref="Open"/>.</param>
+    public void Refocus(bool pasteIntoPreviousWindow = true)
+    {
+        if (_open && pasteIntoPreviousWindow)
+        {
+            _paste.Begin();
+        }
+    }
 
     [RelayCommand]
     private async Task PasteAsync(CancellationToken cancellationToken)
@@ -410,7 +490,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         }
 
         // Hide first: the paste needs the window underneath to have focus again.
-        Close();
+        Dismiss();
         await _paste.PasteAsync(clip, cancellationToken);
     }
 

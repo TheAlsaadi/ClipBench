@@ -209,12 +209,74 @@ public sealed class AppUnderTest : IAsyncLifetime
     /// <summary>Closes the popup if it is open, so the next test starts from a known place.</summary>
     public void ClosePopup()
     {
-        if (FindPopup() is not null)
+        if (FindPopup() is { } popup)
         {
-            Keyboard.Type(VirtualKeyShort.ESCAPE);
-            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("Escape did not close the popup. " + Describe());
+            // The close button is pressed through automation, not with a key: a key goes to the window in front, which is not always
+            // the popup (a locked one stays behind other windows), and Esc is also what interrupts the person running the tests.
+            popup.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.Patterns.Invoke.Pattern.Invoke();
+
+            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("the popup did not close. " + Describe());
         }
     }
+
+    /// <summary>
+    /// Presses the mouse button on a point, drags the pointer by a distance in small steps and lets go, the way a hand moves a
+    /// window. Each step is put there and then nudged with real mouse input, because a move that is only a new position sends no
+    /// mouse message and the system's move loop would not see it.
+    /// </summary>
+    /// <param name="from">Where to press.</param>
+    /// <param name="dx">How far to the right to drag; negative for the left.</param>
+    /// <param name="dy">How far down to drag; negative for up.</param>
+    /// <param name="fast">True to drag in a few big steps with no wait between them, the way a quick flick of the hand does.</param>
+    public static void DragBy(System.Drawing.Point from, int dx, int dy, bool fast = false)
+    {
+        PointAt(from);
+        Mouse.Down(MouseButton.Left);
+        Thread.Sleep(200);
+        var steps = fast ? 6 : 20;
+        for (var step = 1; step <= steps; step++)
+        {
+            Mouse.MoveTo(new System.Drawing.Point(from.X + (dx * step / steps), from.Y + (dy * step / steps)));
+            MouseEvent(MouseEventMove, 1, 0, 0, 0);
+            if (!fast)
+            {
+                Thread.Sleep(30);
+            }
+
+            MouseEvent(MouseEventMove, -1, 0, 0, 0);
+            if (!fast)
+            {
+                Thread.Sleep(30);
+            }
+        }
+
+        Thread.Sleep(200);
+        Mouse.Up(MouseButton.Left);
+        Thread.Sleep(300);
+    }
+
+    /// <summary>
+    /// Tells whether the popup is the window in front. A test that types must check this first: when the popup has not taken the
+    /// focus, the keys go to whatever is in front, which can be the window the person running the tests is working in.
+    /// </summary>
+    public static bool IsInFront(Window popup) => GetForegroundWindow() == popup.Properties.NativeWindowHandle.ValueOrDefault;
+
+    /// <summary>The window in front, for the message of a test that fails.</summary>
+    public static string ForegroundDescription()
+    {
+        var window = GetForegroundWindow();
+        var text = new char[256];
+        var length = GetWindowText(window, text, text.Length);
+        return $"in front: 0x{window:X} \"{new string(text, 0, Math.Max(0, length))}\"";
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern int GetWindowText(nint window, char[] text, int count);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern nint GetForegroundWindow();
 
     public static AutomationElement SearchBox(Window popup) => popup.FindFirstDescendant(cf => cf.ByAutomationId("SearchBox"))
         ?? throw new InvalidOperationException("The popup has no search box.");

@@ -76,7 +76,7 @@ public sealed partial class PopupViewModel
     private async Task PasteChangedAsync(string text, CancellationToken cancellationToken)
     {
         // Hide first: the paste needs the window underneath to have focus again.
-        Close();
+        Dismiss();
         await _paste.PasteContentAsync(new TextContent(text), cancellationToken);
     }
 

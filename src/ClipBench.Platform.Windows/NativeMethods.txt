@@ -102,3 +102,6 @@ WM_NULL
 SetWindowPos
 SetWindowSubclass
 DefSubclassProc
+SwitchToThisWindow
+GetWindowLong
+SetWindowLong

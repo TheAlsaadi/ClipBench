@@ -180,7 +180,7 @@ internal sealed class AppRoot : IAsyncDisposable
             _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
 
             var popupViewModel = services.GetRequiredService<PopupViewModel>();
-            popup = new PopupWindow(popupViewModel);
+            popup = new PopupWindow(popupViewModel, platform.WindowEffects, platform.ForegroundTracker, platform.ScreenLocator);
             var handle = WinRT.Interop.WindowNative.GetWindowHandle(popup);
             if (!options.AllowScreenCapture)
             {
@@ -237,6 +237,22 @@ internal sealed class AppRoot : IAsyncDisposable
 
         if (_popupViewModel.IsOpen)
         {
+            // A locked popup is not put away by its shortcut: from another program it takes the focus, and from the popup the
+            // focus goes back to the program.
+            if (_popupViewModel.IsLocked)
+            {
+                if (_popup.IsActive)
+                {
+                    _popupViewModel.ReturnToProgram();
+                }
+                else
+                {
+                    _popup.TakeFocus(pasteIntoPreviousWindow: !fromTray);
+                }
+
+                return;
+            }
+
             _popupViewModel.Close();
             return;
         }

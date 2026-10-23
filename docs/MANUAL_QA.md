@@ -162,6 +162,17 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 - [ ] Open the transform picker from the right-click menu: the **Paste**, **Add to chain**, **Remove last** and **Back** buttons do what Enter, Ctrl+Space, Backspace and Esc do.
 - [ ] **Separator** → **Custom…**, type `|`, **Enter**: the box closes and nothing is pasted.
 
+### Lock and move
+
+- [ ] Open the popup over another program and press the **lock** button next to the **X** (or **Ctrl+K**): the icon closes and the button is highlighted. Click the other program: the popup stays on top of it.
+- [ ] With the popup locked, click a clip: it is pasted into the program you were in, which keeps the cursor where it was, and the popup stays. Click another clip: it is pasted too.
+- [ ] Switch to a different program, then click a clip in the locked popup: it is pasted into that program. Try it as the owner did: type in program A, open the popup there and lock it, click the search box in program B (a browser), then click clips: they go into B, not A, and B keeps the cursor.
+- [ ] Drag the handle quickly, in big flicks, across the screen: the popup stays under the pointer with no jumps.
+- [ ] Click the search box of a locked popup and type: the text goes into the search box. **Esc** gives the cursor back to the program; the popup stays.
+- [ ] Press the popup's shortcut while a locked popup is behind another program: it comes to the front with the cursor in the search box. Press it again: the cursor goes back to the program.
+- [ ] Press the lock button again: the popup is an ordinary popup, and clicking another program puts it away. A locked popup is closed only by its **X**, and opens unlocked next time.
+- [ ] Drag the handle (the dotted grip left of the lock) across the screen, locked and unlocked, onto the other monitor and back: the popup follows the pointer, keeps its size relative to the screen on each monitor and stays in front. Let go of it half over the edge of a screen: it slides back inside.
+
 ### Looks on every screen
 
 - [ ] Open the popup with the sidebar shown, on every monitor you use, at its display scale (try 100% and 125%). Nothing is cut off: the last footer button (Collect) and the right edge of the list show with an even margin, and the corners are rounded with a thin border and no bright outline.

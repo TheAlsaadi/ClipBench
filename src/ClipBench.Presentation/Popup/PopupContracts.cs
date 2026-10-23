@@ -37,4 +37,14 @@ public interface IPasteFlow
     /// <param name="cancellationToken">Cancels the paste before any key is sent.</param>
     /// <returns>A task that completes when the paste has been attempted.</returns>
     Task PasteContentAsync(ClipContent content, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Says whether the popup stays on screen between pastes (locked). A held flow does not forget its window after a paste,
+    /// and pastes into the program that has focus now when that is not ClipBench itself.
+    /// </summary>
+    /// <param name="hold">True while the popup is locked.</param>
+    void Hold(bool hold);
+
+    /// <summary>Gives the focus back to the window on record, without pasting. Does nothing when there is none.</summary>
+    void ReturnToTarget();
 }

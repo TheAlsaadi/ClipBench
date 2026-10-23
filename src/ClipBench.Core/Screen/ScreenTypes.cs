@@ -38,4 +38,8 @@ public interface IScreenLocator
     /// <param name="foreground">The window that has focus, or null.</param>
     /// <returns>The anchor point and the monitor it is on.</returns>
     ScreenAnchor Locate(WindowHandle? foreground);
+
+    /// <summary>Where the mouse pointer is, in device pixels on the whole desktop.</summary>
+    /// <returns>The pointer position, or the origin when Windows will not say.</returns>
+    PixelPoint CursorPosition();
 }

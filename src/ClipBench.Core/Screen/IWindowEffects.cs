@@ -41,4 +41,23 @@ public interface IWindowEffects
     /// <param name="window">The window.</param>
     /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/> when Windows refused or the window does not exist.</returns>
     Result RemoveFrame(WindowHandle window);
+
+    /// <summary>
+    /// Says whether clicking a window makes it the window with focus, which is what Windows does. A window that does not
+    /// activate on a click still gets the click, but the program the user was working in keeps the focus, so a locked popup can
+    /// be used without taking the cursor out of that program. Call it on the thread that owns the window.
+    /// </summary>
+    /// <param name="window">The window.</param>
+    /// <param name="activates">True for the normal behaviour, false for a window that keeps the focus where it was.</param>
+    /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/> when Windows refused or the window does not exist.</returns>
+    Result SetActivatesOnClick(WindowHandle window, bool activates);
+
+    /// <summary>
+    /// Makes a window that is already on screen the window with focus, as when the user switches to it. Windows does not let a
+    /// program take the focus whenever it likes, and refuses silently when a window is already visible, so callers check
+    /// which window has focus afterwards.
+    /// </summary>
+    /// <param name="window">The window.</param>
+    /// <returns>Success when the request was made, or <see cref="ErrorCode.PlatformFailure"/> when the window does not exist.</returns>
+    Result BringToFront(WindowHandle window);
 }
