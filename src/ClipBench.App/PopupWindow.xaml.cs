@@ -480,30 +480,6 @@ public sealed partial class PopupWindow : Window
         }
     }
 
-    // A click puts the focus on what was clicked: a row, a sidebar entry or a button. The popup is typed into and moved
-    // with the keys, so the focus goes straight back to the box that is being typed in. Moving through the popup with Tab
-    // is left alone: only a focus that a click made is moved.
-    private void Frame_GotFocus(object sender, RoutedEventArgs e)
-    {
-        if (e.OriginalSource is not Control { FocusState: FocusState.Pointer } clicked || clicked is TextBox || clicked is CheckBox)
-        {
-            return;
-        }
-
-        _ = DispatcherQueue.TryEnqueue(() =>
-        {
-            if (!ViewModel.IsOpen || ViewModel.IsPromptingSnippet)
-            {
-                return;
-            }
-
-            Control target = ViewModel.IsTransformsOpen
-                ? (ViewModel.Transforms.IsChoosing ? TransformFilterBox : FindBox)
-                : (ViewModel.Sidebar.IsEditing ? BoardNameBox : SearchBox);
-            _ = target.Focus(FocusState.Programmatic);
-        });
-    }
-
     private bool IsInsideFrame(DependencyObject element)
     {
         for (var current = element; current is not null; current = VisualTreeHelper.GetParent(current))

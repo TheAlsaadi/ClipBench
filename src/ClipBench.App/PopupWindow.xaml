@@ -22,16 +22,27 @@
     <Grid
         x:Name="Frame"
         Padding="8"
-        GotFocus="Frame_GotFocus"
         PreviewKeyDown="Root_PreviewKeyDown">
         <Grid.Resources>
+            <!-- Clicking a control must not take the cursor out of the box that is typed in. Moving with Tab still reaches them. -->
+            <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <Style x:Key="NoFocusAccentButtonStyle" BasedOn="{StaticResource AccentButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
+            <Style x:Key="NoFocusItemStyle" BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+            </Style>
             <!-- The small buttons that show on a row while the pointer is over it. -->
             <!-- The row fills the whole list item, so hover and the menu on the right button work on the whole of it. -->
             <Style x:Key="WholeRowItemStyle" BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             </Style>
             <Style x:Key="RowActionButtonStyle" BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="MinHeight" Value="28" />
@@ -151,7 +162,7 @@
                             AutomationProperties.AutomationId="DeleteBoardConfirmButton"
                             Command="{x:Bind ViewModel.Sidebar.DeleteBoardCommand}"
                             Content="Delete"
-                            Style="{StaticResource AccentButtonStyle}" />
+                            Style="{StaticResource NoFocusAccentButtonStyle}" />
                         <Button
                             AutomationProperties.AutomationId="DeleteBoardKeepButton"
                             Click="KeepBoard_Click"
@@ -435,6 +446,7 @@
             <Grid ColumnSpacing="4">
                 <Grid.Resources>
                     <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                        <Setter Property="AllowFocusOnInteraction" Value="False" />
                         <Setter Property="FontSize" Value="12" />
                         <Setter Property="Padding" Value="8,3" />
                     </Style>
@@ -457,10 +469,11 @@
                     Command="{x:Bind ViewModel.PasteCommand}"
                     Content="{x:Bind ViewModel.PasteLabel, Mode=OneWay}"
                     FontSize="12"
-                    Style="{StaticResource AccentButtonStyle}"
+                    Style="{StaticResource NoFocusAccentButtonStyle}"
                     ToolTipService.ToolTip="Paste (Enter)" />
 
                 <DropDownButton
+                    AllowFocusOnInteraction="False"
                     x:Name="SeparatorButton"
                     Grid.Column="1"
                     MaxWidth="128"
@@ -484,6 +497,7 @@
                     ToolTipService.ToolTip="Paste one clip with each Ctrl+V (Ctrl+Q)" />
 
                 <DropDownButton
+                    AllowFocusOnInteraction="False"
                     Grid.Column="3"
                     AutomationProperties.AutomationId="TableButton"
                     FontSize="12"
@@ -586,6 +600,7 @@
                 IsItemClickEnabled="True"
                 IsTabStop="False"
                 ItemClick="TransformList_ItemClick"
+                ItemContainerStyle="{StaticResource NoFocusItemStyle}"
                 ItemsSource="{x:Bind ViewModel.Transforms.Items}"
                 SelectedIndex="{x:Bind ViewModel.Transforms.SelectedIndex, Mode=TwoWay}"
                 SelectionMode="Single"
@@ -635,7 +650,7 @@
                         AutomationProperties.AutomationId="FindReplaceApplyButton"
                         Command="{x:Bind ViewModel.SubmitFindReplaceCommand}"
                         Content="OK"
-                        Style="{StaticResource AccentButtonStyle}" />
+                        Style="{StaticResource NoFocusAccentButtonStyle}" />
                     <Button
                         AutomationProperties.AutomationId="FindReplaceBackButton"
                         Click="TransformBack_Click"
@@ -682,7 +697,7 @@
                         AutomationProperties.AutomationId="TransformApplyButton"
                         Command="{x:Bind ViewModel.ConfirmTransformCommand}"
                         Content="Paste"
-                        Style="{StaticResource AccentButtonStyle}"
+                        Style="{StaticResource NoFocusAccentButtonStyle}"
                         ToolTipService.ToolTip="Paste the text with the chosen changes (Enter)" />
                     <Button
                         AutomationProperties.AutomationId="TransformAddButton"
@@ -768,7 +783,7 @@
                         AutomationProperties.AutomationId="SnippetPromptPasteButton"
                         Command="{x:Bind ViewModel.SubmitSnippetPromptCommand}"
                         Content="Paste"
-                        Style="{StaticResource AccentButtonStyle}" />
+                        Style="{StaticResource NoFocusAccentButtonStyle}" />
                     <Button
                         AutomationProperties.AutomationId="SnippetPromptCancelButton"
                         Click="SnippetPromptCancel_Click"
