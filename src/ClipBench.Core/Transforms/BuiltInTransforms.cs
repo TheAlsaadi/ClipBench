@@ -5,6 +5,9 @@ namespace ClipBench.Core.Transforms;
 /// <summary>The transforms that come with ClipBench.</summary>
 public static class BuiltInTransforms
 {
+    /// <summary>The deepest nesting of arrays and objects that the JSON transforms accept.</summary>
+    public const int JsonMaxDepth = JsonTransforms.MaxDepth;
+
     /// <summary>Keeps the text and drops the formatting. The text of an HTML or rich text clip is what comes in.</summary>
     public static TextTransform PlainText { get; } = new("text.plain", "Plain text", "Keep the text, drop formatting", Result.Success);
 
@@ -22,6 +25,12 @@ public static class BuiltInTransforms
 
     /// <summary>Removes white space from both ends of the text.</summary>
     public static TextTransform Trim { get; } = new("text.trim", "Trim", "Remove white space at the start and end", text => Result.Success(text.Trim()));
+
+    /// <summary>Lays JSON out over several lines with two-space indents.</summary>
+    public static TextTransform JsonFormat { get; } = new("json.format", "JSON format", "Lay JSON out over several lines", JsonTransforms.Format);
+
+    /// <summary>Writes JSON on one line with no extra white space.</summary>
+    public static TextTransform JsonMinify { get; } = new("json.minify", "JSON minify", "Write JSON on one line", JsonTransforms.Minify);
 
     /// <summary>Escapes the text for use in a web address.</summary>
     public static TextTransform UrlEncode { get; } = new("url.encode", "URL encode", "Escape the text for a web address", TextEncoding.UrlEncode);
