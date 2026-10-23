@@ -27,6 +27,9 @@ internal sealed class FakeClipStore : IClipStore
 
     public List<ClipId> Deleted { get; } = [];
 
+    /// <summary>Every call to <see cref="SetBoardsAsync"/>, in order.</summary>
+    public List<IReadOnlyList<ClipPlacement>> BoardChanges { get; } = [];
+
     public int MaxConcurrentSaves { get; private set; }
 
     public Task<Result<StoredClips>> LoadAsync(CancellationToken cancellationToken) =>
@@ -61,6 +64,12 @@ internal sealed class FakeClipStore : IClipStore
     public Task<Result> SetPinnedAsync(ClipId id, bool pinned, CancellationToken cancellationToken)
     {
         PinChanges.Add((id, pinned));
+        return Task.FromResult(Failure is { } error ? Result.Failure(error) : Result.Success());
+    }
+
+    public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken)
+    {
+        BoardChanges.Add(placements);
         return Task.FromResult(Failure is { } error ? Result.Failure(error) : Result.Success());
     }
 

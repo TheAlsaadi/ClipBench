@@ -95,4 +95,19 @@ public enum ErrorCode
 
     /// <summary>A find-and-replace pattern took too long to match, so the paste was not changed.</summary>
     PatternTimedOut,
+
+    /// <summary>No board with the given id exists.</summary>
+    BoardNotFound,
+
+    /// <summary>A board name is empty, too long or holds control characters.</summary>
+    InvalidBoardName,
+
+    /// <summary>Another board already has that name, ignoring capital letters.</summary>
+    BoardNameTaken,
+
+    /// <summary>The most boards that can exist already do.</summary>
+    TooManyBoards,
+
+    /// <summary>The clip is not on a board, so there is no place in a board to move it from.</summary>
+    ClipNotOnBoard,
 }

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
 using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
@@ -146,6 +147,122 @@ public sealed class ClipLibrary : IDisposable
         }
     }
 
+    /// <summary>Puts a clip on a board, at the end, or takes it off its board. Putting a clip on a board pins it.</summary>
+    /// <param name="id">The clip id.</param>
+    /// <param name="board">The board, or null to take the clip off its board.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns><see cref="ErrorCode.ClipNotFound"/> when the clip is not in the library, or why the change was not stored.</returns>
+    public async Task<Result> SetBoardAsync(ClipId id, BoardId? board, CancellationToken cancellationToken)
+    {
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var before = _history.Get(id);
+            var changed = _history.SetBoard(id, board);
+            if (changed.IsFailure)
+            {
+                return Result.Failure(changed.Error);
+            }
+
+            var after = changed.Value;
+            if (before is not null && before.OnBoard == after.OnBoard && before.IsPinned == after.IsPinned)
+            {
+                return Result.Success();
+            }
+
+            // Pinned first: a clip is on a board only once it is pinned, whatever happens to the second write.
+            var pinned = before is { IsPinned: false } && after.IsPinned
+                ? await _store.SetPinnedAsync(id, true, cancellationToken).ConfigureAwait(false)
+                : Result.Success();
+            var placed = await _store.SetBoardsAsync([new ClipPlacement(id, after.OnBoard, after.BoardPosition)], cancellationToken).ConfigureAwait(false);
+
+            RaiseChanged();
+            return pinned.IsFailure ? pinned : placed;
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
+    /// <summary>Moves a clip to a place in its board.</summary>
+    /// <param name="id">The clip id.</param>
+    /// <param name="newIndex">Where the clip should come, counting from 0.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>Why the clip could not be moved, or why the change was not stored.</returns>
+    public async Task<Result> MoveInBoardAsync(ClipId id, int newIndex, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(newIndex);
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var moved = _history.MoveInBoard(id, newIndex);
+            if (moved.IsFailure)
+            {
+                return Result.Failure(moved.Error);
+            }
+
+            if (moved.Value.IsEmpty)
+            {
+                return Result.Success();
+            }
+
+            var stored = await _store.SetBoardsAsync(Placements(moved.Value), cancellationToken).ConfigureAwait(false);
+            RaiseChanged();
+            return stored;
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
+    /// <summary>
+    /// Takes every clip off a board in memory only. Call it after the board store has deleted the board, which takes
+    /// the clips off it in the database in the same step.
+    /// </summary>
+    /// <param name="board">The board that no longer exists.</param>
+    public void ReleaseBoard(BoardId board)
+    {
+        if (!_history.ReleaseBoard(board).IsEmpty)
+        {
+            RaiseChanged();
+        }
+    }
+
+    /// <summary>Takes clips off boards that do not exist, and clips on a board that are not pinned, in memory and in the store.</summary>
+    /// <param name="known">The boards that exist.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>Success or why the changes were not stored.</returns>
+    public async Task<Result> ReconcileBoardsAsync(IReadOnlySet<BoardId> known, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(known);
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var changed = _history.ReconcileBoards(known);
+            if (changed.IsEmpty)
+            {
+                return Result.Success();
+            }
+
+            var stored = await _store.SetBoardsAsync(Placements(changed), cancellationToken).ConfigureAwait(false);
+            RaiseChanged();
+            return stored;
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
+    /// <summary>The clips on a board, in their order on it.</summary>
+    /// <param name="board">The board.</param>
+    /// <returns>The clips.</returns>
+    public ImmutableArray<Clip> ClipsOnBoard(BoardId board) => _history.ClipsOnBoard(board);
+
     /// <summary>Removes a clip, pinned or not.</summary>
     /// <param name="id">The clip id.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
@@ -193,6 +310,9 @@ public sealed class ClipLibrary : IDisposable
 
     /// <summary>Releases the lock that keeps changes in order. Call it once nothing changes the library any more.</summary>
     public void Dispose() => _changes.Dispose();
+
+    private static List<ClipPlacement> Placements(IEnumerable<Clip> clips) =>
+        [.. clips.Select(clip => new ClipPlacement(clip.Id, clip.OnBoard, clip.BoardPosition))];
 
     private void ForgetSensitivity(IEnumerable<Clip> clips)
     {

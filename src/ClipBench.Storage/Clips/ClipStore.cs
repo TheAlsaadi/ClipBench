@@ -34,6 +34,10 @@ public sealed class ClipStore : IClipStore
         _repository.SetPinnedAsync(id, pinned, cancellationToken);
 
     /// <inheritdoc/>
+    public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken) =>
+        throw new NotImplementedException();
+
+    /// <inheritdoc/>
     public async Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken)
     {
         var deleted = await _repository.DeleteAsync(ids, cancellationToken).ConfigureAwait(false);
