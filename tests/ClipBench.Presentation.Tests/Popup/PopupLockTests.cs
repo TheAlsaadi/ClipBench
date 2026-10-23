@@ -217,6 +217,23 @@ public sealed class PopupLockTests : IDisposable
         _closeRequests.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task The_hint_line_of_a_locked_popup_says_what_Esc_does_and_how_to_unlock()
+    {
+        await CopyAsync("one");
+        _vm.Open();
+        _vm.StatusText.ShouldContain("Esc close");
+
+        _vm.ToggleLockCommand.Execute(null);
+
+        _vm.StatusText.ShouldNotContain("Esc close");
+        _vm.StatusText.ShouldContain("Esc back to the app");
+        _vm.StatusText.ShouldContain("Ctrl+K unlock");
+
+        _vm.ToggleLockCommand.Execute(null);
+        _vm.StatusText.ShouldContain("Esc close");
+    }
+
     // --- Esc and the shortcut ---
 
     [Fact]

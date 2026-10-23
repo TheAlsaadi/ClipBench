@@ -101,6 +101,14 @@ public class ForegroundTrackerTests
     }
 
     [Fact]
+    public void Only_the_window_in_front_is_in_front()
+    {
+        Tracker.IsForeground(new WindowHandle(0x100)).ShouldBeTrue();
+        Tracker.IsForeground(new WindowHandle(0x900)).ShouldBeFalse();
+        Tracker.IsForeground(WindowHandle.None).ShouldBeFalse();
+    }
+
+    [Fact]
     public void A_window_can_be_brought_back_to_the_front()
     {
         _input.Foreground = 0x900;

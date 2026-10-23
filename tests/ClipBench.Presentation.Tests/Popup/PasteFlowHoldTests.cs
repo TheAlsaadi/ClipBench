@@ -141,6 +141,28 @@ public sealed class PasteFlowHoldTests : IDisposable
     }
 
     [Fact]
+    public void A_window_of_ClipBench_itself_is_never_recorded_as_the_place_to_paste()
+    {
+        _tracker.Next = Window(_popupWindow, OwnProcess);
+
+        _flow.Begin();
+        _flow.ReturnToTarget();
+
+        _tracker.Restored.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_window_of_ClipBench_itself_on_record_pastes_into_whatever_has_focus()
+    {
+        _tracker.Next = Window(_popupWindow, OwnProcess);
+        _flow.Begin();
+
+        await _flow.PasteAsync(Clip(), Ct);
+
+        _injector.Requests.Single().Target.ShouldBeNull();
+    }
+
+    [Fact]
     public void Returning_gives_the_focus_back_to_the_window_on_record()
     {
         _tracker.Next = Window(_notepad, 42);

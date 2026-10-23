@@ -107,6 +107,8 @@ internal sealed class FakeForegroundTracker : IForegroundTracker
         : Result.Failure<ForegroundTarget>(new ResultError(ErrorCode.TargetNotFound, "nothing has focus"));
 
     public bool Restore(WindowHandle window) => HasFocusWindow;
+
+    public bool IsForeground(WindowHandle window) => HasFocusWindow && window == Window;
 }
 
 /// <summary>Collects the notices shown to the user.</summary>

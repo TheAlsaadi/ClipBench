@@ -78,9 +78,11 @@ public sealed class PasteFlow : IPasteFlow
     public void Begin(bool recordTarget = true)
     {
         var focused = recordTarget ? _tracker.Capture() : default;
+
+        // One of ClipBench's own windows, such as the snippet editor, is no place to paste into.
         lock (_gate)
         {
-            _target = recordTarget && focused.IsSuccess ? focused.Value.Window : null;
+            _target = recordTarget && focused.IsSuccess && focused.Value.ProcessId != _options.OwnProcessId ? focused.Value.Window : null;
         }
     }
 

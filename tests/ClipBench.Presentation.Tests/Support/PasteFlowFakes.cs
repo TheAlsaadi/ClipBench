@@ -23,6 +23,8 @@ internal sealed class FakeForegroundTracker : IForegroundTracker
     /// <summary>The windows that were asked to come to the front.</summary>
     public List<WindowHandle> Restored { get; } = [];
 
+    public bool IsForeground(WindowHandle window) => Next.IsSuccess && Next.Value.Window == window;
+
     public bool Restore(WindowHandle window)
     {
         Restored.Add(window);

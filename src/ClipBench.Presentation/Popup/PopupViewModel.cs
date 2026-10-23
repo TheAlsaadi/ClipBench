@@ -146,7 +146,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         };
 
     /// <summary>The key hints, or the question when a delete needs confirming.</summary>
-    public string StatusText
+    public string StatusText =>
+        IsLocked ? Hints.Replace("Esc close", "Esc back to the app" + HintGap + "Ctrl+K unlock", StringComparison.Ordinal) : Hints;
+
+    private string Hints
     {
         get
         {
@@ -326,6 +329,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentSnippet));
         OnPropertyChanged(nameof(StatusText));
     }
+
+    partial void OnIsLockedChanged(bool value) => OnPropertyChanged(nameof(StatusText));
 
     partial void OnIsConfirmingDeleteChanged(bool value) => OnPropertyChanged(nameof(StatusText));
 

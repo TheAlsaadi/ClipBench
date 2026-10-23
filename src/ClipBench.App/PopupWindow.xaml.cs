@@ -98,7 +98,7 @@ public sealed partial class PopupWindow : Window
     /// True while the popup is the window with focus. Windows is asked, because the window does not always report that it has
     /// been put behind another one, for example when the shortcut has just given the focus back to a program.
     /// </summary>
-    public bool IsActive => _tracker.Capture() is { IsSuccess: true } front && front.Value.Window == new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this));
+    public bool IsActive => _tracker.IsForeground(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
 
     /// <summary>
     /// Takes up a locked popup that is on screen: the program in front is the one to paste into, and the cursor goes to the
@@ -164,8 +164,13 @@ public sealed partial class PopupWindow : Window
         {
             if (element is TextBox box)
             {
-                NeedKeyboard();
-                _ = DispatcherQueue.TryEnqueue(() => _ = box.Focus(FocusState.Pointer));
+                // Only a locked popup that is not in front needs this: any other text box takes the focus by itself.
+                if (ViewModel.IsOpen && ViewModel.IsLocked && !IsActive)
+                {
+                    NeedKeyboard();
+                    _ = DispatcherQueue.TryEnqueue(() => _ = box.Focus(FocusState.Pointer));
+                }
+
                 return;
             }
         }
