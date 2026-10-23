@@ -18,8 +18,11 @@ public sealed partial class TransformPickerViewModel : ObservableObject
     /// <summary>The most transforms in one chain.</summary>
     public const int MaxChainLength = 10;
 
-    /// <summary>The longest source text that is previewed as the choice changes. Longer text is only transformed on Enter.</summary>
-    public const int LivePreviewLimit = 1_000_000;
+    /// <summary>
+    /// The longest source text that is previewed as the choice changes. The preview runs on the UI thread at every key,
+    /// so the limit keeps a keystroke fast; longer text is only transformed on Enter.
+    /// </summary>
+    public const int LivePreviewLimit = 100_000;
 
     /// <summary>What the preview says for a text too long to preview.</summary>
     public const string PreviewSkipped = "The text is large, so there is no preview.";

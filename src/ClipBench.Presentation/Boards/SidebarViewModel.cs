@@ -112,12 +112,28 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
     /// <summary>Rebuilds the entries from the boards and the clips, keeping the chosen entry when it still exists.</summary>
     public void Rebuild()
     {
+        // One pass over the clips gives every count. This runs for every clip that is captured, so it must not sort each board.
         var clips = _library.Clips;
+        var pinned = 0;
+        var onBoard = new Dictionary<BoardId, int>();
+        foreach (var clip in clips)
+        {
+            if (clip.IsPinned)
+            {
+                pinned++;
+            }
+
+            if (clip.OnBoard is { } board)
+            {
+                onBoard[board] = onBoard.GetValueOrDefault(board) + 1;
+            }
+        }
+
         List<SidebarEntryViewModel> wanted =
         [
             new(PopupScope.History, null, "History", clips.Length),
-            new(PopupScope.Pinned, null, "Pinned", clips.Count(clip => clip.IsPinned)),
-            .. _boards.Boards.Select(board => new SidebarEntryViewModel(PopupScope.Board, board.Id, board.Name, _library.ClipsOnBoard(board.Id).Length)),
+            new(PopupScope.Pinned, null, "Pinned", pinned),
+            .. _boards.Boards.Select(board => new SidebarEntryViewModel(PopupScope.Board, board.Id, board.Name, onBoard.GetValueOrDefault(board.Id))),
             new(PopupScope.Snippets, null, "Snippets", _snippets.Snippets.Length),
         ];
 

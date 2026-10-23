@@ -445,15 +445,27 @@ public sealed partial class SnippetEditorViewModel : ObservableObject, IDisposab
         var expanded = _engine.Expand(parsed.Value, new SnippetValues("<clipboard>", inputs));
         if (expanded.IsSuccess)
         {
-            Preview = expanded.Value.Length > PreviewLimit ? expanded.Value[..PreviewLimit] + Ellipsis : expanded.Value;
+            Preview = Cut(expanded.Value, PreviewLimit);
         }
+    }
+
+    // Cuts a text to at most this many characters and marks the cut. A character made of two parts is kept whole or left out.
+    private static string Cut(string text, int limit)
+    {
+        if (text.Length <= limit)
+        {
+            return text;
+        }
+
+        var keep = char.IsHighSurrogate(text[limit - 1]) && char.IsLowSurrogate(text[limit]) ? limit - 1 : limit;
+        return text[..keep] + Ellipsis;
     }
 
     private string Describe(SnippetWarning warning)
     {
         var line = 1 + Body.AsSpan(0, warning.Position).Count('\n');
         var shown = Body.Substring(warning.Position, warning.Length);
-        var excerpt = shown.Length > ExcerptLength ? shown[..ExcerptLength] + Ellipsis : shown;
+        var excerpt = Cut(shown, ExcerptLength);
         return warning.Kind switch
         {
             SnippetWarningKind.UnknownVariable => $"Line {line}: \"{excerpt}\" is not a variable, so it is pasted as typed.",

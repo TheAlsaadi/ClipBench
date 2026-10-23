@@ -446,6 +446,40 @@ public sealed class SnippetEditorViewModelTests : IDisposable
         _editor.Preview.Length.ShouldBeLessThanOrEqualTo(SnippetEditorViewModel.PreviewLimit + 1);
     }
 
+    [Fact]
+    public void A_cut_preview_never_splits_a_character_made_of_two_parts()
+    {
+        _editor.Body = new string('a', SnippetEditorViewModel.PreviewLimit - 1) + "😀" + "tail";
+
+        IsWellFormed(_editor.Preview).ShouldBeTrue();
+        _editor.Preview.ShouldEndWith("…");
+    }
+
+    [Fact]
+    public void A_cut_excerpt_in_a_warning_never_splits_a_character_made_of_two_parts()
+    {
+        _editor.Body = "{" + new string('x', 28) + "😀" + "yyyy}";
+
+        _editor.Warnings.Count.ShouldBe(1);
+        IsWellFormed(_editor.Warnings.Single()).ShouldBeTrue();
+    }
+
+    private static bool IsWellFormed(string text)
+    {
+        var index = 0;
+        while (index < text.Length)
+        {
+            if (System.Text.Rune.DecodeFromUtf16(text.AsSpan(index), out _, out var consumed) != System.Buffers.OperationStatus.Done)
+            {
+                return false;
+            }
+
+            index += consumed;
+        }
+
+        return true;
+    }
+
     // --- changes made elsewhere ---
 
     [Fact]
