@@ -1,5 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
+using Windows.Win32;
+using Windows.Win32.Foundation;
 
 namespace ClipBench.Platform.Windows.IntegrationTests.Support;
 
@@ -28,6 +30,10 @@ internal sealed class TestEditForm : IDisposable
 
     /// <summary>True when the client area is as large as the whole window, which a window with a frame never has.</summary>
     public bool ClientFillsWindow => (bool)_form!.Invoke(() => _form.ClientSize == _form.Size);
+
+    /// <summary>What the window answers when asked whether a click should make it the window with focus (WM_MOUSEACTIVATE).</summary>
+    public nint AnswerToMouseActivate() => (nint)_form!.Invoke(() =>
+        PInvoke.SendMessage(new HWND(_form.Handle), 0x0021, default, default).Value);
 
     /// <summary>Runs something on the thread that owns the window, which some calls on a window must be made from.</summary>
     /// <typeparam name="T">What it returns.</typeparam>

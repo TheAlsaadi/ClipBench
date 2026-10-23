@@ -103,6 +103,51 @@ public class RealWindowEffectsTests
         form.ClientFillsWindow.ShouldBeTrue();
     }
 
+    private const int MouseActivate = 1;
+    private const int MouseNoActivate = 3;
+
+    [Fact]
+    public void A_window_that_does_not_activate_on_a_click_says_so_when_asked_and_can_go_back()
+    {
+        using var form = TestEditForm.Create();
+        var window = new WindowHandle(form.Handle);
+        form.AnswerToMouseActivate().ShouldBe(MouseActivate, "a window starts out taking the focus when it is clicked");
+
+        form.OnWindowThread(() => _effects.SetActivatesOnClick(window, activates: false)).IsSuccess.ShouldBeTrue();
+        form.AnswerToMouseActivate().ShouldBe(MouseNoActivate);
+
+        form.OnWindowThread(() => _effects.SetActivatesOnClick(window, activates: true)).IsSuccess.ShouldBeTrue();
+        form.AnswerToMouseActivate().ShouldBe(MouseActivate);
+    }
+
+    [Fact]
+    public void Keeping_the_frame_removed_and_the_focus_where_it_was_do_not_undo_each_other()
+    {
+        using var form = TestEditForm.Create();
+        var window = new WindowHandle(form.Handle);
+
+        form.OnWindowThread(() => _effects.SetActivatesOnClick(window, activates: false)).IsSuccess.ShouldBeTrue();
+        form.OnWindowThread(() => _effects.RemoveFrame(window)).IsSuccess.ShouldBeTrue();
+
+        form.ClientFillsWindow.ShouldBeTrue();
+        form.AnswerToMouseActivate().ShouldBe(MouseNoActivate, "taking the frame off must not bring the old behaviour back");
+    }
+
+    [Fact]
+    public void The_click_behaviour_of_a_missing_window_cannot_be_changed()
+    {
+        _effects.SetActivatesOnClick(new WindowHandle(0x7FFF_FFF0), activates: false).IsFailure.ShouldBeTrue();
+        _effects.SetActivatesOnClick(WindowHandle.None, activates: false).IsFailure.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_missing_window_cannot_be_moved()
+    {
+        // A real move waits for the mouse, so only the refusal can be tested without a person at the mouse.
+        _effects.BeginMove(new WindowHandle(0x7FFF_FFF0)).IsFailure.ShouldBeTrue();
+        _effects.BeginMove(WindowHandle.None).IsFailure.ShouldBeTrue();
+    }
+
     [Fact]
     public void The_frame_of_a_missing_window_cannot_be_removed()
     {

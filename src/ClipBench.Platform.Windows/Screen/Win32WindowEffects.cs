@@ -16,13 +16,24 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
     private const uint DwmColorNone = 0xFFFFFFFE;
 
     private const uint WmNcCalcSize = 0x0083;
+    private const uint WmMouseActivate = 0x0021;
+    private const uint WmSysCommand = 0x0112;
+    private const nuint ScMoveFromTitleBar = 0xF012;   // SC_MOVE | HTCAPTION: the move that a press on a title bar starts
+    private const int MaNoActivate = 3;
     private const nuint SubclassId = 1;
+    private const nuint KeepFocusId = 2;
 
     // Asked how large the client area of a window is whenever its frame is worked out, it answers that it is the whole
     // window. It holds no state, so one callback serves every window, and it stays alive for as long as this object does.
     private readonly SUBCLASSPROC _answerWithWholeWindow =
         (HWND handle, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data) =>
             message == WmNcCalcSize && wParam.Value != 0 ? new LRESULT(0) : PInvoke.DefSubclassProc(handle, message, wParam, lParam);
+
+    // Asked whether a click should make the window the one with focus, it answers no when the reference data of its subclass
+    // says so. The data belongs to the window, so a window that goes away takes it along and the callback holds no state.
+    private readonly SUBCLASSPROC _keepFocusOnClick =
+        (HWND handle, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data) =>
+            message == WmMouseActivate && data != 0 ? new LRESULT(MaNoActivate) : PInvoke.DefSubclassProc(handle, message, wParam, lParam);
 
     /// <inheritdoc/>
     public Result ExcludeFromCapture(WindowHandle window)
@@ -111,6 +122,36 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
             0,
             SET_WINDOW_POS_FLAGS.SWP_NOMOVE | SET_WINDOW_POS_FLAGS.SWP_NOSIZE | SET_WINDOW_POS_FLAGS.SWP_NOZORDER | SET_WINDOW_POS_FLAGS.SWP_NOACTIVATE | SET_WINDOW_POS_FLAGS.SWP_FRAMECHANGED);
         return applied ? Result.Success() : Failure("Windows would not remove the window frame.");
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>It must be called on the thread that owns the window, which is what Windows requires of a subclass.</remarks>
+    public Result SetActivatesOnClick(WindowHandle window, bool activates)
+    {
+        if (window.IsNone || !PInvoke.IsWindow(ToHwnd(window)))
+        {
+            return Failure("That window does not exist.");
+        }
+
+        // Installing the callback again only changes its data, which is how the state is changed.
+        return PInvoke.SetWindowSubclass(ToHwnd(window), _keepFocusOnClick, KeepFocusId, activates ? 0u : 1u)
+            ? Result.Success()
+            : Failure("Windows would not change how the window reacts to a click.");
+    }
+
+    /// <inheritdoc/>
+    public Result BeginMove(WindowHandle window)
+    {
+        if (window.IsNone || !PInvoke.IsWindow(ToHwnd(window)))
+        {
+            return Failure("That window does not exist.");
+        }
+
+        // The pointer is let go of by the program first: the move loop has to own it. Sending the command is what a press on a
+        // title bar does, and it does not return until the button is up. The window is not activated by it.
+        _ = PInvoke.ReleaseCapture();
+        _ = PInvoke.SendMessage(ToHwnd(window), WmSysCommand, new WPARAM(ScMoveFromTitleBar), new LPARAM(0));
+        return Result.Success();
     }
 
     private static HWND ToHwnd(WindowHandle window) => new((nint)window.Value);
