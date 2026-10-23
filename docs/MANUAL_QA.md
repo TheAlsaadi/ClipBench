@@ -151,10 +151,21 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 - [ ] The Snippets window and the popup's snippet list are not in screenshots or screen sharing.
 - [ ] Quit and start again: the snippets are there.
 
-### Screens with different scales
+### The mouse
 
-- [ ] With two monitors at different display scales (say 100% and 125%), open the popup on each, then press **Ctrl+B** on each. On both, the list, the sidebar and the footer buttons fit with an even margin on both sides, and the text is the same size relative to the screen. (Seen while testing: on a second monitor at 125% the popup's content was drawn at 100% inside a larger window. That also happens without the sidebar, so it is older than this phase, and it is not fixed here.)
+- [ ] Open the popup and use only the mouse for this whole list. The button beside the search box (three lines) shows and hides the sidebar; the **X** closes the popup.
+- [ ] Move the pointer over a clip: four small buttons appear on the right of its row (select, pin, board, delete). **Pin** pins it (its icon turns into an unpin icon); **board** opens the list of boards; **delete** deletes an unpinned clip, and on a pinned one asks you to press it again.
+- [ ] Right-click a clip: a menu lists Paste, Change the text then paste, Select, Pin, Add to a board, Delete (and Take off its board, Move up and Move down inside a board, Show or Hide for a secret), each with its shortcut. Each does what its shortcut does.
+- [ ] Highlight a clip with the arrow keys and press the **Menu** key (or **Shift+F10**): the same menu opens, and **Esc** closes only the menu.
+- [ ] Right-click an entry in the sidebar: a board offers Rename and Delete, and any entry offers New board. Delete shows **Delete** and **Keep** buttons in the sidebar. Making a board shows **Save** and **Cancel** buttons beside its name.
+- [ ] Click an entry in the sidebar, then type: the text goes to the search box, and the arrow keys move in the list.
+- [ ] Open the transform picker from the right-click menu: the **Paste**, **Add to chain**, **Remove last** and **Back** buttons do what Enter, Ctrl+Space, Backspace and Esc do.
 - [ ] **Separator** → **Custom…**, type `|`, **Enter**: the box closes and nothing is pasted.
+
+### Looks on every screen
+
+- [ ] Open the popup with the sidebar shown, on every monitor you use, at its display scale (try 100% and 125%). Nothing is cut off: the last footer button (Collect) and the right edge of the list show with an even margin, and the corners are rounded with a thin border and no bright outline.
+- [ ] With monitors at different scales, the text is the same size relative to the screen on each. (Seen while testing on a second monitor at 125%: the popup's contents looked drawn at 100% inside a larger window. That is older than this phase and is not fixed here.)
 
 ### The database
 

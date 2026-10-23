@@ -38,12 +38,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   texts are sealed in the database, and the log records only that a snippet was pasted, how many values it asked
   for and how big it was.
 
+- **Everything can be done with the mouse**, and every key still works. A button beside the search box shows and hides
+  the sidebar, and another closes the popup. While the pointer is over a clip, small buttons appear on its row to
+  select it for a multi-paste, pin it, add it to a board or delete it. The right mouse button (or the Menu key, or
+  Shift+F10) opens a menu of everything that can be done with the clip, with each shortcut shown. Boards have a menu
+  too (rename, delete, new board), deleting one asks with a button, and the name box has Save and Cancel. The
+  transform picker has Paste, Add to chain, Remove last and Back buttons.
+
 ### Changed
 
-- The popup is a little wider (440 instead of 420 device-independent pixels), and grows by 148 more while the sidebar
+- The popup is a little wider (440 instead of 420 device-independent pixels), and grows by 168 more while the sidebar
   is shown. The footer gains a Transform button and a Board button, and the tray menu gains Snippets.
 - The messages that quote a limit write the number the same way on every machine ("10,000"), whatever the language of
   Windows.
+- The popup has a thin border and rounded corners of its own that follow the theme, instead of the bright outline
+  Windows drew around it.
+
+### Fixed
+
+- The popup lost three pixels on every side to a frame that Windows keeps around a window like it, so its contents were
+  six pixels too narrow and too short: the last button of the footer and the edge of the sidebar could be cut off.
+  The contents now fill the whole window.
+- Clicking in the popup (the sidebar, a button, a row) took the cursor out of the search box, so typing and the arrow
+  keys stopped working. The cursor now goes straight back to the box that is being typed in.
+- Enter in a menu or in the box for a custom separator pasted a clip instead of choosing or saving. Keys typed in a menu
+  or a flyout now belong to it.
+- A snippet that asked for values, or a transform, could paste nowhere: the popup moved the cursor in its own hidden
+  window as it closed and took the focus from the program being pasted into.
 
 ## [0.1.0] - 2026-10-23
 
