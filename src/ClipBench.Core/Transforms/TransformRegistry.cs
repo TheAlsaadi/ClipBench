@@ -7,6 +7,27 @@ public sealed class TransformRegistry
 {
     private readonly Dictionary<string, TextTransform> _byId = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// Every built-in transform that works on the text alone, in the order the picker shows them. Find and replace is
+    /// not in it: it needs the text to find, so it is built with <see cref="FindReplace.Create"/> when the user asks.
+    /// </summary>
+    public static TransformRegistry Default { get; } = new(
+    [
+        BuiltInTransforms.PlainText,
+        BuiltInTransforms.Upper,
+        BuiltInTransforms.Lower,
+        BuiltInTransforms.Title,
+        BuiltInTransforms.Sentence,
+        BuiltInTransforms.Trim,
+        BuiltInTransforms.RemoveLineBreaks,
+        BuiltInTransforms.JsonFormat,
+        BuiltInTransforms.JsonMinify,
+        BuiltInTransforms.UrlEncode,
+        BuiltInTransforms.UrlDecode,
+        BuiltInTransforms.Base64Encode,
+        BuiltInTransforms.Base64Decode,
+    ]);
+
     /// <summary>Creates a registry.</summary>
     /// <param name="transforms">The transforms, in the order they are shown. Identifiers must be different.</param>
     public TransformRegistry(IEnumerable<TextTransform> transforms)
