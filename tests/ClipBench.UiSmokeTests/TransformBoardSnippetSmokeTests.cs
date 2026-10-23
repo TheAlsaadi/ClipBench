@@ -71,8 +71,7 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
     public void A_board_is_made_a_clip_is_put_on_it_and_taken_off_again()
     {
         var popup = app.OpenPopup();
-        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_B);
-        AppUnderTest.WaitFor(() => SidebarNames(popup).Length > 0, 10_000).ShouldBeTrue("the sidebar did not appear");
+        EnsureSidebar(popup);
         SidebarNames(popup).ShouldContain(name => name.StartsWith("History", StringComparison.Ordinal));
 
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_N);
@@ -107,8 +106,7 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
     {
         using var target = ActiveTarget();
         var popup = app.OpenPopup();
-        Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_B);
-        AppUnderTest.WaitFor(() => SidebarNames(popup).Length > 0, 10_000).ShouldBeTrue("the sidebar did not appear");
+        EnsureSidebar(popup);
         ChooseEntry(popup, "Snippets");
 
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_E);
@@ -118,6 +116,8 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
             .ShouldBeTrue("the name box did not get the focus");
 
         Keyboard.Type("Smoke greeting");
+        AppUnderTest.WaitFor(() => editor!.FindFirstDescendant(cf => cf.ByAutomationId("SnippetNameBox"))?.Patterns.Value.Pattern.Value.ValueOrDefault == "Smoke greeting", 10_000)
+            .ShouldBeTrue("the whole name was not typed before the text was entered");
         editor!.FindFirstDescendant(cf => cf.ByAutomationId("SnippetBodyBox"))!.AsTextBox().Enter("Hello {input:Name}, it is {date:yyyy}.");
         AppUnderTest.SaveScreenshot(editor, "snippets-window");
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_S);
@@ -127,8 +127,9 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
         Keyboard.Type(VirtualKeyShort.ESCAPE);
         AppUnderTest.WaitFor(() => app.FindWindow("ClipBench snippets") is null, 10_000).ShouldBeTrue("the snippets window did not hide");
 
-        // The window is gone: paste the snippet from the popup into the target window.
-        target.TryActivate().ShouldBeTrue("Windows would not let the test window take focus");
+        // The editor is gone: paste the snippet from the popup into a window made for it, which Windows puts in front.
+        target.Dispose();
+        using var pasteTarget = ActiveTarget();
         popup = app.OpenPopup();
         ChooseEntry(popup, "Snippets");
         Keyboard.Type("greeting");
@@ -138,7 +139,7 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
         Keyboard.Type("Sam");
         Keyboard.Type(VirtualKeyShort.RETURN);
 
-        AppUnderTest.WaitFor(() => target.Text == $"Hello Sam, it is {DateTime.Now:yyyy}.", 15_000).ShouldBeTrue($"the window holds: \"{target.Text}\"");
+        AppUnderTest.WaitFor(() => pasteTarget.Text == $"Hello Sam, it is {DateTime.Now:yyyy}.", 15_000).ShouldBeTrue($"the window holds: \"{pasteTarget.Text}\"");
     }
 
     private PasteTargetWindow ActiveTarget()
@@ -171,6 +172,17 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
 
     private static string ChainText(Window popup) =>
         popup.FindFirstDescendant(cf => cf.ByAutomationId("TransformChain"))?.Properties.Name.ValueOrDefault ?? string.Empty;
+
+    // The sidebar stays open or closed as the user left it, so a test opens it only when it is closed.
+    private static void EnsureSidebar(Window popup)
+    {
+        if (SidebarNames(popup).Length == 0)
+        {
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_B);
+        }
+
+        AppUnderTest.WaitFor(() => SidebarNames(popup).Length > 0, 10_000).ShouldBeTrue("the sidebar did not appear");
+    }
 
     private static string[] SidebarNames(Window popup) =>
         popup.FindFirstDescendant(cf => cf.ByAutomationId("SidebarList"))?.FindAllChildren(cf => cf.ByControlType(ControlType.ListItem)).Select(item => item.Name).ToArray() ?? [];
