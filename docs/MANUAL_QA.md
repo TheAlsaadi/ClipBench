@@ -151,6 +151,11 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 - [ ] The Snippets window and the popup's snippet list are not in screenshots or screen sharing.
 - [ ] Quit and start again: the snippets are there.
 
+### Screens with different scales
+
+- [ ] With two monitors at different display scales (say 100% and 125%), open the popup on each, then press **Ctrl+B** on each. On both, the list, the sidebar and the footer buttons fit with an even margin on both sides, and the text is the same size relative to the screen. (Seen while testing: on a second monitor at 125% the popup's content was drawn at 100% inside a larger window. That also happens without the sidebar, so it is older than this phase, and it is not fixed here.)
+- [ ] **Separator** → **Custom…**, type `|`, **Enter**: the box closes and nothing is pasted.
+
 ### The database
 
 - [ ] After making boards and snippets, open `%LOCALAPPDATA%\ClipBench\clipbench.db` in a hex editor: neither a board name nor any snippet text can be found in it, or in the `-wal` file.
