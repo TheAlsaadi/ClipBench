@@ -98,17 +98,32 @@ public sealed partial class PopupWindow : Window
         else if (e.PropertyName == nameof(PopupViewModel.IsPromptingSnippet))
         {
             // The first value is focused by the field itself when it appears; going back puts the cursor in the search box.
+            // Not once the popup is hidden, which is what a paste does right after the prompt closes: focusing a control in a
+            // hidden window would take the focus back from the program the paste is going to.
             if (!ViewModel.IsPromptingSnippet)
             {
-                _ = DispatcherQueue.TryEnqueue(() => _ = SearchBox.Focus(FocusState.Programmatic));
+                _ = DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (ViewModel.IsOpen)
+                    {
+                        _ = SearchBox.Focus(FocusState.Programmatic);
+                    }
+                });
             }
         }
         else if (e.PropertyName == nameof(PopupViewModel.IsTransformsOpen))
         {
             // The cursor goes into the picker when it opens and back to the search box when it closes. The focus is
             // moved after the layout has caught up with the panel being shown or hidden.
+            // A hidden popup is left alone, as with the snippet prompt.
             var open = ViewModel.IsTransformsOpen;
-            _ = DispatcherQueue.TryEnqueue(() => _ = (open ? TransformFilterBox : SearchBox).Focus(FocusState.Programmatic));
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                if (ViewModel.IsOpen)
+                {
+                    _ = (open ? TransformFilterBox : SearchBox).Focus(FocusState.Programmatic);
+                }
+            });
         }
     }
 
@@ -127,7 +142,13 @@ public sealed partial class PopupWindow : Window
         {
             // The cursor goes into the name box while a name is typed and back to the search box afterwards.
             var editing = ViewModel.Sidebar.IsEditing;
-            _ = DispatcherQueue.TryEnqueue(() => _ = (editing ? BoardNameBox : SearchBox).Focus(FocusState.Programmatic));
+            _ = DispatcherQueue.TryEnqueue(() =>
+            {
+                if (ViewModel.IsOpen)
+                {
+                    _ = (editing ? BoardNameBox : SearchBox).Focus(FocusState.Programmatic);
+                }
+            });
         }
         else if (e.PropertyName == nameof(SidebarViewModel.SelectedIndex) && SidebarList.Items.Count > 0)
         {
@@ -167,6 +188,24 @@ public sealed partial class PopupWindow : Window
         var create = new MenuFlyoutItem { Text = "New board\u2026" };
         create.Click += (_, _) => StartNewBoard();
         BoardMenu.Items.Add(create);
+    }
+
+    // Opened from the keyboard, the menu takes the keys: the arrows choose a board and Enter adds the clip to it.
+    private void BoardMenu_Opened(object? sender, object e)
+    {
+        if (BoardMenu.Items.FirstOrDefault() is MenuFlyoutItem first)
+        {
+            _ = first.Focus(FocusState.Keyboard);
+        }
+    }
+
+    // The cursor goes back to the search box, unless the menu's New board item has started a name.
+    private void BoardMenu_Closed(object? sender, object e)
+    {
+        if (ViewModel.IsOpen && !ViewModel.Sidebar.IsEditing)
+        {
+            _ = SearchBox.Focus(FocusState.Programmatic);
+        }
     }
 
     private void ShowBoardMenu() => BoardMenu.ShowAt(BoardButton);
@@ -294,8 +333,9 @@ public sealed partial class PopupWindow : Window
         var control = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
         var shift = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
 
-        // On a button, Enter and Space press the button, as they do everywhere else.
-        if (e.Key is VirtualKey.Enter or VirtualKey.Space && FocusManager.GetFocusedElement(Content.XamlRoot) is ButtonBase)
+        // On a button, Enter and Space press the button, as they do everywhere else. In an open menu every key is the menu's.
+        var focused = FocusManager.GetFocusedElement(Content.XamlRoot);
+        if (focused is MenuFlyoutItem || (e.Key is VirtualKey.Enter or VirtualKey.Space && focused is ButtonBase))
         {
             return;
         }

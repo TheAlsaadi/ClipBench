@@ -52,7 +52,8 @@ public sealed partial class SnippetsWindow : Window
             AppWindow.Resize(new SizeInt32((int)Math.Round(WidthDip * scale), (int)Math.Round(HeightDip * scale)));
         }
 
-        _ = DispatcherQueue.TryEnqueue(() => _ = (ViewModel.IsNew ? (Control)NameBox : SnippetNames).Focus(FocusState.Programmatic));
+        // After the window has been laid out, so the control can take the cursor.
+        _ = DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => _ = (ViewModel.IsNew ? (Control)NameBox : SnippetNames).Focus(FocusState.Programmatic));
     }
 
     /// <summary>Closes the window for good, as the app exits.</summary>

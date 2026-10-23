@@ -16,7 +16,6 @@
     <Grid
         x:Name="Frame"
         Padding="8"
-        ColumnSpacing="8"
         PreviewKeyDown="Root_PreviewKeyDown">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
@@ -27,6 +26,7 @@
         <UserControl
             x:Name="SidebarHost"
             Grid.Column="0"
+            Margin="0,0,8,0"
             IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
             IsTabStop="False"
             Visibility="{x:Bind ViewModel.Sidebar.IsOpen, Mode=OneWay}">
@@ -162,7 +162,7 @@
             ItemClick="ClipList_ItemClick"
             Visibility="{x:Bind ViewModel.IsClipsView, Mode=OneWay}"
             ItemsSource="{x:Bind ViewModel.Rows}"
-            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=TwoWay}"
+            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=OneWay}"
             SelectionMode="Single">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="rows:ClipRowViewModel">
@@ -237,7 +237,7 @@
             IsTabStop="False"
             ItemClick="SnippetList_ItemClick"
             ItemsSource="{x:Bind ViewModel.Snippets.Rows}"
-            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=TwoWay}"
+            SelectedIndex="{x:Bind ViewModel.SelectedIndex, Mode=OneWay}"
             SelectionMode="Single"
             Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
             <ListView.ItemTemplate>
@@ -361,7 +361,12 @@
                     ToolTipService.ToolTip="Add the clip to a board (Ctrl+D)">
                     <FontIcon FontSize="14" Glyph="&#xE8F1;" />
                     <Button.Flyout>
-                        <MenuFlyout x:Name="BoardMenu" Opening="BoardMenu_Opening" Placement="Top" />
+                        <MenuFlyout
+                            x:Name="BoardMenu"
+                            Closed="BoardMenu_Closed"
+                            Opened="BoardMenu_Opened"
+                            Opening="BoardMenu_Opening"
+                            Placement="Top" />
                     </Button.Flyout>
                 </Button>
 
@@ -414,7 +419,6 @@
             <TextBlock
                 Grid.Row="1"
                 AutomationProperties.AutomationId="TransformChain"
-                AutomationProperties.Name="Chosen transforms"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Text="{x:Bind ViewModel.Transforms.ChainText, Mode=OneWay}"
