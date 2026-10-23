@@ -20,6 +20,9 @@ internal sealed class ScreenLocator : IScreenLocator
     }
 
     /// <inheritdoc/>
+    public PixelPoint CursorPosition() => _api.GetCursor();
+
+    /// <inheritdoc/>
     public ScreenAnchor Locate(WindowHandle? foreground)
     {
         var caret = foreground is { IsNone: false } window ? _api.GetCaret((nint)window.Value) : null;

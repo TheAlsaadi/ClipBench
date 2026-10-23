@@ -17,7 +17,9 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
 
     private const uint WmNcCalcSize = 0x0083;
     private const uint WmMouseActivate = 0x0021;
+    private const uint WmActivate = 0x0006;
     private const int MaNoActivate = 3;
+    private const int NoActivateStyle = 0x08000000;   // WS_EX_NOACTIVATE
     private const nuint SubclassId = 1;
     private const nuint KeepFocusId = 2;
 
@@ -27,11 +29,29 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
         (HWND handle, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data) =>
             message == WmNcCalcSize && wParam.Value != 0 ? new LRESULT(0) : PInvoke.DefSubclassProc(handle, message, wParam, lParam);
 
-    // Asked whether a click should make the window the one with focus, it answers no when the reference data of its subclass
-    // says so. The data belongs to the window, so a window that goes away takes it along and the callback holds no state.
+    // A window that keeps the focus where it was (the reference data of its subclass says so): asked whether a click should make
+    // it the window with focus, it answers no, and when it is put behind another window it gets the style that tells Windows never
+    // to make it the window with focus on a click, because the child windows of a WinUI window take the click first and
+    // activate the window by themselves. The style is lifted again by BringToFront, for when the focus is wanted. It holds no
+    // state itself: the data belongs to the window, so a window that goes away takes it along.
     private readonly SUBCLASSPROC _keepFocusOnClick =
         (HWND handle, uint message, WPARAM wParam, LPARAM lParam, nuint id, nuint data) =>
-            message == WmMouseActivate && data != 0 ? new LRESULT(MaNoActivate) : PInvoke.DefSubclassProc(handle, message, wParam, lParam);
+        {
+            if (data != 0)
+            {
+                if (message == WmMouseActivate)
+                {
+                    return new LRESULT(MaNoActivate);
+                }
+
+                if (message == WmActivate && (wParam.Value & 0xFFFF) == 0)
+                {
+                    SetNoActivateStyle(handle, on: true);
+                }
+            }
+
+            return PInvoke.DefSubclassProc(handle, message, wParam, lParam);
+        };
 
     /// <inheritdoc/>
     public Result ExcludeFromCapture(WindowHandle window)
@@ -132,9 +152,16 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
         }
 
         // Installing the callback again only changes its data, which is how the state is changed.
-        return PInvoke.SetWindowSubclass(ToHwnd(window), _keepFocusOnClick, KeepFocusId, activates ? 0u : 1u)
-            ? Result.Success()
-            : Failure("Windows would not change how the window reacts to a click.");
+        var hwnd = ToHwnd(window);
+        if (!PInvoke.SetWindowSubclass(hwnd, _keepFocusOnClick, KeepFocusId, activates ? 0u : 1u))
+        {
+            return Failure("Windows would not change how the window reacts to a click.");
+        }
+
+        // A window that is in front keeps its ability to be activated until it is put behind another one; any other gets the
+        // style at once. Going back to normal lifts it.
+        SetNoActivateStyle(hwnd, on: !activates && PInvoke.GetForegroundWindow() != hwnd);
+        return Result.Success();
     }
 
     /// <inheritdoc/>
@@ -145,10 +172,23 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
             return Failure("That window does not exist.");
         }
 
+        // The style that keeps a locked window from taking the focus is lifted: this is the focus being asked for.
+        SetNoActivateStyle(ToHwnd(window), on: false);
+
         // SetForegroundWindow is refused for a window that is already visible unless the program has just had the user's input,
         // and the shortcut does not count. Switching to a window, as the task switcher does, is allowed.
         PInvoke.SwitchToThisWindow(ToHwnd(window), true);
         return Result.Success();
+    }
+
+    private static void SetNoActivateStyle(HWND hwnd, bool on)
+    {
+        var style = PInvoke.GetWindowLong(hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE);
+        var wanted = on ? style | NoActivateStyle : style & ~NoActivateStyle;
+        if (wanted != style)
+        {
+            _ = PInvoke.SetWindowLong(hwnd, WINDOW_LONG_PTR_INDEX.GWL_EXSTYLE, wanted);
+        }
     }
 
     private static HWND ToHwnd(WindowHandle window) => new((nint)window.Value);

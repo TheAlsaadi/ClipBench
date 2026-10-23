@@ -37,6 +37,26 @@ internal sealed class TestEditForm : IDisposable
     [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
     private static extern nint SendMessage(nint window, uint message, nint wParam, nint lParam);
 
+    /// <summary>True when the window has the extended style that keeps it from becoming the window with focus when it is clicked.</summary>
+    public bool HasNoActivateStyle => (bool)_form!.Invoke(() => (GetWindowLongPtr(_form.Handle, -20) & 0x08000000) != 0);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern nint GetWindowLongPtr(nint window, int index);
+
+    /// <summary>The title of the window that is in front, for the message of a test that fails.</summary>
+    public static string ForegroundTitle()
+    {
+        var window = GetForegroundWindow();
+        var text = new char[256];
+        var length = GetWindowText(window, text, text.Length);
+        return "0x" + window.ToString("X", System.Globalization.CultureInfo.InvariantCulture) + " \"" + new string(text, 0, Math.Max(0, length)) + "\"";
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+    private static extern int GetWindowText(nint window, char[] text, int count);
+
     /// <summary>Waits until Windows says this window is the one in front.</summary>
     public bool WaitUntilInFront(TimeSpan timeout)
     {

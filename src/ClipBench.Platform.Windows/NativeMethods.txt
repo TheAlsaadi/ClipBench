@@ -103,3 +103,5 @@ SetWindowPos
 SetWindowSubclass
 DefSubclassProc
 SwitchToThisWindow
+GetWindowLong
+SetWindowLong

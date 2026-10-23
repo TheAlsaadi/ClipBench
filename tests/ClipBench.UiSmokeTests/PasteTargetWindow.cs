@@ -17,6 +17,13 @@ internal sealed class PasteTargetWindow : IDisposable
         _thread.SetApartmentState(ApartmentState.STA);
     }
 
+    /// <summary>Where the window is on the desktop, in device pixels.</summary>
+    public Rectangle Bounds => (Rectangle)_form!.Invoke(() => _form.Bounds);
+
+    /// <summary>Puts the window somewhere else, for tests that need two windows apart.</summary>
+    /// <param name="location">The new top-left corner.</param>
+    public void MoveTo(Point location) => _form!.Invoke(() => _form.Location = location);
+
     public string Text => (string)_form!.Invoke(() => _box!.Text);
 
     /// <summary>Empties the text box.</summary>

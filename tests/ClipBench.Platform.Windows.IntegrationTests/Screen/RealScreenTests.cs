@@ -47,6 +47,19 @@ public class RealScreenTests
     }
 
     [Fact]
+    public void The_locator_reports_the_pointer_where_the_screen_api_does()
+    {
+        var locator = new ScreenLocator(_api);
+        var before = _api.GetCursor();
+
+        var reported = locator.CursorPosition();
+
+        // The pointer may move between the two reads; it is only never far from where it was.
+        Math.Abs(reported.X - before.X).ShouldBeLessThan(2_000);
+        Math.Abs(reported.Y - before.Y).ShouldBeLessThan(2_000);
+    }
+
+    [Fact]
     public void The_locator_gives_a_placeable_anchor_on_the_real_screen()
     {
         var locator = new ScreenLocator(_api);

@@ -36,21 +36,25 @@ public sealed partial class PopupWindow : Window
 
     private readonly IWindowEffects _effects;
     private readonly IForegroundTracker _tracker;
+    private readonly IScreenLocator _screens;
     private bool _customSeparatorChosen;
-    private Windows.Foundation.Point? _dragStart;
+    private (PixelPoint Cursor, PointInt32 Window)? _dragStart;
 
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
     /// <param name="effects">What Windows does with the window from outside: what a click on it does.</param>
     /// <param name="tracker">Tells which window has focus.</param>
-    public PopupWindow(PopupViewModel viewModel, IWindowEffects effects, IForegroundTracker tracker)
+    /// <param name="screens">Tells where the mouse pointer is, for moving the window.</param>
+    public PopupWindow(PopupViewModel viewModel, IWindowEffects effects, IForegroundTracker tracker, IScreenLocator screens)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(effects);
         ArgumentNullException.ThrowIfNull(tracker);
+        ArgumentNullException.ThrowIfNull(screens);
         ViewModel = viewModel;
         _effects = effects;
         _tracker = tracker;
+        _screens = screens;
         InitializeComponent();
 
         var presenter = OverlappedPresenter.Create();
@@ -90,7 +94,7 @@ public sealed partial class PopupWindow : Window
     {
         AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height));
         AppWindow.Show();
-        Activate();
+        TakeForeground();
         _ = SearchBox.Focus(FocusState.Programmatic);
     }
 
@@ -132,11 +136,9 @@ public sealed partial class PopupWindow : Window
     // just had the user's input. The request is then made the way the task switcher makes it.
     private void TakeForeground()
     {
+        // The request lifts the style that keeps a locked popup from taking the focus; it is not lifted by Activate.
+        _ = _effects.BringToFront(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
         Activate();
-        if (!IsActive)
-        {
-            _ = _effects.BringToFront(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
-        }
     }
 
     private void OnActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs args)
@@ -176,28 +178,26 @@ public sealed partial class PopupWindow : Window
         }
     }
 
-    // The popup is moved by the pointer events of the handle, which is captured for as long as the button is down. The pointer
-    // is measured inside the window, which moves along with it, so each event moves the window by how far the pointer is from
-    // where it was pressed and the two stay together.
+    // The popup is moved by the pointer events of the handle, which is captured for as long as the button is down. The pointer is
+    // read on the whole desktop and the window is put where it was plus how far the pointer has gone, so a fast mouse cannot get
+    // ahead of the window: measuring the pointer inside a window that is still moving counts the same distance twice.
     private void DragHandle_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (e.GetCurrentPoint(DragHandle).Properties.IsLeftButtonPressed && DragHandle.CapturePointer(e.Pointer))
         {
-            _dragStart = e.GetCurrentPoint(null).Position;
+            _dragStart = (_screens.CursorPosition(), AppWindow.Position);
         }
     }
 
     private void DragHandle_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (_dragStart is not { } start || !e.GetCurrentPoint(DragHandle).Properties.IsLeftButtonPressed)
+        if (_dragStart is not var (cursor, origin) || !e.GetCurrentPoint(DragHandle).Properties.IsLeftButtonPressed)
         {
             return;
         }
 
-        var scale = Content.XamlRoot?.RasterizationScale ?? 1.0;
-        var now = e.GetCurrentPoint(null).Position;
-        var position = AppWindow.Position;
-        AppWindow.Move(new PointInt32(position.X + (int)Math.Round((now.X - start.X) * scale), position.Y + (int)Math.Round((now.Y - start.Y) * scale)));
+        var now = _screens.CursorPosition();
+        AppWindow.Move(new PointInt32(origin.X + (now.X - cursor.X), origin.Y + (now.Y - cursor.Y)));
     }
 
     private void DragHandle_DragEnded(object sender, PointerRoutedEventArgs e)

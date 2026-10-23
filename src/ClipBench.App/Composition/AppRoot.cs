@@ -180,7 +180,7 @@ internal sealed class AppRoot : IAsyncDisposable
             _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
 
             var popupViewModel = services.GetRequiredService<PopupViewModel>();
-            popup = new PopupWindow(popupViewModel, platform.WindowEffects, platform.ForegroundTracker);
+            popup = new PopupWindow(popupViewModel, platform.WindowEffects, platform.ForegroundTracker, platform.ScreenLocator);
             var handle = WinRT.Interop.WindowNative.GetWindowHandle(popup);
             if (!options.AllowScreenCapture)
             {

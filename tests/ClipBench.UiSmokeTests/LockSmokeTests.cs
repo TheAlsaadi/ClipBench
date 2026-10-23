@@ -72,6 +72,7 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
         PointClick(AppUnderTest.SearchBox(popup).Center());
         AppUnderTest.WaitFor(() => AppUnderTest.SearchBox(popup).Properties.HasKeyboardFocus.ValueOrDefault, 10_000)
             .ShouldBeTrue("a click in the search box of a locked popup did not give it the cursor. " + app.Describe());
+        AppUnderTest.WaitFor(() => AppUnderTest.IsInFront(popup), 10_000).ShouldBeTrue("the locked popup did not take the focus, so nothing was typed");
         Keyboard.Type("invoice");
         AppUnderTest.WaitFor(() => AppUnderTest.Rows(popup).Length == 1, 10_000).ShouldBeTrue("typing in a locked popup did not search");
 
@@ -94,13 +95,14 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
         }
 
         var popup = app.OpenPopup();
+        AppUnderTest.WaitFor(() => AppUnderTest.IsInFront(popup), 10_000).ShouldBeTrue("the popup did not take the focus, so nothing was typed. " + AppUnderTest.ForegroundDescription() + "; popup handle 0x" + popup.Properties.NativeWindowHandle.ValueOrDefault.ToString("X", System.Globalization.CultureInfo.InvariantCulture));
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_K);
         AppUnderTest.WaitFor(() => IsLocked(popup), 10_000).ShouldBeTrue("Ctrl+K did not lock the popup");
         target.TryActivate().ShouldBeTrue();
         Thread.Sleep(500);
 
         Keyboard.Type(VirtualKeyShort.F24);
-        AppUnderTest.WaitFor(() => !target.IsInFront, 10_000).ShouldBeTrue("the shortcut did not bring the locked popup to the front");
+        AppUnderTest.WaitFor(() => AppUnderTest.IsInFront(popup), 10_000).ShouldBeTrue("the shortcut did not bring the locked popup to the front");
         AppUnderTest.WaitFor(() => AppUnderTest.SearchBox(popup).Properties.HasKeyboardFocus.ValueOrDefault, 10_000)
             .ShouldBeTrue("the shortcut did not take up the locked popup");
 
@@ -110,7 +112,7 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
 
         // Unlocking makes it an ordinary popup again: it has the focus, and a click elsewhere puts it away.
         Keyboard.Type(VirtualKeyShort.F24);
-        AppUnderTest.WaitFor(() => !target.IsInFront, 10_000).ShouldBeTrue("the shortcut did not bring the locked popup to the front a second time");
+        AppUnderTest.WaitFor(() => AppUnderTest.IsInFront(popup), 10_000).ShouldBeTrue("the shortcut did not bring the locked popup to the front a second time");
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_K);
         AppUnderTest.WaitFor(() => !IsLocked(popup), 10_000).ShouldBeTrue("Ctrl+K did not unlock the popup. " + app.Describe() + "; target in front: " + target.IsInFront);
         target.TryActivate().ShouldBeTrue();
@@ -150,6 +152,109 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
         popup.BoundingRectangle.ShouldBe(placed, "the shortcut moved a locked popup");
         PointClick(Control(popup, "CloseButton").Center());
         AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_locked_popup_pastes_into_the_window_the_user_clicked_last_and_not_the_one_it_was_opened_from()
+    {
+        app.ClosePopup();
+        using var opened = PasteTargetWindow.Create();
+        using var clicked = PasteTargetWindow.Create();
+        if (!opened.TryActivate())
+        {
+            Assert.Skip("Windows would not let the test window take focus, so no key was sent. Run this test from a terminal that is in front.");
+        }
+
+        var popup = app.OpenPopup();
+        PointClick(Control(popup, "LockButton").Center());
+        AppUnderTest.WaitFor(() => IsLocked(popup), 10_000).ShouldBeTrue("the lock button did not lock the popup");
+
+        // The second window goes next to the popup, and is used the way the user used the browser: a click in it.
+        var area = popup.BoundingRectangle;
+        var screen = System.Windows.Forms.Screen.FromPoint(area.Location).WorkingArea;
+        var left = area.Left - clicked.Bounds.Width - 20;
+        clicked.MoveTo(new System.Drawing.Point(left >= screen.Left ? left : area.Right + 20, area.Top));
+        Thread.Sleep(500);
+        PointClick(new System.Drawing.Point(clicked.Bounds.X + (clicked.Bounds.Width / 2), clicked.Bounds.Y + (clicked.Bounds.Height / 2)));
+        AppUnderTest.WaitFor(() => clicked.IsInFront, 10_000).ShouldBeTrue("a click did not bring the second window to the front");
+
+        // A click on the locked popup must not take the focus: it is checked with a button that pastes nothing.
+        PointClick(Control(popup, "SidebarToggleButton").Center());
+        Thread.Sleep(600);
+        clicked.IsInFront.ShouldBeTrue("a click on the locked popup took the focus from the window in front");
+        PointClick(Control(popup, "SidebarToggleButton").Center());
+        Thread.Sleep(600);
+        clicked.IsInFront.ShouldBeTrue("a second click on the locked popup took the focus from the window in front");
+
+        opened.Clear();
+        clicked.Clear();
+        PointClick(RowWith(popup, "Invoice").Center());
+
+        AppUnderTest.WaitFor(() => clicked.Text == Invoice || opened.Text == Invoice, 15_000).ShouldBeTrue("nothing was pasted anywhere");
+        opened.Text.ShouldBeEmpty("the paste went to the window the popup was opened from");
+        clicked.Text.ShouldBe(Invoice);
+        clicked.IsInFront.ShouldBeTrue("the click on the popup took the focus away from the window it pasted into");
+
+        // And back: the first window is used again.
+        opened.TryActivate().ShouldBeTrue();
+        clicked.Clear();
+        PointClick(RowWith(popup, "Invoice").Center());
+        AppUnderTest.WaitFor(() => opened.Text == Invoice, 15_000).ShouldBeTrue($"the paste did not follow the user back to the first window. It holds: \"{opened.Text}\"");
+        clicked.Text.ShouldBeEmpty();
+        PointClick(Control(popup, "CloseButton").Center());
+        AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Opening_the_transform_picker_in_a_locked_popup_that_is_behind_another_window_takes_the_focus_for_typing()
+    {
+        app.ClosePopup();
+        using var target = PasteTargetWindow.Create();
+        if (!target.TryActivate())
+        {
+            Assert.Skip("Windows would not let the test window take focus, so no key was sent. Run this test from a terminal that is in front.");
+        }
+
+        var popup = app.OpenPopup();
+        PointClick(Control(popup, "LockButton").Center());
+        AppUnderTest.WaitFor(() => IsLocked(popup), 10_000).ShouldBeTrue("the lock button did not lock the popup");
+        target.TryActivate().ShouldBeTrue();
+        AppUnderTest.WaitFor(() => !AppUnderTest.IsInFront(popup), 10_000).ShouldBeTrue("the popup stayed in front");
+
+        PointClick(Control(popup, "TransformButton").Center());
+
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByAutomationId("TransformApplyButton")) is not null, 10_000)
+            .ShouldBeTrue("the Transform button did not open the picker in a locked popup");
+        AppUnderTest.WaitFor(() => AppUnderTest.IsInFront(popup), 10_000).ShouldBeTrue("the picker did not take the focus, so typing would go to another window. " + AppUnderTest.ForegroundDescription());
+
+        // Typing narrows the picker, and Esc closes only the picker; then clicking the other window puts the popup behind it again.
+        Keyboard.Type("upper");
+        Keyboard.Type(VirtualKeyShort.ESCAPE);
+        AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByAutomationId("TransformApplyButton")) is null, 10_000).ShouldBeTrue("Esc did not close the picker");
+        target.TryActivate().ShouldBeTrue();
+        PointClick(Control(popup, "SidebarToggleButton").Center());
+        Thread.Sleep(600);
+        target.IsInFront.ShouldBeTrue("after the picker, a click on the locked popup took the focus from the window in front");
+        PointClick(Control(popup, "CloseButton").Center());
+        AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_fast_drag_ends_exactly_as_far_from_where_it_started_as_the_pointer_went()
+    {
+        app.ClosePopup();
+        var popup = app.OpenPopup();
+        var before = popup.BoundingRectangle;
+        var screen = System.Windows.Forms.Screen.FromPoint(before.Location).WorkingArea;
+        var dx = before.X + before.Width + 300 < screen.Right ? 300 : -300;
+        var dy = before.Y + before.Height + 100 < screen.Bottom ? 100 : -100;
+
+        AppUnderTest.DragBy(Control(popup, "DragHandle").Center(), dx, dy, fast: true);
+
+        var after = popup.BoundingRectangle;
+        Math.Abs((after.X - before.X) - dx).ShouldBeLessThanOrEqualTo(4, $"the popup did not end where the pointer did: {before} -> {after}, pointer moved ({dx}, {dy})");
+        Math.Abs((after.Y - before.Y) - dy).ShouldBeLessThanOrEqualTo(4, $"the popup did not end where the pointer did: {before} -> {after}, pointer moved ({dx}, {dy})");
+        app.ClosePopup();
     }
 
     private static bool IsLocked(Window popup) =>
