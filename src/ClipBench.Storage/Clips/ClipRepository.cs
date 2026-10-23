@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
+using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
@@ -23,7 +24,7 @@ namespace ClipBench.Storage.Clips;
 /// columns are not authenticated: someone with the file can reorder, pin or expire clips, but cannot read,
 /// forge or move content (see the threat model).
 /// </remarks>
-public sealed class ClipRepository : IAsyncDisposable
+public sealed partial class ClipRepository : IAsyncDisposable
 {
     private const string CanaryName = "key_check";
 
@@ -33,18 +34,18 @@ public sealed class ClipRepository : IAsyncDisposable
 
     private const string InsertClip = """
         INSERT OR REPLACE INTO clips
-            (id, format, captured_at, expires_at, is_pinned, size_bytes, content_hash, content, preview, source_app)
+            (id, format, captured_at, expires_at, is_pinned, size_bytes, content_hash, content, preview, source_app, board_id, board_position)
         VALUES
-            ($id, $format, $capturedAt, $expiresAt, $pinned, $size, $hash, $content, $preview, $source);
+            ($id, $format, $capturedAt, $expiresAt, $pinned, $size, $hash, $content, $preview, $source, $board, $boardPosition);
         """;
 
     private const string SelectOne = """
-        SELECT format, captured_at, is_pinned, content, source_app FROM clips
+        SELECT format, captured_at, is_pinned, content, source_app, board_id, board_position FROM clips
         WHERE id = $id AND (expires_at IS NULL OR expires_at > $now);
         """;
 
     private const string SelectAll = """
-        SELECT id, format, captured_at, is_pinned, content, source_app FROM clips
+        SELECT id, format, captured_at, is_pinned, content, source_app, board_id, board_position FROM clips
         WHERE expires_at IS NULL OR expires_at > $now
         ORDER BY captured_at DESC, id DESC;
         """;
@@ -55,9 +56,18 @@ public sealed class ClipRepository : IAsyncDisposable
         ORDER BY captured_at DESC, id DESC;
         """;
 
-    private const string UpdatePinned = "UPDATE clips SET is_pinned = $pinned WHERE id = $id;";
+    // A board holds pinned clips only, so letting a clip go also takes it off its board.
+    private const string UpdatePinned = """
+        UPDATE clips SET
+            is_pinned = $pinned,
+            board_id = CASE WHEN $pinned = 0 THEN NULL ELSE board_id END,
+            board_position = CASE WHEN $pinned = 0 THEN 0 ELSE board_position END
+        WHERE id = $id;
+        """;
     private const string DeleteOne = "DELETE FROM clips WHERE id = $id;";
     private const string DeleteAll = "DELETE FROM clips;";
+    private const string DeleteAllBoards = "DELETE FROM boards;";
+    private const string DeleteAllSnippets = "DELETE FROM snippets;";
     private const string DeleteExpired = "DELETE FROM clips WHERE expires_at IS NOT NULL AND expires_at <= $now RETURNING id;";
 
     // Unpinned clips only. A clip older than the cutoff goes. Of the rest, newest first, a clip goes when it is
@@ -178,6 +188,8 @@ public sealed class ClipRepository : IAsyncDisposable
                     Blob(command, "$content", content);
                     Blob(command, "$preview", preview);
                     Blob(command, "$source", source);
+                    Blob(command, "$board", clip.OnBoard is { } board ? board.Value.ToByteArray(bigEndian: true) : null);
+                    Integer(command, "$boardPosition", clip.OnBoard is null ? 0 : clip.BoardPosition);
                     command.ExecuteNonQuery();
                     return Result.Success();
                 }
@@ -207,7 +219,7 @@ public sealed class ClipRepository : IAsyncDisposable
                     return Result.Failure<Clip>(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."));
                 }
 
-                return ReadClip(id, (ClipFormat)reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2) != 0, reader.GetFieldValue<byte[]>(3), SourceOrNull(reader, 4));
+                return ReadClip(id, (ClipFormat)reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2) != 0, reader.GetFieldValue<byte[]>(3), SourceOrNull(reader, 4), BoardOf(reader, 5), BoardPositionOf(reader, 6));
             },
             cancellationToken);
 
@@ -227,7 +239,7 @@ public sealed class ClipRepository : IAsyncDisposable
                 while (reader.Read())
                 {
                     var id = IdFrom(reader, 0);
-                    var clip = ReadClip(id, (ClipFormat)reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetFieldValue<byte[]>(4), SourceOrNull(reader, 5));
+                    var clip = ReadClip(id, (ClipFormat)reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetFieldValue<byte[]>(4), SourceOrNull(reader, 5), BoardOf(reader, 6), BoardPositionOf(reader, 7));
                     if (clip.IsSuccess)
                     {
                         clips.Add(clip.Value);
@@ -403,6 +415,8 @@ public sealed class ClipRepository : IAsyncDisposable
             connection =>
             {
                 Execute(connection, DeleteAll);
+                Execute(connection, DeleteAllBoards);
+                Execute(connection, DeleteAllSnippets);
                 Execute(connection, Vacuum);
 
                 // Last, so the log that VACUUM wrote to is emptied and no removed page image is left in it.
@@ -640,7 +654,7 @@ public sealed class ClipRepository : IAsyncDisposable
     }
 
     // Opens one stored clip. Anything that is not exactly what was written fails closed.
-    private Result<Clip> ReadClip(ClipId id, ClipFormat format, long capturedTicks, bool pinned, byte[] sealedContent, byte[]? sealedSource)
+    private Result<Clip> ReadClip(ClipId id, ClipFormat format, long capturedTicks, bool pinned, byte[] sealedContent, byte[]? sealedSource, BoardId? board, int boardPosition)
     {
         // The time is a plain column, so it can hold any number. One that is not a date is a damaged record.
         if (!TryTime(capturedTicks, out var capturedAt))
@@ -666,7 +680,7 @@ public sealed class ClipRepository : IAsyncDisposable
             var source = OpenText(sealedSource, id, "source_app", format);
             return source.IsFailure
                 ? Result.Failure<Clip>(source.Error)
-                : Result.Success(new Clip(id, content.Value, capturedAt, source.Value, pinned));
+                : Result.Success(new Clip(id, content.Value, capturedAt, source.Value, pinned) { OnBoard = board, BoardPosition = board is null ? 0 : boardPosition });
         }
         finally
         {
@@ -743,6 +757,14 @@ public sealed class ClipRepository : IAsyncDisposable
         time = new DateTimeOffset(ticks, TimeSpan.Zero);
         return true;
     }
+
+    // The board a clip is on, and its place there. These are plain columns, so anything may be in them: a value that is
+    // not a board id means "no board", and a place is held to the range of an int.
+    private static BoardId? BoardOf(SqliteDataReader reader, int ordinal) =>
+        !reader.IsDBNull(ordinal) && reader.GetFieldValue<byte[]>(ordinal) is { Length: 16 } bytes ? new BoardId(new Guid(bytes, bigEndian: true)) : null;
+
+    private static int BoardPositionOf(SqliteDataReader reader, int ordinal) =>
+        (int)Math.Clamp(reader.GetInt64(ordinal), int.MinValue, int.MaxValue);
 
     private static byte[]? SourceOrNull(SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetFieldValue<byte[]>(ordinal);
 

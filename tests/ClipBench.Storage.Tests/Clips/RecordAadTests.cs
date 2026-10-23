@@ -23,6 +23,39 @@ public class RecordAadTests
     }
 
     [Fact]
+    public void A_board_value_is_bound_to_a_tag_its_id_and_its_column()
+    {
+        var id = new ClipBench.Core.Boards.BoardId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+        byte[] expected =
+        [
+            .. "CB1B"u8,
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF,
+            4, .. "name"u8,
+        ];
+
+        RecordAad.ForBoard(id, "name").ShouldBe(expected);
+    }
+
+    [Fact]
+    public void A_board_value_can_never_be_taken_for_a_clip_value_even_with_the_same_id_and_column()
+    {
+        var guid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+
+        RecordAad.ForBoard(new ClipBench.Core.Boards.BoardId(guid), "preview")
+            .ShouldNotBe(RecordAad.ForClip(new ClipId(guid), "preview", ClipFormat.Text));
+    }
+
+    [Fact]
+    public void Another_board_id_or_column_gives_other_board_data()
+    {
+        var id = new ClipBench.Core.Boards.BoardId(Guid.Parse("00112233-4455-6677-8899-aabbccddeeff"));
+        var other = new ClipBench.Core.Boards.BoardId(Guid.Parse("00112233-4455-6677-8899-aabbccddee00"));
+
+        RecordAad.ForBoard(other, "name").ShouldNotBe(RecordAad.ForBoard(id, "name"));
+        RecordAad.ForBoard(id, "other").ShouldNotBe(RecordAad.ForBoard(id, "name"));
+    }
+
+    [Fact]
     public void A_meta_value_is_bound_to_a_tag_and_its_name()
     {
         RecordAad.ForMeta("key_check").ShouldBe([.. "CB1M"u8, 9, .. "key_check"u8]);

@@ -35,7 +35,7 @@ public sealed class ClipStore : IClipStore
 
     /// <inheritdoc/>
     public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken) =>
-        throw new NotImplementedException();
+        _repository.SetBoardsAsync(placements, cancellationToken);
 
     /// <inheritdoc/>
     public async Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken)

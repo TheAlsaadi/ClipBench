@@ -28,8 +28,30 @@ internal static class Migrations
         CREATE INDEX clips_expires_at ON clips (expires_at) WHERE expires_at IS NOT NULL;
         """;
 
+    // Boards and snippets. Names and snippet text are sealed blobs, like clip content. A clip's board and its place
+    // on the board are plain columns, like the pin flag, because ordering needs them. board_id has no foreign key on
+    // purpose: a board that is missing is repaired when the boards are loaded, and a tampered row cannot fail a write.
+    private const string Version2 = """
+        CREATE TABLE boards (
+            id       BLOB    NOT NULL PRIMARY KEY CHECK (length(id) = 16),
+            position INTEGER NOT NULL,
+            name     BLOB    NOT NULL
+        ) STRICT;
+
+        ALTER TABLE clips ADD COLUMN board_id BLOB CHECK (board_id IS NULL OR length(board_id) = 16);
+        ALTER TABLE clips ADD COLUMN board_position INTEGER NOT NULL DEFAULT 0;
+        CREATE INDEX clips_board ON clips (board_id, board_position) WHERE board_id IS NOT NULL;
+
+        CREATE TABLE snippets (
+            id       BLOB    NOT NULL PRIMARY KEY CHECK (length(id) = 16),
+            position INTEGER NOT NULL,
+            name     BLOB    NOT NULL,
+            body     BLOB    NOT NULL
+        ) STRICT;
+        """;
+
     /// <summary>Every step, oldest first.</summary>
-    public static IReadOnlyList<Migration> All { get; } = [new Migration(1, Version1)];
+    public static IReadOnlyList<Migration> All { get; } = [new Migration(1, Version1), new Migration(2, Version2)];
 
     /// <summary>The schema version this build of the app writes.</summary>
     public static int Latest => All[^1].Version;

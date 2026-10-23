@@ -177,7 +177,8 @@ public sealed class SchemaMigratorTests : IDisposable
             }
         }
 
-        columns.ShouldBe(["id", "format", "captured_at", "expires_at", "is_pinned", "size_bytes", "content_hash", "content", "preview", "source_app"]);
+        // Step 2 added the board and the place on it: plain columns, like the pin flag, because ordering needs them.
+        columns.ShouldBe(["id", "format", "captured_at", "expires_at", "is_pinned", "size_bytes", "content_hash", "content", "preview", "source_app", "board_id", "board_position"]);
     }
 
     [Theory]
