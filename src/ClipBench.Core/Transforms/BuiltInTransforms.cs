@@ -23,6 +23,18 @@ public static class BuiltInTransforms
     /// <summary>Removes white space from both ends of the text.</summary>
     public static TextTransform Trim { get; } = new("text.trim", "Trim", "Remove white space at the start and end", text => Result.Success(text.Trim()));
 
+    /// <summary>Escapes the text for use in a web address.</summary>
+    public static TextTransform UrlEncode { get; } = new("url.encode", "URL encode", "Escape the text for a web address", TextEncoding.UrlEncode);
+
+    /// <summary>Turns a percent-escaped text back into plain text.</summary>
+    public static TextTransform UrlDecode { get; } = new("url.decode", "URL decode", "Turn %20 style escapes back into text", TextEncoding.UrlDecode);
+
+    /// <summary>Writes the text as Base64.</summary>
+    public static TextTransform Base64Encode { get; } = new("base64.encode", "Base64 encode", "Write the text as Base64", TextEncoding.Base64Encode);
+
+    /// <summary>Reads Base64 back into text.</summary>
+    public static TextTransform Base64Decode { get; } = new("base64.decode", "Base64 decode", "Read Base64 back into text", TextEncoding.Base64Decode);
+
     /// <summary>Joins the lines into one, with a single space where a line break was.</summary>
     public static TextTransform RemoveLineBreaks { get; } = new("text.single-line", "Remove line breaks", "Join all lines into one", text => Result.Success(TextConversion.RemoveLineBreaks(text)));
 }
