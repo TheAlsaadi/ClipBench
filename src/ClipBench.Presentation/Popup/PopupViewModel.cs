@@ -442,6 +442,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _paste.Hold(IsLocked);
     }
 
+    /// <summary>Gives the focus back to the program the popup was opened from, and leaves the popup on screen.</summary>
+    public void ReturnToProgram() => _paste.ReturnToTarget();
+
     /// <summary>
     /// Takes up a locked popup again, as when the shortcut is pressed while it is on screen: the window that has focus is
     /// the one to paste into, and the list is as it was.

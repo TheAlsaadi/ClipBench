@@ -51,6 +51,9 @@ internal sealed class PasteTargetWindow : IDisposable
         return Form.ActiveForm == _form && GetForegroundWindow() == _form.Handle;
     });
 
+    /// <summary>True while this window is the one in front, which gets the keys.</summary>
+    public bool IsInFront => (bool)_form!.Invoke(() => GetForegroundWindow() == _form.Handle);
+
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
     private static extern nint GetForegroundWindow();

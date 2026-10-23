@@ -257,6 +257,18 @@ public sealed class PopupLockTests : IDisposable
     }
 
     [Fact]
+    public async Task The_shortcut_pressed_in_a_locked_popup_gives_the_focus_back_without_closing_it()
+    {
+        await LockedAsync("one");
+
+        _vm.ReturnToProgram();
+
+        _paste.Returns.ShouldBe(1);
+        _vm.IsOpen.ShouldBeTrue();
+        _closeRequests.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Taking_up_a_locked_popup_again_records_the_window_in_front_and_keeps_the_list()
     {
         await LockedAsync("one", "two");

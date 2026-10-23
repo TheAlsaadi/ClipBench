@@ -45,6 +45,17 @@ internal static class Glyphs
     /// <returns>A box with a check mark for a selected clip and an empty box for the others.</returns>
     public static string MarkGlyph(bool marked) => ((char)(marked ? 0xE73A : 0xE739)).ToString();
 
+    /// <summary>The icon of the button that keeps the popup on screen.</summary>
+    /// <param name="locked">True when the popup is locked now.</param>
+    /// <returns>A closed lock for a locked popup and an open one for the others.</returns>
+    public static string LockGlyph(bool locked) => ((char)(locked ? 0xE72E : 0xE785)).ToString();
+
+    /// <summary>The tip of the button that keeps the popup on screen.</summary>
+    /// <param name="locked">True when the popup is locked now.</param>
+    /// <returns>What the button does.</returns>
+    public static string LockTip(bool locked) =>
+        locked ? "Unlock: the popup goes away again after a paste or a click elsewhere (Ctrl+K)" : "Lock: keep the popup on screen, on top of other windows (Ctrl+K)";
+
     /// <summary>The tip of the button that pins a clip or lets it go.</summary>
     /// <param name="pinned">True when the clip is pinned now.</param>
     /// <returns>What the button does.</returns>

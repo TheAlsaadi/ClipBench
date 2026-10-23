@@ -34,14 +34,19 @@ public sealed partial class PopupWindow : Window
     /// <summary>How much wider the popup is while the sidebar is shown, in device-independent pixels.</summary>
     public const double SidebarWidthDip = 168;
 
+    private readonly IWindowEffects _effects;
     private bool _customSeparatorChosen;
+    private bool _isActive;
 
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
-    public PopupWindow(PopupViewModel viewModel)
+    /// <param name="effects">What Windows does with the window from outside: moving it, and what a click on it does.</param>
+    public PopupWindow(PopupViewModel viewModel, IWindowEffects effects)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(effects);
         ViewModel = viewModel;
+        _effects = effects;
         InitializeComponent();
 
         var presenter = OverlappedPresenter.Create();
@@ -54,6 +59,10 @@ public sealed partial class PopupWindow : Window
         AppWindow.IsShownInSwitchers = false;
 
         Activated += OnActivated;
+
+        // These two are handled by the controls themselves, so they are listened to even when they say they are done.
+        DragHandle.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(DragHandle_PointerPressed), handledEventsToo: true);
+        Frame.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Frame_PointerPressed), handledEventsToo: true);
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         ViewModel.Transforms.PropertyChanged += OnTransformsPropertyChanged;
@@ -77,18 +86,82 @@ public sealed partial class PopupWindow : Window
         _ = SearchBox.Focus(FocusState.Programmatic);
     }
 
+    /// <summary>True while the popup is the window with focus.</summary>
+    public bool IsActive => _isActive;
+
+    /// <summary>
+    /// Takes up a locked popup that is on screen: the program in front is the one to paste into, and the cursor goes to the
+    /// search box. A popup that is not locked is opened with <see cref="ShowAt"/> instead.
+    /// </summary>
+    /// <param name="pasteIntoPreviousWindow">False when the tray icon was used and the window in front is the taskbar.</param>
+    public void TakeFocus(bool pasteIntoPreviousWindow)
+    {
+        ViewModel.Refocus(pasteIntoPreviousWindow);
+        Activate();
+        _ = SearchBox.Focus(FocusState.Programmatic);
+    }
+
     private void OnActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs args)
     {
-        // Clicking anywhere else, or switching to another window, puts the popup away.
-        if (args.WindowActivationState == WindowActivationState.Deactivated && ViewModel.IsOpen)
+        _isActive = args.WindowActivationState != WindowActivationState.Deactivated;
+
+        // Clicking anywhere else, or switching to another window, puts the popup away. A locked popup stays.
+        if (!_isActive && ViewModel.IsOpen && !ViewModel.IsLocked)
         {
             ViewModel.CloseNowCommand.Execute(null);
         }
     }
 
+    // A locked popup does not take the focus when it is clicked, so that a click on a clip pastes into the program the user
+    // was in. Keys and typing need the focus, so it is taken when something that is typed in is used.
+    private void NeedKeyboard()
+    {
+        if (ViewModel.IsOpen && ViewModel.IsLocked && !_isActive)
+        {
+            TakeFocus(pasteIntoPreviousWindow: true);
+        }
+    }
+
+    private void Frame_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        for (var element = e.OriginalSource as DependencyObject; element is not null && !ReferenceEquals(element, Frame); element = VisualTreeHelper.GetParent(element))
+        {
+            if (element is TextBox box)
+            {
+                NeedKeyboard();
+                _ = DispatcherQueue.TryEnqueue(() => _ = box.Focus(FocusState.Pointer));
+                return;
+            }
+        }
+    }
+
+    private void DragHandle_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (e.GetCurrentPoint(DragHandle).Properties.IsLeftButtonPressed)
+        {
+            _ = _effects.BeginMove(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
+        }
+    }
+
+    // Whether a click makes the popup the window with focus follows the lock. Letting go of the lock makes it an ordinary popup
+    // again, which has the focus, so that clicking elsewhere puts it away.
+    private void ApplyLock()
+    {
+        _ = _effects.SetActivatesOnClick(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)), activates: !ViewModel.IsLocked);
+        if (!ViewModel.IsLocked && ViewModel.IsOpen && !_isActive)
+        {
+            Activate();
+            _ = SearchBox.Focus(FocusState.Programmatic);
+        }
+    }
+
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PopupViewModel.SelectedIndex) && ViewModel.Current is { } current)
+        if (e.PropertyName == nameof(PopupViewModel.IsLocked))
+        {
+            ApplyLock();
+        }
+        else if (e.PropertyName == nameof(PopupViewModel.SelectedIndex) && ViewModel.Current is { } current)
         {
             ClipList.ScrollIntoView(current);
         }
@@ -101,7 +174,11 @@ public sealed partial class PopupWindow : Window
             // The first value is focused by the field itself when it appears; going back puts the cursor in the search box.
             // Not once the popup is hidden, which is what a paste does right after the prompt closes: focusing a control in a
             // hidden window would take the focus back from the program the paste is going to.
-            if (!ViewModel.IsPromptingSnippet)
+            if (ViewModel.IsPromptingSnippet)
+            {
+                NeedKeyboard();
+            }
+            else
             {
                 _ = DispatcherQueue.TryEnqueue(() =>
                 {
@@ -118,6 +195,11 @@ public sealed partial class PopupWindow : Window
             // moved after the layout has caught up with the panel being shown or hidden.
             // A hidden popup is left alone, as with the snippet prompt.
             var open = ViewModel.IsTransformsOpen;
+            if (open)
+            {
+                NeedKeyboard();
+            }
+
             _ = DispatcherQueue.TryEnqueue(() =>
             {
                 if (ViewModel.IsOpen)
@@ -143,6 +225,11 @@ public sealed partial class PopupWindow : Window
         {
             // The cursor goes into the name box while a name is typed and back to the search box afterwards.
             var editing = ViewModel.Sidebar.IsEditing;
+            if (editing)
+            {
+                NeedKeyboard();
+            }
+
             _ = DispatcherQueue.TryEnqueue(() =>
             {
                 if (ViewModel.IsOpen)
@@ -320,7 +407,11 @@ public sealed partial class PopupWindow : Window
                 args.Handled = true;
             }
         };
-        flyout.Opened += (_, _) => _ = box.Focus(FocusState.Programmatic);
+        flyout.Opened += (_, _) =>
+        {
+            NeedKeyboard();
+            _ = box.Focus(FocusState.Programmatic);
+        };
         flyout.Closed += (_, _) =>
         {
             if (ViewModel.IsOpen)
@@ -375,6 +466,10 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.Enter when shift:
                 ViewModel.OpenTransformsCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case VirtualKey.K when control:
+                ViewModel.ToggleLockCommand.Execute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.B when control:

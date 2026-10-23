@@ -209,11 +209,48 @@ public sealed class AppUnderTest : IAsyncLifetime
     /// <summary>Closes the popup if it is open, so the next test starts from a known place.</summary>
     public void ClosePopup()
     {
-        if (FindPopup() is not null)
+        if (FindPopup() is { } popup)
         {
-            Keyboard.Type(VirtualKeyShort.ESCAPE);
-            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("Escape did not close the popup. " + Describe());
+            // A locked popup is not closed by Esc, only by its close button, which also unlocks it.
+            if (popup.FindFirstDescendant(cf => cf.ByAutomationId("LockButton"))?.Patterns.Toggle.PatternOrDefault?.ToggleState.ValueOrDefault == FlaUI.Core.Definitions.ToggleState.On)
+            {
+                popup.FindFirstDescendant(cf => cf.ByAutomationId("CloseButton"))!.Patterns.Invoke.Pattern.Invoke();
+            }
+            else
+            {
+                Keyboard.Type(VirtualKeyShort.ESCAPE);
+            }
+
+            WaitFor(() => FindPopup() is null, 10_000).ShouldBeTrue("the popup did not close. " + Describe());
         }
+    }
+
+    /// <summary>
+    /// Presses the mouse button on a point, drags the pointer by a distance in small steps and lets go, the way a hand moves a
+    /// window. Each step is put there and then nudged with real mouse input, because a move that is only a new position sends no
+    /// mouse message and the system's move loop would not see it.
+    /// </summary>
+    /// <param name="from">Where to press.</param>
+    /// <param name="dx">How far to the right to drag; negative for the left.</param>
+    /// <param name="dy">How far down to drag; negative for up.</param>
+    public static void DragBy(System.Drawing.Point from, int dx, int dy)
+    {
+        PointAt(from);
+        Mouse.Down(MouseButton.Left);
+        Thread.Sleep(200);
+        const int steps = 20;
+        for (var step = 1; step <= steps; step++)
+        {
+            Mouse.MoveTo(new System.Drawing.Point(from.X + (dx * step / steps), from.Y + (dy * step / steps)));
+            MouseEvent(MouseEventMove, 1, 0, 0, 0);
+            Thread.Sleep(30);
+            MouseEvent(MouseEventMove, -1, 0, 0, 0);
+            Thread.Sleep(30);
+        }
+
+        Thread.Sleep(200);
+        Mouse.Up(MouseButton.Left);
+        Thread.Sleep(300);
     }
 
     public static AutomationElement SearchBox(Window popup) => popup.FindFirstDescendant(cf => cf.ByAutomationId("SearchBox"))
