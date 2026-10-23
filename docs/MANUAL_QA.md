@@ -166,7 +166,8 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 
 - [ ] Open the popup over another program and press the **lock** button next to the **X** (or **Ctrl+K**): the icon closes and the button is highlighted. Click the other program: the popup stays on top of it.
 - [ ] With the popup locked, click a clip: it is pasted into the program you were in, which keeps the cursor where it was, and the popup stays. Click another clip: it is pasted too.
-- [ ] Switch to a different program, then click a clip in the locked popup: it is pasted into that program.
+- [ ] Switch to a different program, then click a clip in the locked popup: it is pasted into that program. Try it as the owner did: type in program A, open the popup there and lock it, click the search box in program B (a browser), then click clips: they go into B, not A, and B keeps the cursor.
+- [ ] Drag the handle quickly, in big flicks, across the screen: the popup stays under the pointer with no jumps.
 - [ ] Click the search box of a locked popup and type: the text goes into the search box. **Esc** gives the cursor back to the program; the popup stays.
 - [ ] Press the popup's shortcut while a locked popup is behind another program: it comes to the front with the cursor in the search box. Press it again: the cursor goes back to the program.
 - [ ] Press the lock button again: the popup is an ordinary popup, and clicking another program puts it away. A locked popup is closed only by its **X**, and opens unlocked next time.
