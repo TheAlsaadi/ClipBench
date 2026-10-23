@@ -12,7 +12,7 @@ several items, and paste them in one action.
 > history, the Windows integration and the app are built and tested: a tray icon, a
 > shortcut (Win+Alt+V) that opens a search popup, pasting one clip into the program you
 > were in, and multi-paste: batch, queue, collect (Win+Alt+C) and table paste.
-> Transforms, boards, the settings window, OCR and the installer come next. Nothing is released yet and there is nothing to install; you
+> Transforms (Shift+Enter), boards and snippets are built too. The settings window, OCR and the installer come next. Nothing is released yet and there is nothing to install; you
 > can build it from source and check it by hand with [docs/MANUAL_QA.md](docs/MANUAL_QA.md).
 
 ## Privacy promise

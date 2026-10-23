@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Transforms, boards and snippets (ADR 0016). **Transforms**: Shift+Enter in the popup, or the Transform button,
+  opens a picker over the list. Type to narrow it, move with the arrow keys, and Enter pastes the highlighted
+  transform applied to the text that would have been pasted (the highlighted clip, or the marked clips joined by
+  the separator). Ctrl+Space adds a transform to a chain and Backspace takes the last one off, so "Trim, then
+  Title Case" is one paste. A preview shows the result before it is pasted, and is hidden for a secret. The
+  transforms are plain text (drops formatting), UPPER, lower, Title and Sentence case, trim, remove line breaks,
+  JSON format and minify, URL and Base64 encode and decode, and find and replace. A transform never changes the
+  stored clip, and text it cannot handle (invalid JSON, a broken escape, a bad pattern) gives a message and
+  pastes nothing. Case changes use the invariant culture, so they do not depend on the language of Windows.
+  JSON is copied token by token, so numbers and escapes are not changed. Find and replace takes plain text or a
+  pattern; a pattern runs on the non-backtracking engine where it can, with a one-second limit, so it cannot
+  hang the paste.
+- **Boards**: Ctrl+B opens a sidebar beside the list with History, Pinned, one entry for each board and Snippets
+  (Ctrl+1 to Ctrl+9 jump to an entry). Ctrl+N makes a board, F2 renames it, and Ctrl+Shift+Delete deletes it after
+  a question; its clips stay, pinned. Ctrl+D (or the Board button) puts the highlighted or marked clips on a board,
+  Ctrl+Shift+D takes them off, and Ctrl+Up and Ctrl+Down move a clip within its board. A clip is on at most one
+  board, putting a clip on a board pins it, and unpinning a clip takes it off. Board names are sealed like clip
+  content, and the database moved to schema step 2 (boards and snippets tables, and the board and place on each
+  clip) without touching the saved clips.
+- **Snippets**: reusable text with variables. `{date}` and `{time}` (or `{date:dd/MM/yyyy}` and any .NET custom
+  format), `{clipboard}` (the text of the newest text clip in the history), `{input:Name}` (asks for a value
+  before pasting) and `{{` and `}}` for the braces themselves. Anything else in braces is pasted as typed, and
+  the editor warns about it. A snippet is read once from left to right and what is put in is never read again,
+  with limits on its length, the values it asks for and the result. The Snippets view of the popup lists them,
+  searches by name and text, and Enter pastes one, with a small form first when it asks for values. Snippets are
+  written in a Snippets window (tray menu, or Ctrl+E in the popup) with live warnings and a preview. Names and
+  texts are sealed in the database, and the log records only that a snippet was pasted, how many values it asked
+  for and how big it was.
+
+### Changed
+
+- The popup is a little wider (440 instead of 420 device-independent pixels), and grows by 148 more while the sidebar
+  is shown. The footer gains a Transform button and a Board button, and the tray menu gains Snippets.
+- The messages that quote a limit write the number the same way on every machine ("10,000"), whatever the language of
+  Windows.
+
+## [0.1.0] - 2026-10-23
+
+The first tag: a source tag only, with no installer or download (see ADR 0015 and the release plan in PLAN.md).
+
+### Added
+
 - Multi-paste (ADR 0015). **Batch paste**: mark clips with Space, or Ctrl+Space while searching; each mark shows
   its place in the paste order, and Enter pastes them joined by the chosen separator (new line, blank line, comma
   and space, comma, semicolon, tab, space, nothing, or a custom one with `\n`, `\r`, `\t` and `\\`). Ctrl+S

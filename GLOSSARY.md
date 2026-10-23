@@ -31,18 +31,24 @@ To protect a Clip from being removed by the History limits. A pinned Clip stays 
 _Avoid_: favorite, star, lock
 
 **Board**:
-A named group of pinned Clips.
+A named group of pinned Clips, in an order the user sets. A Clip is on at most one Board, putting it on one pins it, and deleting a Board keeps its Clips.
 _Avoid_: folder, collection, list
 
 **Snippet**:
-A reusable piece of text with variables, such as the date, that is filled in when it is pasted.
+A reusable piece of text with Variables, such as the date, that is filled in when it is pasted. It is written in the snippet editor and pasted from the Snippets view of the Popup. It is not a Clip: it is not recorded from the clipboard.
 _Avoid_: template, macro
+
+**Variable**:
+A name in braces inside a Snippet, such as `{date}`, `{time}`, `{clipboard}` or `{input:Name}`, that is replaced when the Snippet is pasted. `{{` and `}}` stand for the braces themselves.
 
 ### Pasting
 
 **Popup**:
 The window that opens at the cursor from the global hotkey, for searching, selecting and pasting Clips.
 _Avoid_: picker, panel, launcher
+
+**Sidebar**:
+The strip at the side of the Popup that lists History, Pinned, the Boards and Snippets, and chooses what the list shows.
 
 **Multi-paste**:
 Any way of pasting more than one Clip: batch paste, queue paste, collect session or table paste.
@@ -71,6 +77,9 @@ Pasting the selected Clips as rows or columns of tab-separated cells, for spread
 **Transform**:
 A change applied to text as it is pasted, such as changing case, trimming or formatting JSON. A Transform never changes the stored Clip.
 _Avoid_: filter, formatter
+
+**Chain**:
+Two or more Transforms applied one after the other, in the order chosen, to the text being pasted.
 
 ### Privacy
 

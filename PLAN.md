@@ -342,6 +342,8 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 
 **Implementation**: A transform picker on Shift+Enter in the popup; a board sidebar; a snippet editor in settings.
 
+*As built (ADR 0016):* the owner chose one sidebar for History, Pinned, the boards and Snippets (Ctrl+B), one board per clip, a small Snippets window until Phase 7 builds the Settings window (it opens from the tray menu and Ctrl+E), and no transforms beyond the list above. The transform picker takes Ctrl+Space to build a chain. A pattern in find and replace runs on the non-backtracking engine where it can. Schema step 2 holds the boards and snippets tables, with names and texts sealed.
+
 **Acceptance**: The coverage floors hold, and `MANUAL_QA.md` is extended.
 
 ---
