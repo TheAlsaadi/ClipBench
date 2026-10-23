@@ -108,8 +108,24 @@ public sealed partial class PopupWindow : Window
     public void TakeFocus(bool pasteIntoPreviousWindow)
     {
         ViewModel.Refocus(pasteIntoPreviousWindow);
+        KeepOnScreen();
         TakeForeground();
         _ = SearchBox.Focus(FocusState.Programmatic);
+    }
+
+    // A popup that was let go over the edge of a screen, or was left on a monitor that is gone, is moved back into the work area.
+    // One that is inside it is not touched.
+    private void KeepOnScreen()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        var position = AppWindow.Position;
+        var size = AppWindow.Size;
+        var x = Math.Clamp(position.X, area.X, Math.Max(area.X, area.X + area.Width - size.Width));
+        var y = Math.Clamp(position.Y, area.Y, Math.Max(area.Y, area.Y + area.Height - size.Height));
+        if (x != position.X || y != position.Y)
+        {
+            AppWindow.Move(new PointInt32(x, y));
+        }
     }
 
     // A window that is on screen already is not always given the focus by Activate: Windows only allows that to a program that has
@@ -188,6 +204,7 @@ public sealed partial class PopupWindow : Window
 
         _dragStart = null;
         DragHandle.ReleasePointerCaptures();
+        KeepOnScreen();
 
         // Pressing something that cannot take the focus leaves it nowhere, and the keys would go nowhere. It is put back once
         // the pointer events are over, or the press that is ending would take it again. A locked popup that is not in front

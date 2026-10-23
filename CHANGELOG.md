@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Shift+F10) opens a menu of everything that can be done with the clip, with each shortcut shown. Boards have a menu
   too (rename, delete, new board), deleting one asks with a button, and the name box has Save and Cancel. The
   transform picker has Paste, Add to chain, Remove last and Back buttons.
+- **Lock and move the popup.** A lock button (or Ctrl+K) keeps the popup on screen, on top of other windows, after a
+  paste and when another window is used. A click on a locked popup does not take the focus from the program you are
+  in, so a click on a clip pastes straight into that program, and again for the next clip. Clicking the search box, or
+  opening the transform picker, a snippet prompt or a board name, takes the focus so typing works. Only the **X**
+  button closes a locked popup; Esc gives the focus back to the program, and the shortcut takes the popup up again
+  (pressed in the popup, it gives the focus back). The handle beside the lock button moves the popup with the mouse,
+  locked or not. A popup that is closed opens unlocked, near the active window as before.
 
 ### Changed
 
