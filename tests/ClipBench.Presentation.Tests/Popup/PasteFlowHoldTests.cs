@@ -12,9 +12,9 @@ public sealed class PasteFlowHoldTests : IDisposable
 {
     private const int OwnProcess = 900;
 
-    private static readonly WindowHandle Notepad = new(0x1234);
-    private static readonly WindowHandle Browser = new(0x5678);
-    private static readonly WindowHandle Popup = new(0x9ABC);
+    private static readonly WindowHandle _notepad = new(0x1234);
+    private static readonly WindowHandle _browser = new(0x5678);
+    private static readonly WindowHandle _popupWindow = new(0x9ABC);
 
     private readonly FakeForegroundTracker _tracker = new();
     private readonly FakePasteInjector _injector = new();
@@ -46,15 +46,15 @@ public sealed class PasteFlowHoldTests : IDisposable
     [Fact]
     public async Task A_held_flow_keeps_its_window_for_the_next_paste()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
         _flow.Hold(true);
-        _tracker.Next = Window(Popup, OwnProcess);
+        _tracker.Next = Window(_popupWindow, OwnProcess);
 
         await _flow.PasteAsync(Clip(), Ct);
         await _flow.PasteAsync(Clip(), Ct);
 
-        _injector.Requests.Select(request => request.Target).ShouldBe([Notepad, Notepad]);
+        _injector.Requests.Select(request => request.Target).ShouldBe([_notepad, _notepad]);
     }
 
     [Fact]
@@ -63,92 +63,92 @@ public sealed class PasteFlowHoldTests : IDisposable
         _flow.Begin();
 
         await _flow.PasteAsync(Clip(), Ct);
-        _tracker.Next = Window(Popup, OwnProcess);
+        _tracker.Next = Window(_popupWindow, OwnProcess);
         await _flow.PasteAsync(Clip(), Ct);
 
-        _injector.Requests.Select(request => request.Target).ShouldBe([Notepad, null]);
+        _injector.Requests.Select(request => request.Target).ShouldBe([_notepad, null]);
     }
 
     [Fact]
     public async Task A_held_flow_pastes_into_the_program_in_front_now_when_it_is_not_ClipBench()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
         _flow.Hold(true);
 
         // The user clicked into another program; the locked popup did not take the focus.
-        _tracker.Next = Window(Browser, 43);
+        _tracker.Next = Window(_browser, 43);
         await _flow.PasteAsync(Clip(), Ct);
 
-        _injector.Requests.Single().Target.ShouldBe(Browser);
+        _injector.Requests.Single().Target.ShouldBe(_browser);
     }
 
     [Fact]
     public async Task The_program_pasted_into_last_stays_on_record_while_ClipBench_is_in_front()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
         _flow.Hold(true);
-        _tracker.Next = Window(Browser, 43);
+        _tracker.Next = Window(_browser, 43);
         await _flow.PasteAsync(Clip(), Ct);
 
-        _tracker.Next = Window(Popup, OwnProcess);
+        _tracker.Next = Window(_popupWindow, OwnProcess);
         await _flow.PasteAsync(Clip(), Ct);
 
-        _injector.Requests.Select(request => request.Target).ShouldBe([Browser, Browser]);
+        _injector.Requests.Select(request => request.Target).ShouldBe([_browser, _browser]);
     }
 
     [Fact]
     public async Task A_held_flow_with_nothing_in_front_uses_the_window_on_record()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
         _flow.Hold(true);
         _tracker.Next = Result.Failure<ForegroundTarget>(new ResultError(ErrorCode.TargetNotFound, "no window"));
 
         await _flow.PasteAsync(Clip(), Ct);
 
-        _injector.Requests.Single().Target.ShouldBe(Notepad);
+        _injector.Requests.Single().Target.ShouldBe(_notepad);
     }
 
     [Fact]
     public async Task Letting_go_of_the_hold_goes_back_to_one_paste_per_window()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
         _flow.Hold(true);
         await _flow.PasteAsync(Clip(), Ct);
 
         _flow.Hold(false);
         await _flow.PasteAsync(Clip(), Ct);
-        _tracker.Next = Window(Popup, OwnProcess);
+        _tracker.Next = Window(_popupWindow, OwnProcess);
         await _flow.PasteAsync(Clip(), Ct);
 
-        _injector.Requests.Select(request => request.Target).ShouldBe([Notepad, Notepad, null]);
+        _injector.Requests.Select(request => request.Target).ShouldBe([_notepad, _notepad, null]);
     }
 
     [Fact]
     public async Task Composed_content_is_also_pasted_into_the_program_in_front_now()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
         _flow.Hold(true);
-        _tracker.Next = Window(Browser, 43);
+        _tracker.Next = Window(_browser, 43);
 
         await _flow.PasteContentAsync(new TextContent("a, b"), Ct);
 
-        _injector.Requests.Single().Target.ShouldBe(Browser);
+        _injector.Requests.Single().Target.ShouldBe(_browser);
     }
 
     [Fact]
     public void Returning_gives_the_focus_back_to_the_window_on_record()
     {
-        _tracker.Next = Window(Notepad, 42);
+        _tracker.Next = Window(_notepad, 42);
         _flow.Begin();
 
         _flow.ReturnToTarget();
 
-        _tracker.Restored.ShouldBe([Notepad]);
+        _tracker.Restored.ShouldBe([_notepad]);
     }
 
     [Fact]
