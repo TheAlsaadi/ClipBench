@@ -93,6 +93,12 @@ public sealed class AppUnderTest : IAsyncLifetime
         .GetAllTopLevelWindows(_automation!)
         .FirstOrDefault(window => window.Title == "ClipBench" && !window.Properties.IsOffscreen.ValueOrDefault);
 
+    /// <summary>Another window of the app (the snippets window, say) when it is on screen, or null.</summary>
+    /// <param name="title">The title of the window.</param>
+    public Window? FindWindow(string title) => _application!
+        .GetAllTopLevelWindows(_automation!)
+        .FirstOrDefault(window => window.Title == title && !window.Properties.IsOffscreen.ValueOrDefault);
+
     /// <summary>The queue window when it is on screen, or null.</summary>
     public Window? FindQueueWindow() => _application!
         .GetAllTopLevelWindows(_automation!)
