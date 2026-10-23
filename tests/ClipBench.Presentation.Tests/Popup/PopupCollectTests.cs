@@ -25,6 +25,7 @@ public sealed class PopupCollectTests : IDisposable
             new FakeQueueControl(),
             new CollectToggle(_collect, _notifier),
             TestPickers.New(),
+            TestSidebars.New(_library),
             _settings,
             new ImmediateDispatcher(),
             _time);
@@ -118,6 +119,6 @@ public sealed class PopupCollectTests : IDisposable
     public void A_missing_collect_toggle_is_a_bug()
     {
         Should.Throw<ArgumentNullException>(() => new PopupViewModel(
-            _library, new FakePasteFlow(), new FakeQueueControl(), null!, TestPickers.New(), _settings, new ImmediateDispatcher(), _time));
+            _library, new FakePasteFlow(), new FakeQueueControl(), null!, TestPickers.New(), TestSidebars.New(_library), _settings, new ImmediateDispatcher(), _time));
     }
 }

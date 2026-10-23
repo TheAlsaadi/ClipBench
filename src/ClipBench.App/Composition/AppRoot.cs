@@ -1,3 +1,4 @@
+using ClipBench.Core.Boards;
 using ClipBench.Core.Capture;
 using ClipBench.Core.Diagnostics;
 using ClipBench.Core.History;
@@ -11,6 +12,7 @@ using ClipBench.Core.Transforms;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
+using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
@@ -18,6 +20,7 @@ using ClipBench.Presentation.Queue;
 using ClipBench.Presentation.Transforms;
 using ClipBench.Presentation.Tray;
 using ClipBench.Storage;
+using ClipBench.Storage.Boards;
 using ClipBench.Storage.Clips;
 using ClipBench.Storage.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -150,6 +153,14 @@ internal sealed class AppRoot : IAsyncDisposable
             if (loaded.Value.Unreadable > 0)
             {
                 log.Write(ActivityLevel.Warning, ActivityEvent.HistorySkipped, new ActivityDetails { Count = loaded.Value.Unreadable });
+            }
+
+            // The boards come after the clips, because loading them takes clips off boards that no longer exist. Without
+            // them the app still pastes what is saved.
+            var boardsLoad = await services.GetRequiredService<BoardCatalog>().LoadAsync(cancellationToken);
+            if (boardsLoad.IsFailure)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = boardsLoad.Error.Code });
             }
 
             // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
@@ -290,6 +301,9 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
+        _ = services.AddSingleton<IBoardStore>(new BoardStore(storage.Repository));
+        _ = services.AddSingleton<BoardCatalog>();
+        _ = services.AddSingleton<SidebarViewModel>();
         _ = services.AddSingleton<CollectController>();
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());

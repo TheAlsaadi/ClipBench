@@ -296,6 +296,14 @@ public sealed class ClipLibrary : IDisposable
     public ImmutableArray<SearchResult> Search(string query, int limit = ClipSearch.DefaultLimit) =>
         _search.Search(_history.Clips, query, limit);
 
+    /// <summary>Searches some of the clips, such as the pinned ones or the ones on a board.</summary>
+    /// <param name="within">The clips to search, in the order to keep when the query is empty.</param>
+    /// <param name="query">What to look for. Empty returns the first clips as they are given.</param>
+    /// <param name="limit">The most results.</param>
+    /// <returns>The matches, best first.</returns>
+    public ImmutableArray<SearchResult> Search(IEnumerable<Clip> within, string query, int limit = ClipSearch.DefaultLimit) =>
+        _search.Search(within, query, limit);
+
     /// <summary>Tells whether a clip looks like a secret. The scan runs once per clip, the first time it is asked.</summary>
     /// <param name="clip">The clip.</param>
     /// <returns>The kind of secret, or none. Images and file lists are never reported: a path is not a secret, and a folder named after a GUID would look like a key.</returns>

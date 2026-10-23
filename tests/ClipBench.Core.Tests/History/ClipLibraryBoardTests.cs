@@ -252,6 +252,21 @@ public sealed class ClipLibraryBoardTests : IDisposable
     }
 
     [Fact]
+    public async Task A_search_can_be_limited_to_some_of_the_clips_and_keeps_their_order_when_nothing_is_typed()
+    {
+        var a = await AddAsync("apple pie");
+        var b = await AddAsync("banana apple");
+        await AddAsync("apple tart");
+        await _library.SetBoardAsync(b.Id, _work, Ct);
+        await _library.SetBoardAsync(a.Id, _work, Ct);
+        var onBoard = _library.ClipsOnBoard(_work);
+
+        _library.Search(onBoard, string.Empty).Select(result => result.Clip.Id).ShouldBe([b.Id, a.Id]);
+        _library.Search(onBoard, "apple").Select(result => result.Clip.Id).ShouldBe([a.Id, b.Id]);
+        _library.Search(onBoard, "tart").ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Stored_clips_come_back_on_their_boards()
     {
         var a = TestClips.Text("a") with { IsPinned = true, OnBoard = _work, BoardPosition = 1 };

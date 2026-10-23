@@ -23,7 +23,7 @@ public sealed class PopupTransformTests : IDisposable
     public PopupTransformTests()
     {
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _time), new FakeClipStore());
-        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), _settings, new ImmediateDispatcher(), _time);
+        _vm = new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), TestPickers.New(), TestSidebars.New(_library), _settings, new ImmediateDispatcher(), _time);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -338,6 +338,6 @@ public sealed class PopupTransformTests : IDisposable
     [Fact]
     public void A_missing_picker_is_a_bug()
     {
-        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), null!, _settings, new ImmediateDispatcher(), _time));
+        Should.Throw<ArgumentNullException>(() => new PopupViewModel(_library, _paste, new FakeQueueControl(), new CollectToggle(new FakeCollectControl(), new FakeNotifier()), null!, TestSidebars.New(_library), _settings, new ImmediateDispatcher(), _time));
     }
 }

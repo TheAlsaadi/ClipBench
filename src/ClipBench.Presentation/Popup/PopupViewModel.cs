@@ -4,6 +4,7 @@ using ClipBench.Core.History;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
+using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Transforms;
@@ -19,6 +20,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(150);
 
     private const string SaveFailed = "That change could not be saved.";
+    // The most clips a list of pinned clips or of one board shows. The history list is cut shorter, by the search.
+    private const int ScopeLimit = 1000;
+
     private const string HintGap = " · ";
 
     private readonly ClipLibrary _library;
@@ -26,6 +30,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     private readonly IQueueControl _queue;
     private readonly CollectToggle _collect;
     private readonly TransformPickerViewModel _transforms;
+    private readonly SidebarViewModel _sidebar;
     private readonly SettingsService _settings;
     private readonly IUiDispatcher _dispatcher;
     private readonly TimeProvider _timeProvider;
@@ -43,16 +48,18 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <param name="queue">Runs a paste queue of the chosen clips.</param>
     /// <param name="collect">Starts and finishes collect mode.</param>
     /// <param name="transforms">The picker that changes the text before it is pasted.</param>
+    /// <param name="sidebar">History, pinned clips and the boards, and which of them the list shows.</param>
     /// <param name="settings">The user's settings, such as the separator for joining clips.</param>
     /// <param name="dispatcher">Moves work to the UI thread.</param>
     /// <param name="timeProvider">The clock and timers, for the age shown and the search delay.</param>
-    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, TransformPickerViewModel transforms, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
+    public PopupViewModel(ClipLibrary library, IPasteFlow paste, IQueueControl queue, CollectToggle collect, TransformPickerViewModel transforms, SidebarViewModel sidebar, SettingsService settings, IUiDispatcher dispatcher, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(library);
         ArgumentNullException.ThrowIfNull(paste);
         ArgumentNullException.ThrowIfNull(queue);
         ArgumentNullException.ThrowIfNull(collect);
         ArgumentNullException.ThrowIfNull(transforms);
+        ArgumentNullException.ThrowIfNull(sidebar);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -61,6 +68,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _queue = queue;
         _collect = collect;
         _transforms = transforms;
+        _sidebar = sidebar;
         _settings = settings;
         _dispatcher = dispatcher;
         _timeProvider = timeProvider;
@@ -70,6 +78,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _settings.Changed += OnSettingsChanged;
         _collect.Collect.Changed += OnCollectChanged;
         _transforms.PropertyChanged += OnTransformsChanged;
+        _sidebar.ScopeChanged += OnScopeChanged;
+        _sidebar.PropertyChanged += OnSidebarChanged;
     }
 
     /// <summary>Raised when the popup should be hidden.</summary>
@@ -114,9 +124,14 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     public bool ShowEmptyState => Rows.Count == 0;
 
     /// <summary>What to say when there is nothing to list.</summary>
-    public string EmptyText => string.IsNullOrWhiteSpace(SearchText)
-        ? "Nothing copied yet. Copy something and it will show up here."
-        : "No clips match your search.";
+    public string EmptyText => !string.IsNullOrWhiteSpace(SearchText)
+        ? "No clips match your search."
+        : _sidebar.Scope switch
+        {
+            PopupScope.Pinned => "No pinned clips yet. Press Ctrl+P on a clip to pin it.",
+            PopupScope.Board => "This board is empty. Press Ctrl+D on a clip to add it.",
+            _ => "Nothing copied yet. Copy something and it will show up here.",
+        };
 
     /// <summary>The key hints, or the question when a delete needs confirming.</summary>
     public string StatusText
@@ -126,6 +141,16 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             if (_transforms.IsOpen)
             {
                 return _transforms.StatusText;
+            }
+
+            if (_sidebar.IsEditing)
+            {
+                return string.Join(HintGap, "Enter save", "Esc cancel");
+            }
+
+            if (_sidebar.IsConfirmingDelete)
+            {
+                return _sidebar.DeleteQuestion;
             }
 
             if (IsConfirmingDelete)
@@ -144,6 +169,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             }
 
             var second = Current is { IsSensitive: true } ? "Ctrl+R reveal" : "Space select";
+            if (!IsCollecting && _sidebar.Scope == PopupScope.Board)
+            {
+                return string.Join(HintGap, "Enter paste", "Ctrl+Up/Down move", "Ctrl+Shift+D remove", "Esc close");
+            }
+
             return IsCollecting
                 ? string.Join(HintGap, $"Collecting {_collect.Collect.Count}", "Ctrl+L finish", "Enter paste", second, "Esc close")
                 : string.Join(HintGap, "Enter paste", second, "Ctrl+P pin", "Del delete", "Esc close");
@@ -165,6 +195,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         _marks.Clear();
         _transforms.Close();
+        _sidebar.Reset();
         _open = true;
         IsOpen = true;
         Refresh(keepSelection: false);
@@ -181,6 +212,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _open = false;
         IsOpen = false;
         _transforms.Close();
+        _ = _sidebar.Cancel();
         _ = _searchTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         SetSearchTextFromCode(string.Empty);
         IsConfirmingDelete = false;
@@ -205,6 +237,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         _settings.Changed -= OnSettingsChanged;
         _collect.Collect.Changed -= OnCollectChanged;
         _transforms.PropertyChanged -= OnTransformsChanged;
+        _sidebar.ScopeChanged -= OnScopeChanged;
+        _sidebar.PropertyChanged -= OnSidebarChanged;
         _searchTimer.Dispose();
     }
 
@@ -296,6 +330,11 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         if (_transforms.IsOpen)
         {
             _transforms.Cancel();
+            return;
+        }
+
+        if (_sidebar.Cancel())
+        {
             return;
         }
 
@@ -432,7 +471,13 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         var present = _library.Clips.Select(clip => clip.Id).ToHashSet();
         _ = _marks.RemoveAll(id => !present.Contains(id));
 
-        var rows = _library.Search(SearchText)
+        var results = _sidebar.Scope switch
+        {
+            PopupScope.Pinned => _library.Search(_library.Clips.Where(clip => clip.IsPinned), SearchText, ScopeLimit),
+            PopupScope.Board when _sidebar.CurrentBoard is { } board => _library.Search(_library.ClipsOnBoard(board), SearchText, ScopeLimit),
+            _ => _library.Search(SearchText),
+        };
+        var rows = results
             .Select(result => new ClipRowViewModel(result.Clip, _library.GetSensitivity(result.Clip), now))
             .ToList();
 
