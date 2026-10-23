@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using ClipBench.Core.Clips;
+using ClipBench.Core.Diagnostics;
+using ClipBench.Core.Results;
 using ClipBench.Core.Snippets;
 using ClipBench.Presentation.Rows;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -17,6 +20,7 @@ public sealed partial class SnippetsViewModel : ObservableObject, IDisposable
 
     private readonly SnippetCatalog _catalog;
     private readonly SnippetEngine _engine;
+    private readonly IActivityLog _log;
     private volatile bool _disposed;
 
     // The snippet whose values are being asked for, and the clipboard text from the moment the paste began.
@@ -26,12 +30,15 @@ public sealed partial class SnippetsViewModel : ObservableObject, IDisposable
     /// <summary>Creates the view model and starts following the catalog.</summary>
     /// <param name="catalog">The snippets.</param>
     /// <param name="engine">Reads and fills in snippets.</param>
-    public SnippetsViewModel(SnippetCatalog catalog, SnippetEngine engine)
+    /// <param name="log">Records that a snippet was pasted or could not be, without any text.</param>
+    public SnippetsViewModel(SnippetCatalog catalog, SnippetEngine engine, IActivityLog log)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(log);
         _catalog = catalog;
         _engine = engine;
+        _log = log;
         Rows = [];
         Fields = [];
         _catalog.Changed += OnCatalogChanged;
@@ -94,19 +101,25 @@ public sealed partial class SnippetsViewModel : ObservableObject, IDisposable
 
         if (_catalog.Find(id) is not { } snippet)
         {
-            return Failed("That snippet no longer exists.");
+            return Failed(new ResultError(ErrorCode.SnippetNotFound, "That snippet no longer exists."));
         }
 
         var parsed = SnippetEngine.Parse(snippet.Body);
         if (parsed.IsFailure)
         {
-            return Failed(parsed.Error.Message);
+            return Failed(parsed.Error);
         }
 
         if (parsed.Value.InputNames.Count == 0)
         {
             var text = _engine.Expand(parsed.Value, new SnippetValues(clipboardText, null));
-            return text.IsSuccess ? new SnippetStart(SnippetStartKind.Ready, text.Value, null) : Failed(text.Error.Message);
+            if (text.IsFailure)
+            {
+                return Failed(text.Error);
+            }
+
+            LogPasted(0, text.Value);
+            return new SnippetStart(SnippetStartKind.Ready, text.Value, null);
         }
 
         _pending = parsed.Value;
@@ -137,10 +150,12 @@ public sealed partial class SnippetsViewModel : ObservableObject, IDisposable
         if (expanded.IsFailure)
         {
             PromptError = expanded.Error.Message;
+            _log.Write(ActivityLevel.Warning, ActivityEvent.SnippetFailed, new ActivityDetails { Error = expanded.Error.Code });
             return false;
         }
 
         text = expanded.Value;
+        LogPasted(Fields.Count, text);
         CancelPrompt();
         return true;
     }
@@ -168,7 +183,15 @@ public sealed partial class SnippetsViewModel : ObservableObject, IDisposable
         _catalog.Changed -= OnCatalogChanged;
     }
 
-    private static SnippetStart Failed(string error) => new(SnippetStartKind.Failed, string.Empty, error);
+    private SnippetStart Failed(ResultError error)
+    {
+        _log.Write(ActivityLevel.Warning, ActivityEvent.SnippetFailed, new ActivityDetails { Error = error.Code });
+        return new SnippetStart(SnippetStartKind.Failed, string.Empty, error.Message);
+    }
+
+    // The log gets how many values the snippet asked for and how big the text is, never the text.
+    private void LogPasted(int values, string text) =>
+        _log.Write(ActivityLevel.Information, ActivityEvent.SnippetPasted, new ActivityDetails { Count = values, Bytes = Encoding.UTF8.GetByteCount(text) });
 
     private static SnippetRowViewModel Row(Snippet snippet)
     {

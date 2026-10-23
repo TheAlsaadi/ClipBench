@@ -121,6 +121,12 @@ public enum ActivityEvent
 
     /// <summary>A chain of transforms could not change the text, with the reason as an error code.</summary>
     TransformFailed,
+
+    /// <summary>A snippet was filled in and pasted, with the number of values it asked for as the count and the size of the text.</summary>
+    SnippetPasted,
+
+    /// <summary>A snippet could not be filled in, with the reason as an error code.</summary>
+    SnippetFailed,
 }
 
 /// <summary>

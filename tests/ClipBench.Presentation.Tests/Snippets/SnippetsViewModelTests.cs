@@ -8,13 +8,14 @@ namespace ClipBench.Presentation.Tests.Snippets;
 public sealed class SnippetsViewModelTests : IDisposable
 {
     private readonly FakeSnippetStore _store = new();
+    private readonly FakeActivityLog _log = new();
     private readonly SnippetCatalog _catalog;
     private readonly SnippetsViewModel _vm;
 
     public SnippetsViewModelTests()
     {
         _catalog = new SnippetCatalog(_store);
-        _vm = new SnippetsViewModel(_catalog, new SnippetEngine(new SnippetTestClock()));
+        _vm = new SnippetsViewModel(_catalog, new SnippetEngine(new SnippetTestClock()), _log);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -306,6 +307,59 @@ public sealed class SnippetsViewModelTests : IDisposable
         _vm.Fields.Select(field => field.Name).ShouldBe(["B"]);
     }
 
+    // --- the activity log ---
+
+    [Fact]
+    public async Task A_snippet_that_is_ready_at_once_is_logged_with_how_many_values_it_asked_for_and_its_size_but_not_its_text()
+    {
+        var snippet = await AddAsync("Note", "secret-marker {date}");
+
+        _vm.Begin(snippet.Id, null);
+
+        var entry = _log.Entries.Single();
+        entry.Activity.ShouldBe(ClipBench.Core.Diagnostics.ActivityEvent.SnippetPasted);
+        entry.Details.Count.ShouldBe(0);
+        entry.Details.Bytes.ShouldBe("secret-marker 2026-10-24".Length);
+        entry.ToString().ShouldNotContain("secret-marker");
+    }
+
+    [Fact]
+    public async Task A_snippet_pasted_after_a_prompt_is_logged_once_it_is_made()
+    {
+        var snippet = await AddAsync("Reply", "{input:A} {input:B}");
+        _vm.Begin(snippet.Id, null);
+        _log.Entries.ShouldBeEmpty();
+        _vm.Fields[0].Value = "x";
+
+        _vm.TrySubmit(out _).ShouldBeTrue();
+
+        var entry = _log.Entries.Single();
+        entry.Activity.ShouldBe(ClipBench.Core.Diagnostics.ActivityEvent.SnippetPasted);
+        entry.Details.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_snippet_that_cannot_be_made_is_logged_with_the_reason_as_a_code()
+    {
+        var snippet = await AddAsync("Reply", "{input:A}");
+        _vm.Begin(snippet.Id, null);
+        _vm.Fields[0].Value = new string('a', SnippetEngine.MaxInputLength + 1);
+
+        _vm.TrySubmit(out _).ShouldBeFalse();
+
+        var entry = _log.Entries.Single();
+        entry.Activity.ShouldBe(ClipBench.Core.Diagnostics.ActivityEvent.SnippetFailed);
+        entry.Details.Error.ShouldBe(ErrorCode.SnippetInputTooLong);
+    }
+
+    [Fact]
+    public void A_snippet_that_is_gone_is_logged_as_a_failure()
+    {
+        _vm.Begin(SnippetId.New(), null);
+
+        _log.Entries.Single().Activity.ShouldBe(ClipBench.Core.Diagnostics.ActivityEvent.SnippetFailed);
+    }
+
     // --- printing and bugs ---
 
     [Fact]
@@ -324,8 +378,9 @@ public sealed class SnippetsViewModelTests : IDisposable
     [Fact]
     public void Missing_arguments_are_bugs()
     {
-        Should.Throw<ArgumentNullException>(() => new SnippetsViewModel(null!, new SnippetEngine(new SnippetTestClock())));
-        Should.Throw<ArgumentNullException>(() => new SnippetsViewModel(_catalog, null!));
+        Should.Throw<ArgumentNullException>(() => new SnippetsViewModel(null!, new SnippetEngine(new SnippetTestClock()), _log));
+        Should.Throw<ArgumentNullException>(() => new SnippetsViewModel(_catalog, null!, _log));
+        Should.Throw<ArgumentNullException>(() => new SnippetsViewModel(_catalog, new SnippetEngine(new SnippetTestClock()), null!));
         Should.Throw<ArgumentNullException>(() => _vm.Refresh(null!));
         Should.Throw<ArgumentNullException>(() => new SnippetRowViewModel(SnippetId.New(), null!, "x", 0));
         Should.Throw<ArgumentNullException>(() => new SnippetFieldViewModel(null!));

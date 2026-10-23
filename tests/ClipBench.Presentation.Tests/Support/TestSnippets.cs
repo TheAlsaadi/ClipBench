@@ -7,5 +7,5 @@ namespace ClipBench.Presentation.Tests.Support;
 internal static class TestSnippets
 {
     public static SnippetsViewModel New(SnippetCatalog? catalog = null) =>
-        new(catalog ?? new SnippetCatalog(new FakeSnippetStore()), new SnippetEngine(new SnippetTestClock()));
+        new(catalog ?? new SnippetCatalog(new FakeSnippetStore()), new SnippetEngine(new SnippetTestClock()), new FakeActivityLog());
 }
