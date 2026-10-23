@@ -53,6 +53,8 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly IActivityLog _log;
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
+    private readonly StartupOptions _options;
+    private SnippetsWindow? _snippetsWindow;
     private HotkeyId? _hotkey;
     private HotkeyId? _collectHotkey;
     private bool _disposed;
@@ -68,8 +70,10 @@ internal sealed class AppRoot : IAsyncDisposable
         ITrayIcon? tray,
         IActivityLog log,
         ISingleInstanceGuard guard,
-        IUiDispatcher dispatcher)
+        IUiDispatcher dispatcher,
+        StartupOptions options)
     {
+        _options = options;
         _services = services;
         _platform = platform;
         _storage = storage;
@@ -186,7 +190,8 @@ internal sealed class AppRoot : IAsyncDisposable
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
 
             hud = CreateQueueWindow(services, platform, options);
-            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher);
+            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
+            popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSnippetEditor();
             await root.ShowTrayAsync(cancellationToken);
             root._hotkey = await root.RegisterShortcutAsync(
                 options.Hotkey ?? Hotkey.Default,
@@ -243,6 +248,29 @@ internal sealed class AppRoot : IAsyncDisposable
         _popup.ShowAt(bounds);
     }
 
+    /// <summary>Shows the snippet editor, making the window the first time.</summary>
+    public void OpenSnippetEditor()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_snippetsWindow is null)
+        {
+            _snippetsWindow = new SnippetsWindow(_services.GetRequiredService<SnippetEditorViewModel>());
+
+            // It shows what the user wrote in their snippets, so it is kept out of screen captures like the popup.
+            if (!_options.AllowScreenCapture)
+            {
+                var handle = WinRT.Interop.WindowNative.GetWindowHandle(_snippetsWindow);
+                _ = _platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
+            }
+        }
+
+        _snippetsWindow.ShowEditor();
+    }
+
     /// <summary>Stops everything in the order that keeps data safe: no new clips, then the history, then Windows.</summary>
     /// <returns>A task that completes when everything is released.</returns>
     public async ValueTask DisposeAsync()
@@ -260,6 +288,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _popupViewModel.Close();
         _popup.Close();
         _hud.Close();
+        _snippetsWindow?.Shutdown();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
@@ -316,6 +345,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<SnippetCatalog>();
         _ = services.AddSingleton<SnippetEngine>();
         _ = services.AddSingleton<SnippetsViewModel>();
+        _ = services.AddSingleton<SnippetEditorViewModel>();
         _ = services.AddSingleton<SidebarViewModel>();
         _ = services.AddSingleton<CollectController>();
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
@@ -384,6 +414,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray.OpenRequested += (_, _) => _dispatcher.Post(() => TogglePopup(fromTray: true));
         _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
+        _trayViewModel.EditSnippetsRequested += (_, _) => OpenSnippetEditor();
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly

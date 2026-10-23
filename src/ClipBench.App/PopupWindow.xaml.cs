@@ -328,6 +328,10 @@ public sealed partial class PopupWindow : Window
                 ViewModel.Sidebar.ToggleCommand.Execute(null);
                 e.Handled = true;
                 break;
+            case VirtualKey.E when control:
+                ViewModel.EditSnippetsCommand.Execute(null);
+                e.Handled = true;
+                break;
             case VirtualKey.N when control:
                 StartNewBoard();
                 e.Handled = true;

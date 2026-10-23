@@ -191,6 +191,31 @@ public sealed class PopupSnippetTests : IDisposable
     }
 
     [Fact]
+    public async Task Ctrl_E_closes_the_popup_and_asks_for_the_snippet_editor()
+    {
+        await AddSnippetAsync("Signature", "Regards");
+        _vm.Open();
+        var asked = 0;
+        _vm.EditSnippetsRequested += (_, _) => asked++;
+
+        _vm.EditSnippetsCommand.Execute(null);
+
+        _vm.IsOpen.ShouldBeFalse();
+        asked.ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_editor_can_be_asked_for_while_the_popup_is_closed_too()
+    {
+        var asked = 0;
+        _vm.EditSnippetsRequested += (_, _) => asked++;
+
+        _vm.EditSnippetsCommand.Execute(null);
+
+        asked.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Each_empty_snippet_view_says_what_to_do()
     {
         _vm.Open();

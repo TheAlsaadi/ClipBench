@@ -9,6 +9,9 @@ namespace ClipBench.Presentation.Popup;
 /// <summary>The Snippets view: a list of snippets, and pasting one with its variables filled in.</summary>
 public sealed partial class PopupViewModel
 {
+    /// <summary>Raised when the user asked to edit the snippets. The popup is hidden first.</summary>
+    public event EventHandler? EditSnippetsRequested;
+
     /// <summary>The snippets and the prompt for their values.</summary>
     public SnippetsViewModel Snippets => _snippets;
 
@@ -27,6 +30,14 @@ public sealed partial class PopupViewModel
     /// <summary>The highlighted snippet, or null when the snippets are not shown.</summary>
     public SnippetRowViewModel? CurrentSnippet =>
         _sidebar.Scope == PopupScope.Snippets && SelectedIndex >= 0 && SelectedIndex < _snippets.Rows.Count ? _snippets.Rows[SelectedIndex] : null;
+
+    [RelayCommand]
+    private void EditSnippets()
+    {
+        // The editor is a window of its own, so the popup goes away before it opens.
+        Close();
+        EditSnippetsRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     [RelayCommand]
     private async Task SubmitSnippetPromptAsync(CancellationToken cancellationToken)

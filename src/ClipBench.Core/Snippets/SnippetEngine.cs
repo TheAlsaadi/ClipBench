@@ -117,7 +117,7 @@ public sealed class SnippetEngine
 
         if (body.Length > MaxBodyLength)
         {
-            return Result.Failure<ParsedSnippet>(new ResultError(ErrorCode.InvalidSnippet, $"A snippet can have at most {MaxBodyLength:N0} characters."));
+            return Result.Failure<ParsedSnippet>(new ResultError(ErrorCode.InvalidSnippet, string.Create(CultureInfo.InvariantCulture, $"A snippet can have at most {MaxBodyLength:N0} characters.")));
         }
 
         var tokens = new List<SnippetToken>();
@@ -160,7 +160,7 @@ public sealed class SnippetEngine
                     {
                         if (names.Count == MaxInputs)
                         {
-                            return Result.Failure<ParsedSnippet>(new ResultError(ErrorCode.InvalidSnippet, $"A snippet can ask for at most {MaxInputs} different values."));
+                            return Result.Failure<ParsedSnippet>(new ResultError(ErrorCode.InvalidSnippet, string.Create(CultureInfo.InvariantCulture, $"A snippet can ask for at most {MaxInputs} different values.")));
                         }
 
                         names.Add(token.Text);
@@ -217,7 +217,7 @@ public sealed class SnippetEngine
 
                     if (typed.Length > MaxInputLength)
                     {
-                        return Result.Failure<string>(new ResultError(ErrorCode.SnippetInputTooLong, $"A value can have at most {MaxInputLength:N0} characters."));
+                        return Result.Failure<string>(new ResultError(ErrorCode.SnippetInputTooLong, string.Create(CultureInfo.InvariantCulture, $"A value can have at most {MaxInputLength:N0} characters.")));
                     }
 
                     piece = typed;

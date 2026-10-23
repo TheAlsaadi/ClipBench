@@ -120,6 +120,14 @@
                         ToolTipService.ToolTip="Delete the board, its clips stay (Ctrl+Shift+Delete)">
                         <FontIcon FontSize="14" Glyph="&#xE74D;" />
                     </Button>
+                    <Button
+                        AutomationProperties.AutomationId="EditSnippetsButton"
+                        AutomationProperties.Name="Edit snippets"
+                        Command="{x:Bind ViewModel.EditSnippetsCommand}"
+                        ToolTipService.ToolTip="Edit the snippets (Ctrl+E)"
+                        Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
+                        <FontIcon FontSize="14" Glyph="&#xE713;" />
+                    </Button>
                 </StackPanel>
             </Grid>
         </UserControl>

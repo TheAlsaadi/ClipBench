@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using ClipBench.Core.Results;
 
@@ -65,12 +66,12 @@ public static class FindReplace
 
         if (options.Find.Length > MaxPatternLength)
         {
-            return Refused($"The text to find is too long (at most {MaxPatternLength:N0} characters).");
+            return Refused(string.Create(CultureInfo.InvariantCulture, $"The text to find is too long (at most {MaxPatternLength:N0} characters)."));
         }
 
         if (options.Replace.Length > MaxReplacementLength)
         {
-            return Refused($"The replacement is too long (at most {MaxReplacementLength:N0} characters).");
+            return Refused(string.Create(CultureInfo.InvariantCulture, $"The replacement is too long (at most {MaxReplacementLength:N0} characters)."));
         }
 
         if (!options.UseRegex)

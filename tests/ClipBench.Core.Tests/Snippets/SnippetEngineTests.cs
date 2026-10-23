@@ -297,6 +297,24 @@ public class SnippetEngineTests
     }
 
     [Fact]
+    public void The_messages_write_numbers_the_same_way_whatever_the_language_of_Windows()
+    {
+        var before = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+            SnippetEngine.Parse(new string('a', SnippetEngine.MaxBodyLength + 1)).Error.Message.ShouldBe("A snippet can have at most 10,000 characters.");
+            _engine.Expand(Parse("{input:X}"), new SnippetValues(null, Inputs(("X", new string('a', SnippetEngine.MaxInputLength + 1))))).Error.Message
+                .ShouldBe("A value can have at most 10,000 characters.");
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = before;
+        }
+    }
+
+    [Fact]
     public void A_snippet_can_ask_for_so_many_values_but_not_more()
     {
         string Body(int count) => string.Concat(Enumerable.Range(0, count).Select(i => "{input:v" + i + "}"));
