@@ -23,4 +23,21 @@ public interface IWindowEffects
     /// <param name="window">The window.</param>
     /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/>. Windows 10 does not support rounded corners, so a failure is not an error to show.</returns>
     Result UseRoundedCorners(WindowHandle window);
+
+    /// <summary>
+    /// Asks Windows not to draw its own border line around a window, so the window can draw a border of its own that
+    /// follows its theme.
+    /// </summary>
+    /// <param name="window">The window.</param>
+    /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/>. Windows 10 does not support it, so a failure is not an error to show.</returns>
+    Result HideSystemBorder(WindowHandle window);
+
+    /// <summary>
+    /// Takes the frame off a window: the caption, the dialog frame and the borders that Windows keeps around a window that
+    /// has none of its own. The area for the window's content then fills the whole window; with the frame, a window loses a
+    /// few pixels on each side to a line that cannot be styled.
+    /// </summary>
+    /// <param name="window">The window.</param>
+    /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/> when Windows refused or the window does not exist.</returns>
+    Result RemoveFrame(WindowHandle window);
 }

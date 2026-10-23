@@ -187,7 +187,9 @@ internal sealed class AppRoot : IAsyncDisposable
                 _ = platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
             }
 
+            _ = platform.WindowEffects.RemoveFrame(new Core.Pasting.WindowHandle(handle));
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
+            _ = platform.WindowEffects.HideSystemBorder(new Core.Pasting.WindowHandle(handle));
 
             hud = CreateQueueWindow(services, platform, options);
             var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
@@ -246,6 +248,7 @@ internal sealed class AppRoot : IAsyncDisposable
         // Opening records the window that has focus now, so it has to come before the popup takes focus.
         _popupViewModel.Open(pasteIntoPreviousWindow: !fromTray);
         _popup.ShowAt(bounds);
+
     }
 
     /// <summary>Shows the snippet editor, making the window the first time.</summary>
