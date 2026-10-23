@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Collections.Immutable;
+using System.Text;
 using ClipBench.Core.Results;
 
 namespace ClipBench.Core.Snippets;
@@ -206,9 +208,31 @@ public sealed class SnippetCatalog : IDisposable
             return Result.Failure<string>(parsed.Error);
         }
 
+        // Half of a surrogate pair has no UTF-8 form, so it could not be stored: it is refused here, before anything changes.
+        if (!IsWellFormed(body))
+        {
+            return Result.Failure<string>(new ResultError(ErrorCode.InvalidSnippet, "The snippet has a character that cannot be saved."));
+        }
+
         return Snippets.Any(snippet => snippet.Id != except && string.Equals(snippet.Name, valid.Value, StringComparison.OrdinalIgnoreCase))
             ? Result.Failure<string>(new ResultError(ErrorCode.SnippetNameTaken, "Another snippet already has that name."))
             : valid;
+    }
+
+    private static bool IsWellFormed(string text)
+    {
+        var index = 0;
+        while (index < text.Length)
+        {
+            if (Rune.DecodeFromUtf16(text.AsSpan(index), out _, out var consumed) != OperationStatus.Done)
+            {
+                return false;
+            }
+
+            index += consumed;
+        }
+
+        return true;
     }
 
     private void SetSnippets(ImmutableArray<Snippet> snippets)

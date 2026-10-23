@@ -147,6 +147,37 @@ public sealed class SnippetCatalogTests : IDisposable
     }
 
     [Fact]
+    public async Task A_text_with_half_of_a_surrogate_pair_is_refused_when_made_and_nothing_is_stored()
+    {
+        var created = await _catalog.CreateAsync("Broken", "a" + (char)0xD800 + "b", Ct);
+
+        created.Error.Code.ShouldBe(ErrorCode.InvalidSnippet);
+        _catalog.Snippets.ShouldBeEmpty();
+        _store.Saved.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_text_with_half_of_a_surrogate_pair_is_refused_when_changed_and_the_old_text_stays()
+    {
+        var snippet = await CreateAsync("Note", "old");
+        _store.Saved.Clear();
+
+        var updated = await _catalog.UpdateAsync(snippet.Id, "Note", "new" + (char)0xDC00, Ct);
+
+        updated.Error.Code.ShouldBe(ErrorCode.InvalidSnippet);
+        _catalog.Snippets.Single().Body.ShouldBe("old");
+        _store.Saved.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Letters_outside_the_basic_plane_are_allowed_in_a_text()
+    {
+        await CreateAsync("Rocket", "Launch 🚀");
+
+        _catalog.Snippets.Single().Body.ShouldBe("Launch 🚀");
+    }
+
+    [Fact]
     public async Task A_text_with_warnings_is_still_saved()
     {
         await CreateAsync("Odd", "{nope} {date");

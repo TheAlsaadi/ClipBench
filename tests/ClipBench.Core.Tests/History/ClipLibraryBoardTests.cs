@@ -111,6 +111,18 @@ public sealed class ClipLibraryBoardTests : IDisposable
     }
 
     [Fact]
+    public async Task When_the_pin_cannot_be_stored_the_place_on_the_board_is_not_stored_either()
+    {
+        var clip = await AddAsync("a");
+        _store.PinFailure = _storeError;
+
+        var result = await _library.SetBoardAsync(clip.Id, _work, Ct);
+
+        result.Error.ShouldBe(_storeError);
+        _store.BoardChanges.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Changes_to_a_board_raise_changed()
     {
         var clip = await AddAsync("a");

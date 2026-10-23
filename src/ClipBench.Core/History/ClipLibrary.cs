@@ -170,14 +170,17 @@ public sealed class ClipLibrary : IDisposable
                 return Result.Success();
             }
 
-            // Pinned first: a clip is on a board only once it is pinned, whatever happens to the second write.
+            // Pinned first: a clip is on a board only once it is pinned. When the pin cannot be stored the place is not
+            // stored either, so the store never holds an unpinned clip on a board.
             var pinned = before is { IsPinned: false } && after.IsPinned
                 ? await _store.SetPinnedAsync(id, true, cancellationToken).ConfigureAwait(false)
                 : Result.Success();
-            var placed = await _store.SetBoardsAsync([new ClipPlacement(id, after.OnBoard, after.BoardPosition)], cancellationToken).ConfigureAwait(false);
+            var placed = pinned.IsFailure
+                ? pinned
+                : await _store.SetBoardsAsync([new ClipPlacement(id, after.OnBoard, after.BoardPosition)], cancellationToken).ConfigureAwait(false);
 
             RaiseChanged();
-            return pinned.IsFailure ? pinned : placed;
+            return placed;
         }
         finally
         {

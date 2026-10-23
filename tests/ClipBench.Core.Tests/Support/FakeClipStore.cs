@@ -18,6 +18,9 @@ internal sealed class FakeClipStore : IClipStore
     /// <summary>When set, every call fails with this error.</summary>
     public ResultError? Failure { get; set; }
 
+    /// <summary>When set, only pin changes fail, with this error.</summary>
+    public ResultError? PinFailure { get; set; }
+
     /// <summary>Runs inside every save, so a test can hold a save open.</summary>
     public Func<Task>? DuringSave { get; set; }
 
@@ -64,7 +67,7 @@ internal sealed class FakeClipStore : IClipStore
     public Task<Result> SetPinnedAsync(ClipId id, bool pinned, CancellationToken cancellationToken)
     {
         PinChanges.Add((id, pinned));
-        return Task.FromResult(Failure is { } error ? Result.Failure(error) : Result.Success());
+        return Task.FromResult((PinFailure ?? Failure) is { } error ? Result.Failure(error) : Result.Success());
     }
 
     public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken)
