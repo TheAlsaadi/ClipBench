@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   monitor; drag a rectangle over the text and let go. Only that rectangle is read, in memory, with the text recognition
   of Windows, and the picture is cleared at once and never saved. The text goes on the clipboard and into the history
   like any copy (a secret is hidden and expires; with incognito on it is not recorded). Esc or a right click cancels.
+  Small text is enlarged twofold before it is read (Windows returns nothing for text of 13 pixels or less otherwise), and every
+  recognition language in your Windows profile is tried, keeping the best reading, so Arabic next to English works.
   If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
   Settings.
 - The popup says what a clip is: a **color** (with a swatch) in hex, `rgb()` or `hsl()`; a **link**; an **email**

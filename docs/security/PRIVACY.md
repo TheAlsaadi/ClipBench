@@ -37,11 +37,11 @@ Settings → Privacy → **Delete everything…**, then confirm. Every clip (pin
 
 Press **Win+Alt+O** (or **Copy text from the screen** in the tray menu), drag a rectangle over the text, and let go. The text is read on your PC by the text recognition that is part of Windows, put on your clipboard and added to your history like any copy. **Esc** or a right click cancels.
 
-- Only the rectangle you drag is read, into memory. The picture is **never saved**, not even temporarily, and it is cleared from ClipBench's memory the moment the text has been read. (Windows' recognizer keeps its own copy for a moment while it works, which ClipBench cannot clear.) Because only text is kept, there is no picture to pin.
+- Only the rectangle you drag is read, into memory. The picture is **never saved**, not even temporarily, and it is cleared from ClipBench's memory the moment the text has been read, and so is the enlarged copy ClipBench makes of small text to read it better. (Windows' recognizer keeps its own copy for a moment while it works, one per language it tries, which ClipBench cannot clear.) Because only text is kept, there is no picture to pin.
 - The dimmed overlay and its border are never part of what is read, and are kept out of screenshots.
 - Text that looks like a secret is hidden and expires, like any copy. With **incognito** on, the text goes on your clipboard but is not added to your history, and the notice says so.
 - ClipBench tells you how many characters were copied, never which.
-- It needs a text-recognition language for the languages in your Windows profile. If there is none, ClipBench says where to add one: Settings, Time and language, Language and region, Language options, Text recognition.
+- It reads with every text-recognition language you have set up in your Windows profile (up to four, in your order) and keeps the best reading, so a second script such as Arabic works next to English. It needs at least one. If there is none, ClipBench says where to add one: Settings, Time and language, Language and region, Language options, Text recognition.
 
 ## What the popup knows about a clip
 
