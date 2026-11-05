@@ -16,7 +16,7 @@ namespace ClipBench.UiSmokeTests;
 /// history is filled through the real storage before the app starts, so the tests never read the user's history. Nobody
 /// may type or click while a test runs: the keys go to whichever window has focus.
 /// </summary>
-public sealed class AppUnderTest : IAsyncLifetime
+public class AppUnderTest : IAsyncLifetime
 {
     public const string Jwt =
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
@@ -41,16 +41,25 @@ public sealed class AppUnderTest : IAsyncLifetime
 
     public string LogPath => Path.Combine(_folder, "logs", "clipbench.log");
 
+    /// <summary>Where the app keeps its settings.</summary>
+    public string SettingsPath => Path.Combine(_folder, "settings.json");
+
+    /// <summary>True when the first-run question is already answered, so the Settings window does not open by itself.</summary>
+    protected virtual bool FirstRunAnswered => true;
+
     public Process Process => _process ?? throw new InvalidOperationException("The app was not started.");
 
     public async ValueTask InitializeAsync()
     {
         await SeedHistoryAsync();
 
-        // The first-run question opens the Settings window by itself; these tests are about the popup, so it counts as answered.
-        await File.WriteAllTextAsync(Path.Combine(_folder, "settings.json"), "{ \"version\": 1, \"firstRunCompleted\": true }", Ct);
+        // The first-run question opens the Settings window by itself; most tests are about the popup, so it counts as answered.
+        if (FirstRunAnswered)
+        {
+            await File.WriteAllTextAsync(SettingsPath, "{ \"version\": 1, \"firstRunCompleted\": true }", Ct);
+        }
 
-        var start =new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
+        var start = new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
         _process = Process.Start(start) ?? throw new InvalidOperationException("The app did not start.");
         _automation = new UIA3Automation();
         _application = FlaUI.Core.Application.Attach(_process);
@@ -81,6 +90,7 @@ public sealed class AppUnderTest : IAsyncLifetime
             }
         }
 
+        GC.SuppressFinalize(this);
         return ValueTask.CompletedTask;
     }
 
