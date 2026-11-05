@@ -171,7 +171,7 @@ public static class LineOrder
         return Direction.Neutral;
     }
 
-    private static bool IsRightToLeftLetter(char c) =>
+    internal static bool IsRightToLeftLetter(char c) =>
         char.IsLetter(c)
         && (int)c is (>= 0x0590 and <= 0x08FF) // Hebrew, Arabic, Syriac, Thaana, N'Ko, Samaritan, Mandaic, Arabic extended
             or (>= 0xFB1D and <= 0xFDFF) // Hebrew and Arabic presentation forms A

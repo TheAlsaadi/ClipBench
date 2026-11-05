@@ -10,18 +10,45 @@ public class AdaptiveRecognizerTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private sealed class FakeEngine(Func<ScreenImage, Result<string>> answer) : ITextRecognizer
+    private sealed class FakeEngine(Func<ScreenImage, Result<IReadOnlyList<RecognizedLine>>> answer) : IWordRecognizer
     {
+        public FakeEngine(Func<ScreenImage, Result<string>> text)
+            : this(image => From(text(image)))
+        {
+        }
+
         public List<(int Width, int Height)> Saw { get; } = [];
 
         public int Calls { get; private set; }
 
-        public Task<Result<string>> RecognizeAsync(ScreenImage image, CancellationToken cancellationToken)
+        public Task<Result<IReadOnlyList<RecognizedLine>>> ReadAsync(ScreenImage image, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             Calls++;
             Saw.Add((image.Width, image.Height));
             return Task.FromResult(answer(image));
+        }
+
+        // Each line of the text becomes a line whose words sit side by side.
+        private static Result<IReadOnlyList<RecognizedLine>> From(Result<string> text)
+        {
+            if (text.IsFailure)
+            {
+                return Result.Failure<IReadOnlyList<RecognizedLine>>(text.Error);
+            }
+
+            var lines = new List<RecognizedLine>();
+            var row = 0;
+            foreach (var line in text.Value.Split('\n'))
+            {
+                var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Select((word, index) => new RecognizedWord(word, index * 100, row * 20, 90, 18))
+                    .ToList();
+                lines.Add(new RecognizedLine(line.TrimEnd('\r'), words));
+                row++;
+            }
+
+            return Result.Success<IReadOnlyList<RecognizedLine>>(lines);
         }
     }
 
@@ -29,9 +56,11 @@ public class AdaptiveRecognizerTests
 
     private static FakeEngine Fails(ErrorCode code, string message) => new(_ => Result.Failure<string>(new ResultError(code, message)));
 
+    private static FakeEngine Reads(params RecognizedLine[] lines) => new(_ => Result.Success<IReadOnlyList<RecognizedLine>>(lines));
+
     private static ScreenImage Image(int width = 200, int height = 40) => new(width, height, new byte[width * height * 4]);
 
-    private static AdaptiveRecognizer Create(params ITextRecognizer[] engines) => new(() => [.. engines], NoLanguage);
+    private static AdaptiveRecognizer Create(params IWordRecognizer[] engines) => new(() => [.. engines], NoLanguage);
 
     // --- no language ---
 
@@ -228,7 +257,7 @@ public class AdaptiveRecognizerTests
     public void Missing_parts_are_a_bug()
     {
         Should.Throw<ArgumentNullException>(() => new AdaptiveRecognizer(null!, NoLanguage));
-        Should.Throw<ArgumentException>(() => new AdaptiveRecognizer(() => ImmutableArray<ITextRecognizer>.Empty, " "));
+        Should.Throw<ArgumentException>(() => new AdaptiveRecognizer(() => ImmutableArray<IWordRecognizer>.Empty, " "));
         Should.Throw<ArgumentNullException>(() => RecognitionChoice.PickBest(null!));
     }
 
@@ -243,5 +272,24 @@ public class AdaptiveRecognizerTests
         using var image = Image();
         await Should.ThrowAsync<OperationCanceledException>(() => Create(engine).RecognizeAsync(image, source.Token));
         engine.Calls.ShouldBe(0);
+    }
+
+    // --- words from the engine that is good at them ---
+
+    [Fact]
+    public async Task An_arabic_name_in_an_english_window_comes_out_with_the_chevrons_of_the_english_engine_and_the_name_of_the_arabic_one()
+    {
+        var mohammed = string.Concat((char)0x645, (char)0x62D, (char)0x645, (char)0x62F);
+        var alsaadi = string.Concat((char)0x627, (char)0x644, (char)0x635, (char)0x627, (char)0x639, (char)0x62F, (char)0x64A);
+        RecognizedWord W(string text, double x, double width) => new(text, x, 5, width, 10);
+        RecognizedLine Line(params RecognizedWord[] words) => new(string.Join(' ', words.Select(w => w.Text)), words);
+
+        var english = Reads(Line(W(">", 59, 16), W("EIOJI", 134, 151), W(">", 446, 16), W("Minecraft-mod-porting", 518, 428), W(">", 1004, 16)));
+        var arabic = Reads(Line(W("(", 59, 17), W(alsaadi, 134, 152), W(mohammed, 298, 92), W("(", 446, 17), W("Minecraft-mod-porting>", 518, 502)));
+        using var image = Image(345, 28);
+
+        var result = await Create(english, arabic).RecognizeAsync(image, Ct);
+
+        result.Value.ShouldBe("> " + mohammed + " " + alsaadi + " > Minecraft-mod-porting >");
     }
 }

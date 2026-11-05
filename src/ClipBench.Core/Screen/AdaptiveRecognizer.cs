@@ -4,14 +4,15 @@ namespace ClipBench.Core.Screen;
 
 /// <summary>
 /// Reads a picture of text well on a real desktop: it gives the picture a margin and enlarges it (<see cref="ImageScaler"/>) and reads the picture
-/// with the engine of every language the user has set up, keeping the reading with the most letters. One engine
-/// reads one language only: Arabic text through an English engine comes out as a few digits, and English
-/// through an Arabic engine as noise, so the languages are tried and compared rather than guessed. Every enlarged copy is
+/// with the engine of every language the user has set up, keeping the reading with the most letters, except that the words of a
+/// right-to-left script are taken from the engine of that script and the rest from an engine of another (<see cref="ReadingMerge"/>). One engine
+/// reads one language only: Arabic text through an English engine comes out as a few digits, and a chevron through an
+/// Arabic engine as "(", so the languages are tried and compared rather than guessed. Every enlarged copy is
 /// zeroed as soon as the reading is done.
 /// </summary>
 public sealed class AdaptiveRecognizer : ITextRecognizer
 {
-    private readonly Func<IReadOnlyList<ITextRecognizer>> _engines;
+    private readonly Func<IReadOnlyList<IWordRecognizer>> _engines;
     private readonly string _noLanguageMessage;
 
     /// <summary>Creates the recognizer.</summary>
@@ -20,7 +21,7 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
     /// add a language while ClipBench runs.
     /// </param>
     /// <param name="noLanguageMessage">What to tell the user when there is no engine at all.</param>
-    public AdaptiveRecognizer(Func<IReadOnlyList<ITextRecognizer>> engines, string noLanguageMessage)
+    public AdaptiveRecognizer(Func<IReadOnlyList<IWordRecognizer>> engines, string noLanguageMessage)
     {
         ArgumentNullException.ThrowIfNull(engines);
         ArgumentException.ThrowIfNullOrWhiteSpace(noLanguageMessage);
@@ -45,16 +46,16 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
         try
         {
             var picture = prepared ?? image;
-            var texts = new List<string>(engines.Count);
+            var readings = new List<IReadOnlyList<RecognizedLine>>(engines.Count);
             ResultError? firstFailure = null;
 
             foreach (var engine in engines)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var result = await engine.RecognizeAsync(picture, cancellationToken).ConfigureAwait(false);
+                var result = await engine.ReadAsync(picture, cancellationToken).ConfigureAwait(false);
                 if (result.IsSuccess)
                 {
-                    texts.Add(result.Value);
+                    readings.Add(result.Value);
                 }
                 else
                 {
@@ -62,13 +63,13 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
                 }
             }
 
-            if (texts.Count == 0)
+            if (readings.Count == 0)
             {
                 // No reading and at least one engine: every engine failed, so a failure was recorded.
                 return Result.Failure<string>(firstFailure!.Value);
             }
 
-            return Result.Success(texts[RecognitionChoice.PickBest(texts)]);
+            return Result.Success(ReadingMerge.ToText(ReadingMerge.Choose(readings)));
         }
         finally
         {
