@@ -208,6 +208,38 @@ public sealed class ClipLibrary : IDisposable
         }
     }
 
+    /// <summary>
+    /// Deletes every clip, pinned or not, from the store and then from the library. It waits for a copy that is being saved,
+    /// so a clip cannot survive the wipe. When the store cannot be wiped the library keeps its clips, because they are still
+    /// on disk.
+    /// </summary>
+    /// <param name="store">Deletes the files' content.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>Success, or why the store could not be wiped.</returns>
+    public async Task<Result> WipeAsync(IStoreWipe store, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var wiped = await store.WipeAsync(cancellationToken).ConfigureAwait(false);
+            if (wiped.IsFailure)
+            {
+                return wiped;
+            }
+
+            _ = _history.Clear(includePinned: true);
+            _sensitivity.Clear();
+            RaiseChanged();
+            return wiped;
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
     /// <summary>Pins or unpins a clip.</summary>
     /// <param name="id">The clip id.</param>
     /// <param name="pinned">True to pin.</param>

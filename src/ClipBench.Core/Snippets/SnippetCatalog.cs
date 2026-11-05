@@ -174,6 +174,17 @@ public sealed class SnippetCatalog : IDisposable
         }
     }
 
+    /// <summary>Empties the list in memory and tells the listeners. The store is not touched: use it after the store was wiped.</summary>
+    public void Forget()
+    {
+        lock (_gate)
+        {
+            _snippets = [];
+        }
+
+        Changed.RaiseEach(this);
+    }
+
     /// <summary>Releases the lock that keeps changes in order. Call it once nothing changes the snippets any more.</summary>
     public void Dispose() => _changes.Dispose();
 

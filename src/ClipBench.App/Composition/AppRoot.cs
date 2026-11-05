@@ -371,7 +371,9 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(platform.PasteInjector);
         _ = services.AddSingleton(platform.Hotkeys);
         _ = tray is null ? services.AddSingleton<IUserNotifier, NullNotifier>() : services.AddSingleton<IUserNotifier>(tray);
-        _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
+        var clipStore = new ClipStore(storage.Repository);
+        _ = services.AddSingleton<IClipStore>(clipStore);
+        _ = services.AddSingleton<IStoreWipe>(clipStore);
         _ = services.AddSingleton<ISettingsStore>(new JsonSettingsStore(paths.SettingsPath));
         _ = services.AddSingleton<SettingsService>();
         _ = services.AddSingleton<IStartupRegistration>(new RegistryStartupRegistration());
@@ -397,6 +399,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<CaptureService>();
         _ = services.AddSingleton<SettingsApplier>();
+        _ = services.AddSingleton<WipeService>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
         _ = services.AddSingleton<QueueRunner>();

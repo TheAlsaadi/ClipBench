@@ -37,6 +37,22 @@ public sealed class BoardCatalogTests : IDisposable
         return created.Value;
     }
 
+    [Fact]
+    public async Task Forgetting_empties_the_list_tells_the_listeners_and_leaves_the_store_alone()
+    {
+        await CreateAsync("One");
+        await CreateAsync("Two");
+        var raised = 0;
+        _catalog.Changed += (_, _) => raised++;
+        var deletesBefore = _boardStore.Deleted.Count;
+
+        _catalog.Forget();
+
+        _catalog.Boards.ShouldBeEmpty();
+        raised.ShouldBe(1);
+        _boardStore.Deleted.Count.ShouldBe(deletesBefore);
+    }
+
     private async Task<Clip> AddClipAsync(string text)
     {
         var clip = TestClips.Text(text);

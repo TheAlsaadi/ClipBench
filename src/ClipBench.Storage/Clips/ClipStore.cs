@@ -6,7 +6,7 @@ using ClipBench.Core.Results;
 namespace ClipBench.Storage.Clips;
 
 /// <summary>Lets the app's clip library keep its clips in the encrypted database.</summary>
-public sealed class ClipStore : IClipStore
+public sealed class ClipStore : IClipStore, IStoreWipe
 {
     private readonly ClipRepository _repository;
 
@@ -41,6 +41,9 @@ public sealed class ClipStore : IClipStore
     /// <inheritdoc/>
     public async Task<Result<ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken) =>
         await _repository.SweepExpiredAsync(cancellationToken).ConfigureAwait(false);
+
+    /// <inheritdoc/>
+    public Task<Result> WipeAsync(CancellationToken cancellationToken) => _repository.WipeAsync(cancellationToken);
 
     /// <inheritdoc/>
     public async Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken)

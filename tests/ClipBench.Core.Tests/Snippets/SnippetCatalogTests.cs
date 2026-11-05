@@ -29,6 +29,24 @@ public sealed class SnippetCatalogTests : IDisposable
 
     private string[] Names() => [.. _catalog.Snippets.Select(snippet => snippet.Name)];
 
+    // --- forgetting ---
+
+    [Fact]
+    public async Task Forgetting_empties_the_list_tells_the_listeners_and_leaves_the_store_alone()
+    {
+        await CreateAsync("One");
+        await CreateAsync("Two");
+        var raised = 0;
+        _catalog.Changed += (_, _) => raised++;
+        var deletesBefore = _store.Deleted.Count;
+
+        _catalog.Forget();
+
+        _catalog.Snippets.ShouldBeEmpty();
+        raised.ShouldBe(1);
+        _store.Deleted.Count.ShouldBe(deletesBefore);
+    }
+
     // --- names ---
 
     [Theory]
