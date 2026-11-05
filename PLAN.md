@@ -384,6 +384,8 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 
 **Implementation**: An overlay window for region selection (Esc cancels). Use `Windows.Graphics.Capture` or GDI capture of the selected region **only**, processed in memory with `Windows.Media.Ocr`. The image is never saved to disk unless the user pins the result.
 
+*As built (ADR 0018):* the owner approved the choices on 2026-11-05. The overlay is a layered Win32 window per monitor drawn with GDI (WinUI has no see-through backdrop), a drag stays on its monitor, capture is GDI `BitBlt` of the rectangle only, and only the text is kept, never the picture, so there is nothing to "pin" (a deviation from the wording above). The shortcut is Win+Alt+O and a link is opened only from the right-click menu.
+
 **Acceptance**: The coverage floors hold, and `MANUAL_QA.md` is extended. Tag **v0.2.0** after the user approves.
 
 ---

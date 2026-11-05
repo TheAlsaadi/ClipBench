@@ -130,13 +130,21 @@ Residual: the in-memory search index is decrypted while the app runs.
 | D | A snippet expands without bound or into itself | One pass from left to right; whatever is put in is never read again, so a snippet cannot expand into itself. A text of at most 10,000 characters, at most 20 different values of at most 10,000 characters each, and a result of at most 100,000 characters; going over is a refusal and not a cut-off paste | 6 | Snippet engine tests (one pass, every limit, a large value repeated) |
 | I | What the user types into the prompt of a snippet lingers | It lives in the fields until the paste, is cleared when the prompt is cancelled or the popup closes, never reaches the log (which records the event, the number of values and the size), and no message repeats it | 6 | Snippets view model and popup tests |
 
-## 5. OCR (Phase 8)
+## 5. OCR and smart detection (Phase 8)
 
 | STRIDE | Threat | Mitigation | Phase | Evidence |
 |---|---|---|---|---|
-| I | Screen pixels written to disk | Region captured and processed in memory only; saved only if the user pins the result | 8 | Review and test |
-| I | Recognized text holds secrets | Goes through the same capture filter and sensitive-clip detection | 8 | Tests |
-| T | Hostile image content | Uses the operating system's OCR component; no custom image parsers | 8 | Review |
+| I | Screen pixels written to disk | Only the rectangle the user dragged is read (GDI `BitBlt`), into memory; no file, no temp file, no log of it. The buffer is zeroed when the picture is let go of, on success, failure and cancel. Not defended: Windows' own recognizer keeps copies of the pixels in buffers of its own until it is done, and ClipBench cannot zero those | 8 | Service tests (zeroed on every path); capture test; review |
+| I | The overlay shows up in the pixels that are read | Each overlay window is excluded from capture whatever the user's screen-capture setting or `--allow-screen-capture` say | 8 | Real-window capture test; manual QA |
+| I | Recognized text holds a secret | The text goes through the same rules as any copy: a secret is hidden and expires, the size limit applies, and with incognito on it is not recorded. It is still put on the clipboard, where other programs and Windows' own clipboard history can see it, as with any copy | 8 | Service tests; PRIVACY.md |
+| I | A notice or the log repeats what was read | The notice says how many characters were copied, never which; the log holds the count, the size or an error code | 8 | Service tests; the log-content test |
+| T | Hostile image content | Windows' own text recognition reads the pixels; ClipBench has no image parser of its own. The pixels come from the user's own screen, not from a file | 8 | Review |
+| D | A huge region, huge text or repeated requests | Sides of 8 to 10,000 pixels (the recognizer's limit), text over 2 MiB refused, one request at a time and a second press ignored, and the overlay is on its own thread so a slow reading never blocks the app | 8 | Region maths, service and overlay tests |
+| E | The overlay takes the keyboard or traps the user | It closes on Esc, on a right click, when the mouse button goes up and when cancelled; it is one process's windows, topmost but not a hook; no keyboard or mouse hook is used (the safety test lists the native calls) | 8 | Platform safety test; overlay tests; manual QA |
+| T | A link opens something harmful | Only `http` and `https` (and `www.`) addresses count; `javascript:`, `file:`, `data:`, `mailto:` and share paths do not; an address with embedded credentials is refused; nothing opens unless the user chooses "Open the link in your browser", the address being written in the row | 8 | Detector and popup tests |
+| I | Opening a link tells a site that ClipBench is used | ClipBench opens no connection; Windows opens the user's browser on a click, which is the browser's request, not ClipBench's. Phase 9's network test must expect this and About's link | 8 | Review |
+| I | What a hidden secret is shows in the row | A hidden secret shows no swatch, no label and no link until it is revealed | 8 | Row and popup tests |
+| D | A detector takes very long on hostile text | Colors, links, emails and phone numbers are hand-parsed with length caps; code patterns run on the non-backtracking engine with a 250 ms limit over the first 4,000 characters; JSON is parsed to 64 levels and 200,000 characters only | 8 | Detector tests with long and nested text |
 
 ## 6. Installer and distribution (Phase 10)
 

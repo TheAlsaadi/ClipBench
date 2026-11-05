@@ -110,6 +110,20 @@ _Avoid_: reset, clear all
 **Start with Windows**:
 One value, named `ClipBench`, in the user's own `Run` registry key, that starts ClipBench at sign-in. Off by default and asked once, at the first run.
 
+### Screen text
+
+**Screen text**:
+Text read from a part of the screen with the text recognition of Windows, put on the clipboard and added to the History as a Clip whose source is "Screen text". The picture it was read from is never kept.
+_Avoid_: OCR clip, screenshot
+
+**Selection overlay**:
+The dimmed windows, one for each monitor, on which the user drags a rectangle over the text to copy. They are hidden from screen capture and close on Esc, a right click or the end of the drag.
+_Avoid_: snipping tool, capture window
+
+**Detection**:
+What a Clip's text turns out to be: a color, a link, an email address, a phone number or code. It is only found when the whole text is exactly that one thing, nothing is fetched, and it is not shown for a hidden Sensitive clip.
+_Avoid_: smart paste, preview
+
 ### Storage
 
 **Master key**:

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Copy text from the screen (ADR 0018). **Win+Alt+O**, or **Copy text from the screen** in the tray menu, dims every
+  monitor; drag a rectangle over the text and let go. Only that rectangle is read, in memory, with the text recognition
+  of Windows, and the picture is cleared at once and never saved. The text goes on the clipboard and into the history
+  like any copy (a secret is hidden and expires; with incognito on it is not recorded). Esc or a right click cancels.
+  If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
+  Settings.
+- The popup says what a clip is: a **color** (with a swatch) in hex, `rgb()` or `hsl()`; a **link**; an **email**
+  address; a **phone** number; or **code** with a guess of its language. Only whole-text matches count and nothing is
+  fetched. A link is opened only from the right-click menu, only if it is `http` or `https`. A hidden secret shows
+  nothing about what it is.
 - Privacy center and settings (ADR 0017, `docs/security/PRIVACY.md`). A **Settings window** (tray menu **Settings…**,
   Ctrl+E in the popup, and by itself the first time ClipBench runs) with General, Shortcuts, History, Privacy, Paste,
   Snippets and About. The snippet editor moved into it.
