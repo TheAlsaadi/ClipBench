@@ -76,6 +76,17 @@ internal sealed class FakeClipStore : IClipStore
         return Task.FromResult(Failure is { } error ? Result.Failure(error) : Result.Success());
     }
 
+    /// <summary>What a sweep reports as deleted.</summary>
+    public ImmutableArray<ClipId> Swept { get; set; } = [];
+
+    public int Sweeps { get; private set; }
+
+    public Task<Result<ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken)
+    {
+        Sweeps++;
+        return Task.FromResult(Failure is { } error ? Result.Failure<ImmutableArray<ClipId>>(error) : Result.Success(Swept));
+    }
+
     public Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken)
     {
         Deleted.AddRange(ids);

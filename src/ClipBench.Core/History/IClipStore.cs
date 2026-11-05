@@ -32,6 +32,11 @@ public interface IClipStore
     /// <returns>Success or why the changes were not stored.</returns>
     Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken);
 
+    /// <summary>Deletes every stored clip whose expiry has arrived, pinned or not, and scrubs what was removed.</summary>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>The ids that were deleted, or why the store could not be swept.</returns>
+    Task<Result<ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken);
+
     /// <summary>Deletes clips for good. Ids that are not stored are ignored.</summary>
     /// <param name="ids">The clips to delete.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>

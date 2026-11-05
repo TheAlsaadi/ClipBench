@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Results;
@@ -36,6 +37,10 @@ public sealed class ClipStore : IClipStore
     /// <inheritdoc/>
     public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken) =>
         _repository.SetBoardsAsync(placements, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<Result<ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken) =>
+        await _repository.SweepExpiredAsync(cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc/>
     public async Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken)
