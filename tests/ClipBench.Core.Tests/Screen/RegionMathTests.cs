@@ -118,46 +118,29 @@ public class RegionMathTests
         region.Value.Width.ShouldBe(RegionMath.MaxSide);
     }
 
-    // --- from window units to device pixels ---
+    // --- sizes that follow the scale of a monitor ---
 
     [Theory]
-    [InlineData(0, 0, 0, 0)]
-    [InlineData(10, 20, 10, 20)]
-    [InlineData(99.5, 0.5, 100, 1)]
-    public void On_a_monitor_at_100_percent_a_point_in_window_units_is_the_same_pixel_offset_from_the_monitors_corner(double x, double y, int pixelX, int pixelY)
+    [InlineData(2, 1.0, 2)]
+    [InlineData(2, 1.25, 3)]
+    [InlineData(2, 1.5, 3)]
+    [InlineData(2, 2.0, 4)]
+    [InlineData(1, 1.25, 1)]
+    [InlineData(1, 0.5, 1)]
+    [InlineData(0, 2.0, 1)]
+    public void A_size_in_units_is_scaled_to_pixels_and_is_never_less_than_one_pixel(int units, double scale, int pixels)
     {
-        RegionMath.ToPixels(x, y, _main).ShouldBe(new PixelPoint(pixelX, pixelY));
-    }
-
-    [Fact]
-    public void On_a_monitor_at_150_percent_window_units_are_scaled_and_placed_from_the_monitors_corner()
-    {
-        // 100 units across and 40 down at 150% is 150 and 60 pixels, from the corner at (-2560, -200).
-        RegionMath.ToPixels(100, 40, _left).ShouldBe(new PixelPoint(-2560 + 150, -200 + 60));
-    }
-
-    [Fact]
-    public void On_a_monitor_at_125_percent_the_result_is_rounded_to_the_nearest_pixel()
-    {
-        // 33 x 1.25 = 41.25 and 7 x 1.25 = 8.75.
-        RegionMath.ToPixels(33, 7, _above).ShouldBe(new PixelPoint(100 + 41, -1080 + 9));
-    }
-
-    [Fact]
-    public void The_same_physical_spot_gives_the_same_pixel_whichever_way_it_is_reached_on_one_monitor()
-    {
-        var corner = RegionMath.ToPixels(0, 0, _left);
-
-        corner.ShouldBe(new PixelPoint(_left.Bounds.X, _left.Bounds.Y));
+        RegionMath.Scaled(units, scale).ShouldBe(pixels);
     }
 
     [Theory]
-    [InlineData(double.NaN, 0)]
-    [InlineData(0, double.PositiveInfinity)]
-    [InlineData(double.NegativeInfinity, 0)]
-    public void A_point_that_is_not_a_finite_number_is_a_bug(double x, double y)
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void A_scale_that_is_not_a_positive_number_is_a_bug(double scale)
     {
-        Should.Throw<ArgumentOutOfRangeException>(() => RegionMath.ToPixels(x, y, _main));
+        Should.Throw<ArgumentOutOfRangeException>(() => RegionMath.Scaled(2, scale));
     }
 
     [Fact]
@@ -173,6 +156,51 @@ public class RegionMathTests
     {
         Should.Throw<ArgumentOutOfRangeException>(() => new MonitorBounds(new PixelRect(0, 0, 0, 100), 1));
         Should.Throw<ArgumentOutOfRangeException>(() => new MonitorBounds(new PixelRect(0, 0, 100, -5), 1));
+    }
+
+    // --- where a selection falls inside a monitor's own window ---
+
+    [Fact]
+    public void A_selection_inside_a_monitor_is_given_relative_to_the_monitors_corner()
+    {
+        RegionMath.ToLocal(new PixelRect(300, 200, 100, 50), new PixelRect(0, 0, 1920, 1080)).ShouldBe(new PixelRect(300, 200, 100, 50));
+    }
+
+    [Fact]
+    public void On_a_monitor_with_negative_coordinates_the_offset_is_taken_from_its_corner()
+    {
+        RegionMath.ToLocal(new PixelRect(-2000, 100, 500, 300), _left.Bounds).ShouldBe(new PixelRect(560, 300, 500, 300));
+    }
+
+    [Fact]
+    public void A_selection_that_reaches_past_the_monitor_is_cut_at_its_edge()
+    {
+        RegionMath.ToLocal(new PixelRect(1800, 1000, 400, 400), _main.Bounds).ShouldBe(new PixelRect(1800, 1000, 120, 80));
+        RegionMath.ToLocal(new PixelRect(-50, -50, 100, 100), _main.Bounds).ShouldBe(new PixelRect(0, 0, 50, 50));
+    }
+
+    [Theory]
+    [InlineData(2000, 100, 50, 50)]
+    [InlineData(-200, 100, 50, 50)]
+    [InlineData(100, 1080, 50, 50)]
+    [InlineData(100, 100, 0, 50)]
+    public void A_selection_on_another_monitor_or_with_no_area_is_not_on_this_one(int x, int y, int width, int height)
+    {
+        RegionMath.ToLocal(new PixelRect(x, y, width, height), _main.Bounds).ShouldBeNull();
+    }
+
+    // --- the whole walk: a drag across the pixels of a second monitor ---
+
+    [Fact]
+    public void A_drag_on_a_scaled_second_monitor_gives_the_pixels_to_capture_and_the_part_to_draw()
+    {
+        var start = new PixelPoint(-2260, -50);
+        var end = new PixelPoint(-1660, 250);
+
+        var region = RegionMath.FromDrag(start, end, _left.Bounds);
+
+        region.Value.ShouldBe(new PixelRect(-2260, -50, 600, 300));
+        RegionMath.ToLocal(region.Value, _left.Bounds).ShouldBe(new PixelRect(300, 150, 600, 300));
     }
 
     // --- which monitor a point is on ---
@@ -203,19 +231,5 @@ public class RegionMathTests
     public void With_no_monitors_a_point_is_on_none()
     {
         RegionMath.MonitorAt([], new PixelPoint(0, 0)).ShouldBeNull();
-    }
-
-    // --- the whole walk: a drag in window units on a second monitor ---
-
-    [Fact]
-    public void A_drag_in_window_units_on_a_scaled_second_monitor_becomes_the_pixels_to_capture()
-    {
-        var start = RegionMath.ToPixels(200, 100, _left);
-        var end = RegionMath.ToPixels(600, 300, _left);
-
-        var region = RegionMath.FromDrag(start, end, _left.Bounds);
-
-        // 400 x 200 units at 150% is 600 x 300 pixels, starting 300 and 150 pixels in from the monitor's corner.
-        region.Value.ShouldBe(new PixelRect(-2560 + 300, -200 + 150, 600, 300));
     }
 }

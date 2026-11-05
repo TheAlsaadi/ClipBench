@@ -77,26 +77,36 @@ public static class RegionMath
         return Result.Success(new PixelRect((int)left, (int)top, (int)width, (int)height));
     }
 
-    /// <summary>Turns a point in the units of a window that fills a monitor into a device pixel on the virtual screen.</summary>
-    /// <param name="x">Units from the window's left edge, which is the monitor's left edge.</param>
-    /// <param name="y">Units from the window's top edge.</param>
-    /// <param name="monitor">The monitor the window is on.</param>
-    /// <returns>The pixel: the monitor's corner plus the offset scaled by the monitor's scale, rounded to the nearest pixel.</returns>
-    public static PixelPoint ToPixels(double x, double y, MonitorBounds monitor)
+    /// <summary>Turns a size in units (a line two units thick) into device pixels for a monitor.</summary>
+    /// <param name="units">The size in units at 96 dpi.</param>
+    /// <param name="scale">The monitor's scale: 1.0 at 96 dpi. Greater than zero.</param>
+    /// <returns>The size in pixels, rounded to the nearest pixel and never less than one, so a thin line never vanishes.</returns>
+    public static int Scaled(int units, double scale)
     {
-        if (!double.IsFinite(x))
+        if (!(scale > 0) || !double.IsFinite(scale))
         {
-            throw new ArgumentOutOfRangeException(nameof(x), x, "The point must be a finite number.");
+            throw new ArgumentOutOfRangeException(nameof(scale), scale, "The scale must be a number greater than zero.");
         }
 
-        if (!double.IsFinite(y))
+        return Math.Max(1, (int)Math.Round(units * scale, MidpointRounding.AwayFromZero));
+    }
+
+    /// <summary>Gives the part of a selection that falls on a monitor, relative to the monitor's own top-left corner.</summary>
+    /// <param name="selection">The selection in device pixels on the virtual screen.</param>
+    /// <param name="monitor">The monitor's rectangle in device pixels.</param>
+    /// <returns>The part inside the monitor, measured from the monitor's corner, or null when none of it is on that monitor.</returns>
+    public static PixelRect? ToLocal(PixelRect selection, PixelRect monitor)
+    {
+        var left = Math.Max((long)selection.X, monitor.X);
+        var top = Math.Max((long)selection.Y, monitor.Y);
+        var right = Math.Min((long)selection.Right, monitor.Right);
+        var bottom = Math.Min((long)selection.Bottom, monitor.Bottom);
+        if (right <= left || bottom <= top)
         {
-            throw new ArgumentOutOfRangeException(nameof(y), y, "The point must be a finite number.");
+            return null;
         }
 
-        return new PixelPoint(
-            monitor.Bounds.X + (int)Math.Round(x * monitor.DpiScale, MidpointRounding.AwayFromZero),
-            monitor.Bounds.Y + (int)Math.Round(y * monitor.DpiScale, MidpointRounding.AwayFromZero));
+        return new PixelRect((int)(left - monitor.X), (int)(top - monitor.Y), (int)(right - left), (int)(bottom - top));
     }
 
     /// <summary>Finds the monitor a point is on.</summary>
