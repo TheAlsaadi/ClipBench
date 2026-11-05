@@ -137,4 +137,10 @@ public enum ErrorCode
 
     /// <summary>The exclusion list already holds as many programs as it can.</summary>
     TooManyExcludedPrograms,
+
+    /// <summary>The region chosen on the screen is too small to hold text, or lies outside the monitor.</summary>
+    RegionTooSmall,
+
+    /// <summary>The region chosen on the screen is larger than the text recognizer can read.</summary>
+    RegionTooLarge,
 }
