@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
 
@@ -30,6 +31,7 @@ public sealed class JsonSettingsStore : ISettingsStore
     private const string HideFromCaptureKey = "hideFromScreenCapture";
     private const string StartWithWindowsKey = "startWithWindows";
     private const string FirstRunKey = "firstRunCompleted";
+    private const string ExcludedProgramsKey = "excludedPrograms";
 
     private static readonly byte[] _byteOrderMark = [0xEF, 0xBB, 0xBF];
     private static readonly string[] _separatorNames = Enum.GetNames<SeparatorChoice>();
@@ -163,6 +165,7 @@ public sealed class JsonSettingsStore : ISettingsStore
                 HideFromScreenCapture = ReadBoolean(root, HideFromCaptureKey) ?? defaults.HideFromScreenCapture,
                 StartWithWindows = ReadBoolean(root, StartWithWindowsKey) ?? defaults.StartWithWindows,
                 FirstRunCompleted = ReadBoolean(root, FirstRunKey) ?? defaults.FirstRunCompleted,
+                ExcludedPrograms = ReadExclusions(root) ?? defaults.ExcludedPrograms,
             };
         }
         catch (JsonException)
@@ -182,6 +185,18 @@ public sealed class JsonSettingsStore : ISettingsStore
 
     private static bool? ReadBoolean(JsonElement root, string key) =>
         root.TryGetProperty(key, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
+
+    // Entries that are not usable names are dropped. A list the user emptied is kept empty; only a missing or wrong
+    // kind of value gives the default list.
+    private static ExclusionList? ReadExclusions(JsonElement root)
+    {
+        if (!root.TryGetProperty(ExcludedProgramsKey, out var value) || value.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        return ExclusionList.FromNames(value.EnumerateArray().Select(entry => entry.ValueKind == JsonValueKind.String ? entry.GetString() : null));
+    }
 
     // A number that is not a whole number, or does not fit, counts as unusable.
     private static int? ReadInteger(JsonElement root, string key) =>
@@ -206,6 +221,13 @@ public sealed class JsonSettingsStore : ISettingsStore
             writer.WriteBoolean(HideFromCaptureKey, settings.HideFromScreenCapture);
             writer.WriteBoolean(StartWithWindowsKey, settings.StartWithWindows);
             writer.WriteBoolean(FirstRunKey, settings.FirstRunCompleted);
+            writer.WriteStartArray(ExcludedProgramsKey);
+            foreach (var name in settings.ExcludedPrograms.Names)
+            {
+                writer.WriteStringValue(name);
+            }
+
+            writer.WriteEndArray();
             writer.WriteEndObject();
         }
 

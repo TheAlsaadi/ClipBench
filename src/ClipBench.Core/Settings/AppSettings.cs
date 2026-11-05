@@ -86,6 +86,13 @@ public sealed record AppSettings
     /// <summary>True to keep ClipBench's windows out of screen captures and recordings.</summary>
     public bool HideFromScreenCapture { get; init; } = true;
 
+    /// <summary>The programs whose copies are never recorded.</summary>
+    public Privacy.ExclusionList ExcludedPrograms
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = Privacy.ExclusionList.Default;
+
     /// <summary>True to start ClipBench when the user signs in to Windows.</summary>
     public bool StartWithWindows { get; init; }
 

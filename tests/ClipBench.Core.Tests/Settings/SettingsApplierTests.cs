@@ -1,6 +1,8 @@
+using ClipBench.Core.Capture;
 using ClipBench.Core.Clips;
 using ClipBench.Core.Diagnostics;
 using ClipBench.Core.History;
+using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
 using ClipBench.Core.Tests.Support;
@@ -15,13 +17,15 @@ public sealed class SettingsApplierTests : IDisposable
     private readonly FakeTimeProvider _clock = new();
     private readonly SettingsService _settings;
     private readonly ClipLibrary _library;
+    private readonly CaptureService _capture;
     private readonly SettingsApplier _applier;
 
     public SettingsApplierTests()
     {
         _settings = new SettingsService(_settingsStore);
         _library = new ClipLibrary(new ClipHistory(new HistoryOptions(), _clock), _clipStore);
-        _applier = new SettingsApplier(_settings, _library, _log);
+        _capture = new CaptureService(new FakeClipboardListener(), new FakeClipboardReader(), _library, _log, _clock);
+        _applier = new SettingsApplier(_settings, _library, _capture, _log);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -29,6 +33,7 @@ public sealed class SettingsApplierTests : IDisposable
     public void Dispose()
     {
         _applier.Dispose();
+        _capture.Dispose();
         _library.Dispose();
         _settings.Dispose();
     }
@@ -108,6 +113,47 @@ public sealed class SettingsApplierTests : IDisposable
         _log.Entries.ShouldContain(entry => entry.Activity == ActivityEvent.StoreFailed && entry.Level == ActivityLevel.Warning);
     }
 
+    // --- excluded programs ---
+
+    [Fact]
+    public void From_the_start_the_default_exclusions_are_in_force()
+    {
+        _capture.Filter.ExcludedProcesses.ShouldBe(ExclusionList.Default.Names);
+    }
+
+    [Fact]
+    public async Task Changing_the_excluded_programs_changes_what_is_captured_at_once()
+    {
+        var list = ExclusionList.Empty.Add("notepad").Value;
+
+        await _settings.UpdateAsync(settings => settings with { ExcludedPrograms = list }, Ct);
+
+        _capture.Filter.ExcludedProcesses.ShouldBe(["notepad"]);
+    }
+
+    [Fact]
+    public async Task Loaded_exclusions_are_applied()
+    {
+        _settingsStore.Load = new SettingsLoad(AppSettings.Default with { ExcludedPrograms = ExclusionList.Empty }, SettingsLoadStatus.Loaded);
+
+        await _settings.LoadAsync(Ct);
+
+        _capture.Filter.ExcludedProcesses.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Applying_exclusions_leaves_incognito_and_the_size_limits_alone()
+    {
+        var limits = new CaptureLimits { MaxTextBytes = 1234, MaxImageBytes = 5678 };
+        _capture.UpdateFilter(filter => filter with { Limits = limits });
+        _capture.SetPaused(true);
+
+        await _settings.UpdateAsync(settings => settings with { ExcludedPrograms = ExclusionList.Empty }, Ct);
+
+        _capture.IsPaused.ShouldBeTrue();
+        _capture.Filter.Limits.ShouldBe(limits);
+    }
+
     [Fact]
     public async Task After_it_is_disposed_changes_are_no_longer_applied()
     {
@@ -124,8 +170,9 @@ public sealed class SettingsApplierTests : IDisposable
     [Fact]
     public void Missing_parts_are_a_bug()
     {
-        Should.Throw<ArgumentNullException>(() => new SettingsApplier(null!, _library, _log));
-        Should.Throw<ArgumentNullException>(() => new SettingsApplier(_settings, null!, _log));
-        Should.Throw<ArgumentNullException>(() => new SettingsApplier(_settings, _library, null!));
+        Should.Throw<ArgumentNullException>(() => new SettingsApplier(null!, _library, _capture, _log));
+        Should.Throw<ArgumentNullException>(() => new SettingsApplier(_settings, null!, _capture, _log));
+        Should.Throw<ArgumentNullException>(() => new SettingsApplier(_settings, _library, null!, _log));
+        Should.Throw<ArgumentNullException>(() => new SettingsApplier(_settings, _library, _capture, null!));
     }
 }

@@ -1,3 +1,4 @@
+using ClipBench.Core.Capture;
 using ClipBench.Core.Diagnostics;
 using ClipBench.Core.History;
 
@@ -11,25 +12,30 @@ public sealed class SettingsApplier : IDisposable
 {
     private readonly SettingsService _settings;
     private readonly ClipLibrary _library;
+    private readonly CaptureService _capture;
     private readonly IActivityLog _log;
     private readonly Lock _gate = new();
     private Task _pending = Task.CompletedTask;
     private HistoryOptions? _appliedHistory;
     private bool _disposed;
 
-    /// <summary>Starts listening for changes. Settings already in force are applied by the first change or load.</summary>
+    /// <summary>Applies the settings now in force and starts listening for changes.</summary>
     /// <param name="settings">The settings in force.</param>
     /// <param name="library">The history, which keeps to the limits the settings ask for.</param>
+    /// <param name="capture">The clipboard capture, which skips the programs the settings exclude.</param>
     /// <param name="log">Where a failure is recorded. It never receives clip content.</param>
-    public SettingsApplier(SettingsService settings, ClipLibrary library, IActivityLog log)
+    public SettingsApplier(SettingsService settings, ClipLibrary library, CaptureService capture, IActivityLog log)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(library);
+        ArgumentNullException.ThrowIfNull(capture);
         ArgumentNullException.ThrowIfNull(log);
         _settings = settings;
         _library = library;
+        _capture = capture;
         _log = log;
         _settings.Changed += OnChanged;
+        Apply();
     }
 
     /// <summary>Waits until every change made so far has been applied.</summary>
@@ -58,7 +64,9 @@ public sealed class SettingsApplier : IDisposable
         _settings.Changed -= OnChanged;
     }
 
-    private void OnChanged(object? sender, EventArgs e)
+    private void OnChanged(object? sender, EventArgs e) => Apply();
+
+    private void Apply()
     {
         var current = _settings.Current;
         lock (_gate)
@@ -67,6 +75,9 @@ public sealed class SettingsApplier : IDisposable
             {
                 return;
             }
+
+            var excluded = current.ExcludedPrograms.Names;
+            _capture.UpdateFilter(filter => filter with { ExcludedProcesses = excluded });
 
             var history = current.ToHistoryOptions();
             if (history == _appliedHistory)

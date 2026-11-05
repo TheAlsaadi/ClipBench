@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
 using ClipBench.Storage.Settings;
@@ -23,6 +24,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         HideFromScreenCapture = false,
         StartWithWindows = true,
         FirstRunCompleted = true,
+        ExcludedPrograms = ExclusionList.FromNames(["KeePass", "My Tool"]),
     };
 
     private readonly TempDirectory _folder = new();
@@ -105,6 +107,60 @@ public sealed class JsonSettingsStoreTests : IDisposable
         root.GetProperty("hideFromScreenCapture").GetBoolean().ShouldBeFalse();
         root.GetProperty("startWithWindows").GetBoolean().ShouldBeTrue();
         root.GetProperty("firstRunCompleted").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_excluded_programs_are_written_as_a_list_of_names()
+    {
+        await Create().SaveAsync(_changed, Ct);
+
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(SettingsPath, Ct));
+        json.RootElement.GetProperty("excludedPrograms").EnumerateArray().Select(name => name.GetString()).ShouldBe(["KeePass", "My Tool"]);
+    }
+
+    [Fact]
+    public async Task A_list_the_user_emptied_stays_empty()
+    {
+        await Create().SaveAsync(AppSettings.Default with { ExcludedPrograms = ExclusionList.Empty }, Ct);
+
+        (await Create().LoadAsync(Ct)).Settings.ExcludedPrograms.ShouldBe(ExclusionList.Empty);
+    }
+
+    [Fact]
+    public async Task Without_a_saved_list_the_default_list_is_used()
+    {
+        await WriteAsync("""{ "separator": "Tab" }""");
+
+        (await Create().LoadAsync(Ct)).Settings.ExcludedPrograms.ShouldBe(ExclusionList.Default);
+    }
+
+    [Theory]
+    [InlineData("""{ "excludedPrograms": "KeePass" }""")]
+    [InlineData("""{ "excludedPrograms": { "a": 1 } }""")]
+    [InlineData("""{ "excludedPrograms": null }""")]
+    [InlineData("""{ "excludedPrograms": 7 }""")]
+    public async Task A_saved_list_that_is_not_a_list_keeps_the_default(string json)
+    {
+        await WriteAsync(json);
+
+        (await Create().LoadAsync(Ct)).ShouldBe(new SettingsLoad(AppSettings.Default, SettingsLoadStatus.Loaded));
+    }
+
+    [Fact]
+    public async Task Entries_that_are_not_usable_names_are_dropped_and_the_rest_kept()
+    {
+        await WriteAsync("""{ "excludedPrograms": ["KeePass.exe", 5, null, "", "a*b", ["x"], "keepass", "Tool"] }""");
+
+        (await Create().LoadAsync(Ct)).Settings.ExcludedPrograms.Names.ShouldBe(["KeePass", "Tool"]);
+    }
+
+    [Fact]
+    public async Task A_file_with_more_names_than_the_limit_keeps_the_first_ones()
+    {
+        var names = string.Join(',', Enumerable.Range(0, ExclusionList.MaxEntries + 20).Select(i => $"\"program{i}\""));
+        await WriteAsync($$"""{ "excludedPrograms": [{{names}}] }""");
+
+        (await Create().LoadAsync(Ct)).Settings.ExcludedPrograms.Count.ShouldBe(ExclusionList.MaxEntries);
     }
 
     [Fact]

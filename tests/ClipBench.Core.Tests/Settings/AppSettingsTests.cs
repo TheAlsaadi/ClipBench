@@ -1,5 +1,6 @@
 using ClipBench.Core.History;
 using ClipBench.Core.Pasting;
+using ClipBench.Core.Privacy;
 using ClipBench.Core.Settings;
 using ClipBench.Core.Tests.Support;
 
@@ -138,6 +139,36 @@ public class AppSettingsTests
         settings.SensitiveExpirySeconds.ShouldBe(120);
         settings.MaskSensitive.ShouldBeTrue();
         settings.HideFromScreenCapture.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_default_exclusion_list_is_the_one_a_new_installation_starts_with()
+    {
+        AppSettings.Default.ExcludedPrograms.ShouldBe(ExclusionList.Default);
+    }
+
+    [Fact]
+    public void Normalizing_keeps_the_exclusion_list_as_it_is_even_when_it_is_empty()
+    {
+        var settings = AppSettings.Default with { ExcludedPrograms = ExclusionList.Empty };
+
+        settings.Normalize().ExcludedPrograms.ShouldBe(ExclusionList.Empty);
+    }
+
+    [Fact]
+    public void Settings_with_the_same_exclusions_are_equal()
+    {
+        var one = AppSettings.Default with { ExcludedPrograms = ExclusionList.FromNames(["a", "b"]) };
+        var two = AppSettings.Default with { ExcludedPrograms = ExclusionList.FromNames(["a", "b"]) };
+
+        one.ShouldBe(two);
+        (one with { ExcludedPrograms = ExclusionList.FromNames(["a"]) }).ShouldNotBe(two);
+    }
+
+    [Fact]
+    public void A_missing_exclusion_list_is_a_bug()
+    {
+        Should.Throw<ArgumentNullException>(() => AppSettings.Default with { ExcludedPrograms = null! });
     }
 
     [Fact]
