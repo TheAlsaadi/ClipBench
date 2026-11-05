@@ -6,16 +6,21 @@ namespace ClipBench.Core.Screen;
 /// Puts the words of a recognized line into reading order. Windows returns the letters of each word in their
 /// reading order but lists the words left to right as they are drawn, which for Arabic, Hebrew and other
 /// right-to-left text is backwards: a name written "first family" is returned "family first". This undoes that with the
-/// part of the Unicode bidirectional rules that matters for lines of words: the line is left-to-right or right-to-left
-/// by which has more words, runs of the other direction are kept together (a run of English in an Arabic sentence
-/// keeps its own order) and a number or punctuation joins the words around it.
+/// part of the Unicode bidirectional rules that matters for lines of words: the line is right-to-left when its Arabic or
+/// Hebrew letters are at least twice the other letters and left-to-right otherwise, runs of the other direction are kept
+/// together (a run of English in an Arabic sentence keeps its own order) and a number or punctuation joins the words around it.
 /// </summary>
 /// <remarks>
 /// A line that mixes both directions is ambiguous: "Name: Mohammed Alsaadi" and "Mohammed Alsaadi :Name" can
-/// look the same on screen. The direction with more words wins and a tie is read left to right.
+/// look the same on screen. Right-to-left needs at least twice the letters of the other direction; anything less is read
+/// left to right, which is right for an English window with an Arabic name in it and wrong for a short Arabic sentence
+/// with a long English word.
 /// </remarks>
 public static class LineOrder
 {
+    // Right-to-left letters must be at least this many times the other letters for the line to read right to left.
+    private const int RightToLeftDominance = 2;
+
     private enum Direction
     {
         Neutral,
@@ -46,14 +51,16 @@ public static class LineOrder
         }
 
         var own = words.Select(Classify).ToList();
-        var rightToLeft = own.Count(d => d == Direction.RightToLeft);
-        if (rightToLeft == 0)
+        if (!own.Contains(Direction.RightToLeft))
         {
             return string.Join(' ', words);
         }
 
-        var leftToRight = own.Count(d => d == Direction.LeftToRight);
-        var paragraph = rightToLeft > leftToRight ? Direction.RightToLeft : Direction.LeftToRight;
+        // The line is right to left only when its right-to-left letters clearly dominate. Counting words is not enough:
+        // an English window with an Arabic name (two short words) next to a long folder name is a left-to-right layout.
+        var rightToLeftLetters = words.Sum(word => word.Count(IsRightToLeftLetter));
+        var otherLetters = words.Sum(word => word.Count(c => char.IsLetter(c) && !IsRightToLeftLetter(c)));
+        var paragraph = rightToLeftLetters >= RightToLeftDominance * otherLetters ? Direction.RightToLeft : Direction.LeftToRight;
         var resolved = Resolve(words, own, paragraph);
         var runs = Split(words, resolved);
 

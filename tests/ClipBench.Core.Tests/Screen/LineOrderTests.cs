@@ -48,9 +48,28 @@ public class LineOrderTests
     [Fact]
     public void English_inside_an_Arabic_sentence_keeps_its_words_in_order_and_its_place()
     {
-        // Logical: Marhaba Bikum Fi ClipBench 2026. On screen the English is at the left end.
-        Logical("ClipBench", "2026", Fi, Bikum, Marhaba)
-            .ShouldBe(Marhaba + " " + Bikum + " " + Fi + " ClipBench 2026");
+        // Logical: Marhaba Bikum Fi Rakam Company ClipBench 2026. On screen the English is at the left end.
+        Logical("ClipBench", "2026", Company, Rakam, Fi, Bikum, Marhaba)
+            .ShouldBe(Marhaba + " " + Bikum + " " + Fi + " " + Rakam + " " + Company + " ClipBench 2026");
+    }
+
+    [Fact]
+    public void A_line_is_right_to_left_only_when_its_Arabic_letters_are_at_least_twice_the_Latin_ones()
+    {
+        // 10 Arabic letters against 9 Latin ones: not clearly Arabic, so it is read left to right and only the Arabic run is reversed.
+        Logical("ClipBench", Fi, Bikum, Marhaba).ShouldBe("ClipBench " + Marhaba + " " + Bikum + " " + Fi);
+
+        // 19 Arabic letters against 9: clearly Arabic.
+        Logical("ClipBench", Company, Rakam, Fi, Bikum, Marhaba).ShouldBe(Marhaba + " " + Bikum + " " + Fi + " " + Rakam + " " + Company + " ClipBench");
+    }
+
+    [Fact]
+    public void A_breadcrumb_with_an_Arabic_name_in_an_English_window_stays_left_to_right()
+    {
+        // File Explorer in English: chevrons between the segments, the name is two Arabic words (11 letters) next to a
+        // folder of 19 Latin letters. More Arabic words than English words must not turn the line around.
+        Logical(">", Alsaadi, Mohammed, ">", "Minecraft-mod-porting", ">")
+            .ShouldBe("> " + Mohammed + " " + Alsaadi + " > Minecraft-mod-porting >");
     }
 
     [Fact]
