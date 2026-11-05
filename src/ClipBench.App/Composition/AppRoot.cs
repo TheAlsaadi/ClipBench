@@ -7,6 +7,7 @@ using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Notifications;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Results;
+using ClipBench.Core.Screen;
 using ClipBench.Core.Settings;
 using ClipBench.Core.Snippets;
 using ClipBench.Core.Transforms;
@@ -14,6 +15,7 @@ using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
 using ClipBench.Platform.Windows.Hosting;
+using ClipBench.Platform.Windows.Screen;
 using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
@@ -223,6 +225,11 @@ internal sealed class AppRoot : IAsyncDisposable
                 HotkeyAction.ToggleCollect,
                 options.CollectHotkey ?? saved.CollectHotkey,
                 "You can still start and finish collecting from the tray menu.",
+                cancellationToken);
+            await root.BindShortcutAsync(
+                HotkeyAction.CaptureText,
+                saved.CaptureTextHotkey,
+                "You can still copy text from the screen from the tray menu.",
                 cancellationToken);
             services.GetRequiredService<HotkeyBindings>().Pressed += root.OnHotkeyPressed;
 
@@ -482,6 +489,11 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<PopupViewModel>();
         _ = services.AddSingleton<QueueHudViewModel>();
         _ = services.AddSingleton<CollectToggle>();
+        _ = services.AddSingleton(platform.Monitors);
+        _ = services.AddSingleton(platform.ScreenCapturer);
+        _ = services.AddSingleton(platform.TextRecognizer);
+        _ = services.AddSingleton<IRegionPicker>(provider => new SelectionOverlay(provider.GetRequiredService<IMonitorLayout>()));
+        _ = services.AddSingleton<ScreenTextService>();
         _ = services.AddSingleton<TrayViewModel>();
         return services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
     }
@@ -536,6 +548,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
         _trayViewModel.SettingsRequested += (_, _) => OpenSettings();
+        _trayViewModel.CaptureTextRequested += (_, _) => StartCaptureText();
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly
@@ -598,6 +611,32 @@ internal sealed class AppRoot : IAsyncDisposable
                     _ = _services.GetRequiredService<CollectToggle>().ToggleAsync(CancellationToken.None);
                 }
             });
+        }
+        else if (e.Action == HotkeyAction.CaptureText)
+        {
+            _dispatcher.Post(StartCaptureText);
+        }
+    }
+
+    // The overlay, the reading and the notice run on their own threads; this only starts them and never lets a failure escape.
+    private void StartCaptureText()
+    {
+        if (!_disposed)
+        {
+            _ = CaptureTextAsync();
+        }
+    }
+
+    private async Task CaptureTextAsync()
+    {
+        try
+        {
+            _ = await _services.GetRequiredService<ScreenTextService>().CaptureTextAsync(CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // The service reports its own failures; this is a bug in what it called. Only the type is logged, never a message.
+            _log.Write(ActivityLevel.Warning, ActivityEvent.ScreenTextFailed, new ActivityDetails { ExceptionType = exception.GetType() });
         }
     }
 
