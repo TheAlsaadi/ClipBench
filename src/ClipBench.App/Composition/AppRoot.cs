@@ -139,6 +139,9 @@ internal sealed class AppRoot : IAsyncDisposable
         QueueHudWindow? hud = null;
         try
         {
+            // The applier comes first so that the loaded settings reach the history and the capture as soon as they are read.
+            _ = services.GetRequiredService<SettingsApplier>();
+
             // Settings that cannot be read give the defaults; the app runs either way.
             var settingsLoad = await services.GetRequiredService<SettingsService>().LoadAsync(cancellationToken);
             if (settingsLoad is SettingsLoadStatus.Damaged or SettingsLoadStatus.Unreadable)
@@ -176,13 +179,16 @@ internal sealed class AppRoot : IAsyncDisposable
                 log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = snippetsLoad.Error.Code });
             }
 
+            // Secrets that expired while the app was closed go now, and later ones as their time comes.
+            services.GetRequiredService<ExpirySweeper>().Start();
+
             // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
             _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
 
             var popupViewModel = services.GetRequiredService<PopupViewModel>();
             popup = new PopupWindow(popupViewModel, platform.WindowEffects, platform.ForegroundTracker, platform.ScreenLocator);
             var handle = WinRT.Interop.WindowNative.GetWindowHandle(popup);
-            if (!options.AllowScreenCapture)
+            if (HideFromCapture(options, services))
             {
                 _ = platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
             }
@@ -279,7 +285,7 @@ internal sealed class AppRoot : IAsyncDisposable
             _snippetsWindow = new SnippetsWindow(_services.GetRequiredService<SnippetEditorViewModel>());
 
             // It shows what the user wrote in their snippets, so it is kept out of screen captures like the popup.
-            if (!_options.AllowScreenCapture)
+            if (HideFromCapture(_options, _services))
             {
                 var handle = WinRT.Interop.WindowNative.GetWindowHandle(_snippetsWindow);
                 _ = _platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
@@ -307,6 +313,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _popup.Close();
         _hud.Close();
         _snippetsWindow?.Shutdown();
+        await _services.GetRequiredService<ExpirySweeper>().StopAsync();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
@@ -330,13 +337,17 @@ internal sealed class AppRoot : IAsyncDisposable
 
         var handle = new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(hud));
         _ = platform.WindowEffects.UseRoundedCorners(handle);
-        if (!options.AllowScreenCapture)
+        if (HideFromCapture(options, services))
         {
             _ = platform.WindowEffects.ExcludeFromCapture(handle);
         }
 
         return hud;
     }
+
+    // The command-line switch is a developer's override; otherwise the user's setting decides.
+    private static bool HideFromCapture(StartupOptions options, IServiceProvider services) =>
+        !options.AllowScreenCapture && services.GetRequiredService<SettingsService>().Current.HideFromScreenCapture;
 
     private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, StoragePaths paths, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
     {
@@ -357,6 +368,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
+        _ = services.AddSingleton(provider => new ExpirySweeper(provider.GetRequiredService<ClipLibrary>(), provider.GetRequiredService<IActivityLog>(), TimeSpan.FromSeconds(5)));
         _ = services.AddSingleton<IBoardStore>(new BoardStore(storage.Repository));
         _ = services.AddSingleton<BoardCatalog>();
         _ = services.AddSingleton<ISnippetStore>(new SnippetStore(storage.Repository));
@@ -369,6 +381,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<CaptureService>();
+        _ = services.AddSingleton<SettingsApplier>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
         _ = services.AddSingleton<QueueRunner>();
