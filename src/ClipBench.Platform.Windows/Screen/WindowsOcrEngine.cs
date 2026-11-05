@@ -25,6 +25,9 @@ public sealed class WindowsOcrEngine : ITextRecognizer
         _engine = engine;
     }
 
+    /// <summary>The tag of the language this engine reads, such as <c>en-US</c>.</summary>
+    internal string LanguageTag => _engine.RecognizerLanguage.LanguageTag;
+
     /// <inheritdoc/>
     public async Task<Result<string>> RecognizeAsync(ScreenImage image, CancellationToken cancellationToken)
     {

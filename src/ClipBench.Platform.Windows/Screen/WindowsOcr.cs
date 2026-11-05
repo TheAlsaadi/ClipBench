@@ -29,13 +29,22 @@ public static class WindowsOcr
 
         // An engine is made once per language. A language without the feature is looked for again next time, so adding it takes effect at once.
         var engines = new ConcurrentDictionary<string, WindowsOcrEngine>(StringComparer.OrdinalIgnoreCase);
-        return new AdaptiveRecognizer(() => EnginesFor(languageTags(), engines), LanguageMessage);
+        return new AdaptiveRecognizer(() => [.. EnginesFor(languageTags(), engines)], LanguageMessage);
     }
 
-    private static List<ITextRecognizer> EnginesFor(IReadOnlyList<string> tags, ConcurrentDictionary<string, WindowsOcrEngine> cache)
+    /// <summary>The languages that would be read for the given tags (for tests): the recognizer language of each engine, in order.</summary>
+    /// <param name="languageTags">The tags.</param>
+    /// <returns>The tags of the engines.</returns>
+    internal static List<string> EngineTags(Func<IReadOnlyList<string>> languageTags)
     {
-        var found = new List<ITextRecognizer>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        ArgumentNullException.ThrowIfNull(languageTags);
+        return [.. EnginesFor(languageTags(), new ConcurrentDictionary<string, WindowsOcrEngine>(StringComparer.OrdinalIgnoreCase)).Select(engine => engine.LanguageTag)];
+    }
+
+    private static List<WindowsOcrEngine> EnginesFor(IReadOnlyList<string> tags, ConcurrentDictionary<string, WindowsOcrEngine> cache)
+    {
+        var found = new List<WindowsOcrEngine>();
+        var languages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var tag in tags)
         {
             if (found.Count >= MaxLanguages)
@@ -43,32 +52,35 @@ public static class WindowsOcr
                 break;
             }
 
-            if (!seen.Add(tag))
+            var engine = cache.TryGetValue(tag, out var known) ? known : TryCreate(tag);
+
+            // Varieties of one language (en-US, en-GB, and en-AU which has no engine of its own) read the same text:
+            // one pass each would spend the few allowed on English and never reach a second script.
+            if (engine is null || !languages.Add(LanguageOf(engine.LanguageTag)))
             {
                 continue;
             }
 
-            if (cache.TryGetValue(tag, out var known))
-            {
-                found.Add(known);
-                continue;
-            }
-
-            var engine = TryCreate(tag);
-            if (engine is not null)
-            {
-                found.Add(cache.GetOrAdd(tag, _ => new WindowsOcrEngine(engine)));
-            }
+            found.Add(cache.GetOrAdd(tag, engine));
         }
 
         return found;
     }
 
-    private static OcrEngine? TryCreate(string tag)
+    // "en-US" and "en-GB" are one language; "zh-Hans-CN" and "zh-Hant-TW" are two scripts and stay apart.
+    private static string LanguageOf(string tag)
+    {
+        var parts = tag.Split('-');
+        return parts.Length > 1 && parts[1].Length == 4 ? parts[0] + "-" + parts[1] : parts[0];
+    }
+
+    private static WindowsOcrEngine? TryCreate(string tag)
     {
         try
         {
-            return OcrEngine.IsLanguageSupported(new Language(tag)) ? OcrEngine.TryCreateFromLanguage(new Language(tag)) : null;
+            var language = new Language(tag);
+            var engine = OcrEngine.IsLanguageSupported(language) ? OcrEngine.TryCreateFromLanguage(language) : null;
+            return engine is null ? null : new WindowsOcrEngine(engine);
         }
         catch (ArgumentException)
         {

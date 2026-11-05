@@ -195,6 +195,30 @@ public class WindowsOcrEngineTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    public void Varieties_of_one_language_are_read_once_so_a_second_script_is_not_crowded_out()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+
+        // en-AU has no engine of its own and falls back to en-GB; the four engines allowed must not all go to English.
+        var tags = WindowsOcr.EngineTags(() => ["en-US", "en-AU", "en-GB", "en-CA", "ar-SA"]);
+
+        tags.Count(tag => tag.StartsWith("en", StringComparison.OrdinalIgnoreCase)).ShouldBe(1);
+        tags.ShouldContain("ar-SA");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public void The_users_order_is_kept_and_a_tag_that_is_not_a_language_is_skipped()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+
+        WindowsOcr.EngineTags(() => ["ar-SA", "not a tag!", "en-US"]).ShouldBe(["ar-SA", "en-US"]);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
     public async Task A_language_listed_twice_or_in_another_case_is_read_once()
     {
         RequireLanguage("en-US");

@@ -65,7 +65,8 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
 
             if (texts.Count == 0)
             {
-                return Result.Failure<string>(firstFailure ?? new ResultError(ErrorCode.OcrFailed, _noLanguageMessage));
+                // No reading and at least one engine: every engine failed, so a failure was recorded.
+                return Result.Failure<string>(firstFailure!.Value);
             }
 
             return Result.Success(texts[RecognitionChoice.PickBest(texts)]);
