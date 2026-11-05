@@ -107,6 +107,13 @@ public sealed record AppSettings
         init => field = value ?? throw new ArgumentNullException(nameof(value));
     } = Hotkeys.Hotkey.DefaultCollect;
 
+    /// <summary>The shortcut that copies text from the screen.</summary>
+    public Hotkeys.Hotkey CaptureTextHotkey
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = Hotkeys.Hotkey.DefaultCaptureText;
+
     /// <summary>True to start ClipBench when the user signs in to Windows.</summary>
     public bool StartWithWindows { get; init; }
 
@@ -150,16 +157,30 @@ public sealed record AppSettings
         // A shortcut that would stop people typing, or that does two things, goes back to its default.
         var popup = IsUsable(PopupHotkey) ? PopupHotkey : Hotkeys.Hotkey.Default;
         var collect = IsUsable(CollectHotkey) ? CollectHotkey : Hotkeys.Hotkey.DefaultCollect;
-        if (popup == collect)
+        var captureText = IsUsable(CaptureTextHotkey) ? CaptureTextHotkey : Hotkeys.Hotkey.DefaultCaptureText;
+        if (collect == popup)
         {
             collect = Hotkeys.Hotkey.DefaultCollect;
-            popup = popup == collect ? Hotkeys.Hotkey.Default : popup;
+        }
+
+        if (captureText == popup || captureText == collect)
+        {
+            captureText = Hotkeys.Hotkey.DefaultCaptureText;
+        }
+
+        // When even the defaults collide with a choice, every shortcut goes back to its own default, which are all different.
+        if (popup == collect || popup == captureText || collect == captureText)
+        {
+            popup = Hotkeys.Hotkey.Default;
+            collect = Hotkeys.Hotkey.DefaultCollect;
+            captureText = Hotkeys.Hotkey.DefaultCaptureText;
         }
 
         return this with
         {
             PopupHotkey = popup,
             CollectHotkey = collect,
+            CaptureTextHotkey = captureText,
             Separator = choice,
             CustomSeparator = customIsReadable ? CustomSeparator : string.Empty,
             HistoryMaxCount = HistoryMaxCountRange.Clamp(HistoryMaxCount),

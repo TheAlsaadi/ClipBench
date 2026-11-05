@@ -39,6 +39,37 @@ public sealed class HotkeysSettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public void It_shows_the_shortcut_for_copying_text_from_the_screen_too()
+    {
+        _vm.CaptureTextHotkey.ShouldBe("Win+Alt+O");
+    }
+
+    [Fact]
+    public async Task The_shortcut_for_copying_text_is_changed_and_reset_like_the_others()
+    {
+        await _vm.SetAsync(HotkeyAction.CaptureText, "Ctrl+Alt+T", Ct);
+
+        _vm.CaptureTextHotkey.ShouldBe("Ctrl+Alt+T");
+        _settings.Current.CaptureTextHotkey.ToString().ShouldBe("Ctrl+Alt+T");
+        _bindings.Current(HotkeyAction.CaptureText)!.ToString().ShouldBe("Ctrl+Alt+T");
+
+        await _vm.ResetCaptureTextCommand.ExecuteAsync(null);
+
+        _vm.CaptureTextHotkey.ShouldBe("Win+Alt+O");
+    }
+
+    [Fact]
+    public async Task Copying_text_cannot_take_the_shortcut_of_the_popup()
+    {
+        await _bindings.BindAsync(HotkeyAction.OpenPopup, Hotkey.Default, Ct);
+
+        var applied = await _vm.SetAsync(HotkeyAction.CaptureText, "Win+Alt+V", Ct);
+
+        applied.ShouldBeFalse();
+        _vm.ErrorMessage.ShouldBe("That shortcut is already used for something else in ClipBench.");
+    }
+
+    [Fact]
     public async Task A_new_shortcut_is_claimed_and_saved()
     {
         var applied = await _vm.SetAsync(HotkeyAction.OpenPopup, "ctrl+alt+k", Ct);

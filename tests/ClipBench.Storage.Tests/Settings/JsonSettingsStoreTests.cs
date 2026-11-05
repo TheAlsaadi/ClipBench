@@ -27,6 +27,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         FirstRunCompleted = true,
         ExcludedPrograms = ExclusionList.FromNames(["KeePass", "My Tool"]),
         PopupHotkey = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'K'),
+        CaptureTextHotkey = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Alt, 'T'),
         CollectHotkey = new Hotkey(HotkeyModifiers.Windows | HotkeyModifiers.Control, 0x78),
     };
 
@@ -129,6 +130,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(SettingsPath, Ct));
         json.RootElement.GetProperty("popupHotkey").GetString().ShouldBe("Ctrl+Shift+K");
         json.RootElement.GetProperty("collectHotkey").GetString().ShouldBe("Win+Ctrl+F9");
+        json.RootElement.GetProperty("captureTextHotkey").GetString().ShouldBe("Ctrl+Alt+T");
     }
 
     [Theory]
@@ -149,6 +151,8 @@ public sealed class JsonSettingsStoreTests : IDisposable
     [InlineData("""{ "popupHotkey": 7 }""")]
     [InlineData("""{ "popupHotkey": null }""")]
     [InlineData("""{ "collectHotkey": "Ctrl+" }""")]
+    [InlineData("""{ "captureTextHotkey": "T" }""")]
+    [InlineData("""{ "captureTextHotkey": 5 }""")]
     public async Task A_shortcut_that_cannot_be_used_keeps_its_default(string json)
     {
         await WriteAsync(json);

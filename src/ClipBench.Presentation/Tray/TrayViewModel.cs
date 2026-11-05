@@ -38,6 +38,9 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     /// <summary>Raised once when the menu asks to quit.</summary>
     public event EventHandler? ExitRequested;
 
+    /// <summary>Raised when the user chose to copy text from the screen.</summary>
+    public event EventHandler? CaptureTextRequested;
+
     /// <summary>Raised when the user chose Settings in the menu.</summary>
     public event EventHandler? SettingsRequested;
 
@@ -113,6 +116,9 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void Open() => OpenRequested?.Invoke(this, EventArgs.Empty);
+
+    [RelayCommand]
+    private void CaptureText() => CaptureTextRequested?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
     private void OpenSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);

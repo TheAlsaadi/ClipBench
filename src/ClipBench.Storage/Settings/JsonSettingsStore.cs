@@ -35,6 +35,7 @@ public sealed class JsonSettingsStore : ISettingsStore
     private const string ExcludedProgramsKey = "excludedPrograms";
     private const string PopupHotkeyKey = "popupHotkey";
     private const string CollectHotkeyKey = "collectHotkey";
+    private const string CaptureTextHotkeyKey = "captureTextHotkey";
 
     private static readonly byte[] _byteOrderMark = [0xEF, 0xBB, 0xBF];
     private static readonly string[] _separatorNames = Enum.GetNames<SeparatorChoice>();
@@ -171,6 +172,7 @@ public sealed class JsonSettingsStore : ISettingsStore
                 ExcludedPrograms = ReadExclusions(root) ?? defaults.ExcludedPrograms,
                 PopupHotkey = ReadHotkey(root, PopupHotkeyKey) ?? defaults.PopupHotkey,
                 CollectHotkey = ReadHotkey(root, CollectHotkeyKey) ?? defaults.CollectHotkey,
+                CaptureTextHotkey = ReadHotkey(root, CaptureTextHotkeyKey) ?? defaults.CaptureTextHotkey,
             };
         }
         catch (JsonException)
@@ -232,6 +234,7 @@ public sealed class JsonSettingsStore : ISettingsStore
             writer.WriteBoolean(FirstRunKey, settings.FirstRunCompleted);
             writer.WriteString(PopupHotkeyKey, settings.PopupHotkey.ToString());
             writer.WriteString(CollectHotkeyKey, settings.CollectHotkey.ToString());
+            writer.WriteString(CaptureTextHotkeyKey, settings.CaptureTextHotkey.ToString());
             writer.WriteStartArray(ExcludedProgramsKey);
             foreach (var name in settings.ExcludedPrograms.Names)
             {
