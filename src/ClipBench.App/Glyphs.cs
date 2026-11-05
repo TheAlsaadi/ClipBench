@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using ClipBench.Core.Clips;
 using ClipBench.Presentation.Boards;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
 
@@ -10,6 +11,15 @@ namespace ClipBench.App;
 internal static class Glyphs
 {
     private const int ThumbnailWidth = 96;
+
+    /// <summary>A brush of one color, for the swatch of a clip that is a color.</summary>
+    /// <param name="red">The red channel.</param>
+    /// <param name="green">The green channel.</param>
+    /// <param name="blue">The blue channel.</param>
+    /// <param name="alpha">The alpha channel.</param>
+    /// <returns>The brush.</returns>
+    public static SolidColorBrush SwatchBrush(byte red, byte green, byte blue, byte alpha) =>
+        new(Windows.UI.Color.FromArgb(alpha, red, green, blue));
 
     /// <summary>The Segoe Fluent Icons character for a kind of clip.</summary>
     /// <param name="format">The kind.</param>

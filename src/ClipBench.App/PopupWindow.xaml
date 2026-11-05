@@ -326,6 +326,25 @@
                                 HorizontalAlignment="Left"
                                 Source="{x:Bind local:Glyphs.ThumbnailOf(ImagePng)}"
                                 Visibility="{x:Bind HasImage}" />
+                            <StackPanel
+                                AutomationProperties.AutomationId="RowDetection"
+                                Orientation="Horizontal"
+                                Spacing="6"
+                                Visibility="{x:Bind HasDetection, Mode=OneWay}">
+                                <Border
+                                    Width="12"
+                                    Height="12"
+                                    VerticalAlignment="Center"
+                                    Background="{x:Bind local:Glyphs.SwatchBrush(SwatchRed, SwatchGreen, SwatchBlue, SwatchAlpha), Mode=OneWay}"
+                                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    Visibility="{x:Bind HasSwatch, Mode=OneWay}" />
+                                <TextBlock
+                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind DetectionLabel, Mode=OneWay}" />
+                            </StackPanel>
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Style="{StaticResource CaptionTextBlockStyle}"

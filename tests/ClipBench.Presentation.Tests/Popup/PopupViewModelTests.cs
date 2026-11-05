@@ -618,6 +618,62 @@ public sealed class PopupViewModelTests : IDisposable
         _vm.IsConfirmingDelete.ShouldBeFalse();
     }
 
+    // --- opening a link ---
+
+    [Fact]
+    public async Task Opening_a_link_asks_the_app_to_open_that_address_and_nothing_else()
+    {
+        await CopyAsync("https://example.com/a/b");
+        _vm.Open();
+        string? asked = null;
+        _vm.OpenLinkRequested += (_, e) => asked = e.Url;
+
+        _vm.OpenLinkCommand.Execute(null);
+
+        asked.ShouldBe("https://example.com/a/b");
+    }
+
+    [Fact]
+    public async Task Opening_a_link_on_a_clip_that_is_not_one_does_nothing()
+    {
+        await CopyAsync("not a link, just words");
+        _vm.Open();
+        var asked = 0;
+        _vm.OpenLinkRequested += (_, _) => asked++;
+
+        _vm.OpenLinkCommand.Execute(null);
+
+        asked.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_link_that_is_a_hidden_secret_is_not_opened_until_it_is_revealed()
+    {
+        await _settings.UpdateAsync(settings => settings with { MaskSensitive = true }, Ct);
+        await CopyAsync("https://example.com/path?token=kJxQmTvBnZpLwRyHcDfGsAeUoViNbXq1");
+        _vm.Open();
+        var asked = 0;
+        _vm.OpenLinkRequested += (_, _) => asked++;
+        _vm.Current!.IsSensitive.ShouldBeTrue();
+
+        _vm.OpenLinkCommand.Execute(null);
+        asked.ShouldBe(0);
+
+        _vm.RevealCommand.Execute(null);
+        _vm.OpenLinkCommand.Execute(null);
+
+        asked.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_row_knows_what_its_clip_is()
+    {
+        await CopyAsync("#00FF00");
+        _vm.Open();
+
+        _vm.Current!.DetectionLabel.ShouldBe("Color #00FF00");
+    }
+
     // --- revealing ---
 
     [Fact]

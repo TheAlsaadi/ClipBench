@@ -93,6 +93,9 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the popup should be hidden.</summary>
     public event EventHandler? CloseRequested;
 
+    /// <summary>Raised when the user chose to open the link in the highlighted row. The app opens it in the user's browser; nothing is fetched here.</summary>
+    public event EventHandler<Preferences.OpenAddressEventArgs>? OpenLinkRequested;
+
     /// <summary>The rows shown, best match or newest first.</summary>
     public ObservableCollection<ClipRowViewModel> Rows { get; }
 
@@ -388,6 +391,16 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
+    private void OpenLink()
+    {
+        // The row gives no address for a clip that is not a link, or while a secret is hidden.
+        if (Current?.LinkAddress is { } address)
+        {
+            OpenLinkRequested?.Invoke(this, new Preferences.OpenAddressEventArgs(address));
+        }
+    }
+
+    [RelayCommand]
     private void Reveal()
     {
         if (Current is { IsSensitive: true } row)
@@ -608,7 +621,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             _ => _library.Search(SearchText),
         };
         var rows = results
-            .Select(result => new ClipRowViewModel(result.Clip, MaskedKind(result.Clip), now))
+            .Select(result => new ClipRowViewModel(result.Clip, MaskedKind(result.Clip), now, _library.GetDetection(result.Clip)))
             .ToList();
 
         Rows.Clear();

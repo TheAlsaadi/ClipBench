@@ -173,6 +173,12 @@ public sealed partial class PopupWindow
         var menu = new MenuFlyout();
         AddItem(menu.Items, "Paste", "Enter", () => ViewModel.PasteCommand.Execute(null));
         AddItem(menu.Items, "Change the text, then paste…", "Shift+Enter", () => ViewModel.OpenTransformsCommand.Execute(null));
+        if (row.LinkAddress is not null)
+        {
+            // Only offered for a web address, and only opened when this is chosen.
+            AddItem(menu.Items, "Open the link in your browser", null, () => ViewModel.OpenLinkCommand.Execute(null));
+        }
+
         menu.Items.Add(new MenuFlyoutSeparator());
         AddItem(menu.Items, row.IsMarked ? "Unselect" : "Select, to paste several clips", "Space", () => ViewModel.ToggleMarkCommand.Execute(null));
         AddItem(menu.Items, row.IsPinned ? "Unpin" : "Pin", "Ctrl+P", () => ViewModel.TogglePinCommand.Execute(null));
