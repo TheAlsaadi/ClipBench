@@ -113,6 +113,32 @@ public sealed class SettingsApplierTests : IDisposable
         _log.Entries.ShouldContain(entry => entry.Activity == ActivityEvent.StoreFailed && entry.Level == ActivityLevel.Warning);
     }
 
+    // --- how long secrets are kept ---
+
+    [Fact]
+    public void From_the_start_secrets_are_kept_for_the_default_time()
+    {
+        _library.SensitiveExpiry.ShouldBe(TimeSpan.FromSeconds(120));
+    }
+
+    [Fact]
+    public async Task Changing_how_long_secrets_are_kept_applies_to_the_next_copies()
+    {
+        await _settings.UpdateAsync(settings => settings with { SensitiveExpirySeconds = 30 }, Ct);
+
+        _library.SensitiveExpiry.ShouldBe(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task Loaded_settings_set_how_long_secrets_are_kept()
+    {
+        _settingsStore.Load = new SettingsLoad(AppSettings.Default with { SensitiveExpirySeconds = 600 }, SettingsLoadStatus.Loaded);
+
+        await _settings.LoadAsync(Ct);
+
+        _library.SensitiveExpiry.ShouldBe(TimeSpan.FromMinutes(10));
+    }
+
     // --- excluded programs ---
 
     [Fact]

@@ -79,6 +79,8 @@ public sealed class SettingsApplier : IDisposable
             var excluded = current.ExcludedPrograms.Names;
             _capture.UpdateFilter(filter => filter with { ExcludedProcesses = excluded });
 
+            _library.SensitiveExpiry = TimeSpan.FromSeconds(AppSettings.SensitiveExpirySecondsRange.Clamp(current.SensitiveExpirySeconds));
+
             var history = current.ToHistoryOptions();
             if (history == _appliedHistory)
             {
