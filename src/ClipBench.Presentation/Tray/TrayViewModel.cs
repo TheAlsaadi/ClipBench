@@ -33,6 +33,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
         _queue = queue;
         _collect = collect;
         IsPaused = capture.IsPaused;
+        _capture.PausedChanged += OnPausedChanged;
         _queue.Changed += OnQueueChanged;
         _collect.Collect.Changed += OnCollectChanged;
         _shownRestore = RestoreClipboard ? 1 : 0;
@@ -89,6 +90,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     /// <summary>Stops following the queue.</summary>
     public void Dispose()
     {
+        _capture.PausedChanged -= OnPausedChanged;
         _queue.Changed -= OnQueueChanged;
         _collect.Collect.Changed -= OnCollectChanged;
         _settings.Changed -= OnSettingsChanged;
@@ -121,6 +123,9 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(RestoreClipboard));
         }
     }
+
+    // Runs on whatever thread turned incognito on or off, for example the Settings window.
+    private void OnPausedChanged(object? sender, EventArgs e) => IsPaused = _capture.IsPaused;
 
     // Runs on whatever thread collected a copy or started or ended the session.
     private void OnCollectChanged(object? sender, EventArgs e)

@@ -15,10 +15,19 @@ public sealed class TrayViewModelTests : IDisposable
 
         public List<bool> Calls { get; } = [];
 
+        public event EventHandler? PausedChanged;
+
         public void SetPaused(bool paused)
         {
             IsPaused = paused;
             Calls.Add(paused);
+            PausedChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ChangeElsewhere(bool paused)
+        {
+            IsPaused = paused;
+            PausedChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -53,6 +62,33 @@ public sealed class TrayViewModelTests : IDisposable
         tray.IsPaused.ShouldBeFalse();
         tray.PauseLabel.ShouldBe("Turn on incognito");
         tray.ToolTip.ShouldBe("ClipBench · capturing");
+    }
+
+    [Fact]
+    public void Incognito_turned_on_elsewhere_changes_the_icon_state_the_label_and_the_tool_tip()
+    {
+        using var tray = Create();
+        var changed = ChangedProperties(tray, () => _capture.ChangeElsewhere(true));
+
+        tray.IsPaused.ShouldBeTrue();
+        tray.PauseLabel.ShouldBe("Turn off incognito");
+        tray.ToolTip.ShouldBe("ClipBench · incognito");
+        changed.ShouldContain(nameof(TrayViewModel.ToolTip));
+
+        _capture.ChangeElsewhere(false);
+
+        tray.IsPaused.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void After_it_is_disposed_it_no_longer_follows_capture()
+    {
+        var tray = Create();
+        tray.Dispose();
+
+        _capture.ChangeElsewhere(true);
+
+        tray.IsPaused.ShouldBeFalse();
     }
 
     [Fact]

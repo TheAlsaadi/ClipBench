@@ -12,6 +12,12 @@ public sealed class TrayMenuTests : IDisposable
     {
         public bool IsPaused { get; private set; }
 
+        public event EventHandler? PausedChanged
+        {
+            add { }
+            remove { }
+        }
+
         public void SetPaused(bool paused) => IsPaused = paused;
     }
 
