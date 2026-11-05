@@ -13,7 +13,7 @@ public class WindowsOcrEngineTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     // Black text on white, drawn with GDI+ the way Windows draws interface text (ClearType), as a picture in memory.
-    private static ScreenImage Render(string text, int pixelSize = 48, string family = "Arial", int width = 900, int height = 0, bool rightToLeft = false)
+    internal static ScreenImage Render(string text, int pixelSize = 48, string family = "Arial", int width = 900, int height = 0, bool rightToLeft = false)
     {
         height = height > 0 ? height : Math.Max(40, pixelSize * 3);
         using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
@@ -48,7 +48,7 @@ public class WindowsOcrEngineTests
     }
 
     // The way a dragged rectangle is cut: 2 pixels around the text, in the colors given.
-    private static ScreenImage RenderTight(string text, int pixelSize, string family, Color foreground, Color background)
+    internal static ScreenImage RenderTight(string text, int pixelSize, string family, Color foreground, Color background)
     {
         using var font = new Font(family, pixelSize, FontStyle.Regular, GraphicsUnit.Pixel);
         using var probe = new Bitmap(10, 10);
@@ -120,7 +120,7 @@ public class WindowsOcrEngineTests
 
     private static OcrEngine? Engine(string tag) => OcrEngine.TryCreateFromLanguage(new Language(tag));
 
-    private static void RequireLanguage(string tag)
+    internal static void RequireLanguage(string tag)
     {
         if (Engine(tag) is null)
         {

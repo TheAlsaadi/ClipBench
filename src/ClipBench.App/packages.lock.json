@@ -42,6 +42,14 @@
         "resolved": "10.0.13",
         "contentHash": "G2GrGWNAPZBsii2F6AU8n+JT2tC1/I0Ml/e9ZyNCgPjf3hZqronP7o0X91aAynCmVeae8KkSIUNXXeXCNRmdVQ=="
       },
+      "Microsoft.Extensions.Logging.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.0.3",
+        "contentHash": "lxl0WLk7ROgBFAsjcOYjQ8/DVK+VMszxGBzUhgtQmAsTNldLL5pk9NG/cWTsXHq0lUhUEAtZkEE7jOGOA8bGKQ==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.3"
+        }
+      },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
         "resolved": "1.0.3719.77",
@@ -193,7 +201,8 @@
       "clipbench.platform.windows": {
         "type": "Project",
         "dependencies": {
-          "ClipBench.Core": "[1.0.0, )"
+          "ClipBench.Core": "[1.0.0, )",
+          "TesseractOCR": "[5.5.2, )"
         }
       },
       "clipbench.presentation": {
@@ -225,6 +234,15 @@
           "Microsoft.Data.Sqlite.Core": "10.0.12",
           "SQLitePCLRaw.bundle_e_sqlite3": "2.1.12",
           "SQLitePCLRaw.core": "2.1.12"
+        }
+      },
+      "TesseractOCR": {
+        "type": "CentralTransitive",
+        "requested": "[5.5.2, )",
+        "resolved": "5.5.2",
+        "contentHash": "m/B0uXLq7JvXfsn+KJtB8iiBJaySEUH13P3x0q9hvnXZ5QnN4+9KcFQaLFE5hwVZD1zGOy2KLxN4B9A1HxvtPQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "10.0.3"
         }
       }
     },
