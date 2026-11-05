@@ -37,6 +37,18 @@ public sealed record AppSettings
     /// <summary>The longest custom separator as typed: every character written as a two-character escape.</summary>
     public const int MaxTypedSeparatorLength = Pasting.Separator.MaxCustomLength * 2;
 
+    /// <summary>The allowed values of <see cref="HistoryMaxCount"/>.</summary>
+    public static SettingRange HistoryMaxCountRange { get; } = new(10, 10_000);
+
+    /// <summary>The allowed values of <see cref="HistoryMaxAgeDays"/>.</summary>
+    public static SettingRange HistoryMaxAgeDaysRange { get; } = new(1, 365);
+
+    /// <summary>The allowed values of <see cref="HistoryMaxMegabytes"/>.</summary>
+    public static SettingRange HistoryMaxMegabytesRange { get; } = new(16, 2048);
+
+    /// <summary>The allowed values of <see cref="SensitiveExpirySeconds"/>.</summary>
+    public static SettingRange SensitiveExpirySecondsRange { get; } = new(15, 3600);
+
     /// <summary>The settings of a new installation.</summary>
     public static AppSettings Default { get; } = new();
 
@@ -56,6 +68,30 @@ public sealed record AppSettings
     /// <summary>True to also keep each copy as its own clip while a collect session runs.</summary>
     public bool KeepCopiesWhileCollecting { get; init; }
 
+    /// <summary>The most unpinned clips kept, within <see cref="HistoryMaxCountRange"/>.</summary>
+    public int HistoryMaxCount { get; init; } = 1000;
+
+    /// <summary>How many days an unpinned clip is kept, within <see cref="HistoryMaxAgeDaysRange"/>.</summary>
+    public int HistoryMaxAgeDays { get; init; } = 30;
+
+    /// <summary>The most megabytes of content the unpinned clips may hold together, within <see cref="HistoryMaxMegabytesRange"/>.</summary>
+    public int HistoryMaxMegabytes { get; init; } = 256;
+
+    /// <summary>How many seconds a clip that looks like a secret is kept, within <see cref="SensitiveExpirySecondsRange"/>.</summary>
+    public int SensitiveExpirySeconds { get; init; } = 120;
+
+    /// <summary>True to hide clips that look like secrets behind a mask until they are revealed.</summary>
+    public bool MaskSensitive { get; init; } = true;
+
+    /// <summary>True to keep ClipBench's windows out of screen captures and recordings.</summary>
+    public bool HideFromScreenCapture { get; init; } = true;
+
+    /// <summary>True to start ClipBench when the user signs in to Windows.</summary>
+    public bool StartWithWindows { get; init; }
+
+    /// <summary>True once the first-run questions have been asked, whatever the answers were.</summary>
+    public bool FirstRunCompleted { get; init; }
+
     /// <summary>The separator to join clips with.</summary>
     /// <returns>The chosen separator, or a line break when the choice cannot be used.</returns>
     public Pasting.Separator ResolveSeparator() => Separator switch
@@ -72,8 +108,8 @@ public sealed record AppSettings
         _ => Pasting.Separator.NewLine,
     };
 
-    /// <summary>Replaces what cannot be used with a default, so the settings can be trusted as they are.</summary>
-    /// <returns>The settings, with an unknown choice or an unreadable custom separator reset.</returns>
+    /// <summary>Replaces what cannot be used, so the settings can be trusted as they are.</summary>
+    /// <returns>The settings, with an unknown choice or an unreadable custom separator reset and every number moved into its range.</returns>
     public AppSettings Normalize()
     {
         var customIsReadable = ReadCustom() is not null;
@@ -81,7 +117,15 @@ public sealed record AppSettings
             ? Separator
             : SeparatorChoice.NewLine;
 
-        return this with { Separator = choice, CustomSeparator = customIsReadable ? CustomSeparator : string.Empty };
+        return this with
+        {
+            Separator = choice,
+            CustomSeparator = customIsReadable ? CustomSeparator : string.Empty,
+            HistoryMaxCount = HistoryMaxCountRange.Clamp(HistoryMaxCount),
+            HistoryMaxAgeDays = HistoryMaxAgeDaysRange.Clamp(HistoryMaxAgeDays),
+            HistoryMaxMegabytes = HistoryMaxMegabytesRange.Clamp(HistoryMaxMegabytes),
+            SensitiveExpirySeconds = SensitiveExpirySecondsRange.Clamp(SensitiveExpirySeconds),
+        };
     }
 
     private Pasting.Separator? ReadCustom()
