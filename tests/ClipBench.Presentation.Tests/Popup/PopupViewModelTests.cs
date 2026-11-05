@@ -640,6 +640,31 @@ public sealed class PopupViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task With_masking_off_a_secret_is_shown_in_full_and_has_nothing_to_reveal()
+    {
+        await _settings.UpdateAsync(settings => settings with { MaskSensitive = false }, Ct);
+        await CopyAsync(Jwt);
+
+        _vm.Open();
+
+        var row = _vm.Current!;
+        row.IsSensitive.ShouldBeFalse();
+        row.DisplayText.ShouldStartWith(Jwt[..40]);
+        row.DisplayText.ShouldNotBe(ClipRowViewModel.Mask);
+        _vm.StatusText.ShouldNotContain("Ctrl+R");
+    }
+
+    [Fact]
+    public async Task With_masking_on_which_is_the_default_a_secret_is_hidden()
+    {
+        await CopyAsync(Jwt);
+
+        _vm.Open();
+
+        _vm.Current!.DisplayText.ShouldBe(ClipRowViewModel.Mask);
+    }
+
+    [Fact]
     public async Task Reveal_does_nothing_for_an_ordinary_clip()
     {
         await CopyAsync("lunch");

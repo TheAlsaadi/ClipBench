@@ -191,6 +191,20 @@ public sealed class PopupTransformTests : IDisposable
     }
 
     [Fact]
+    public async Task With_masking_off_a_secret_is_previewed_like_any_other_text()
+    {
+        await _settings.UpdateAsync(settings => settings with { MaskSensitive = false }, TestContext.Current.CancellationToken);
+        await AddAsync(TestClips.Text(Jwt));
+        _vm.Open();
+
+        _vm.OpenTransformsCommand.Execute(null);
+        Choose("lower case");
+
+        _vm.Transforms.Preview.ShouldNotBe(ClipRowViewModel.Mask);
+        _vm.Transforms.Preview.ShouldStartWith(Jwt.ToLowerInvariant()[..40]);
+    }
+
+    [Fact]
     public async Task A_transform_that_cannot_work_keeps_both_open_with_the_reason_and_pastes_nothing()
     {
         await AddAsync(TestClips.Text("this is not json"));

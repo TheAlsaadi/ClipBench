@@ -73,6 +73,9 @@ internal sealed class FakeClipStore : IClipStore
         return Task.FromResult(Failure is { } error ? Result.Failure(error) : Result.Success());
     }
 
+    public Task<Result<ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Failure is { } error ? Result.Failure<ImmutableArray<ClipId>>(error) : Result.Success(ImmutableArray<ClipId>.Empty));
+
     public Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken)
     {
         Deleted.AddRange(ids);
