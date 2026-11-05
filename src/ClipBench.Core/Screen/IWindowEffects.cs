@@ -14,6 +14,11 @@ public interface IWindowEffects
     /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/> when Windows refused or the window does not exist.</returns>
     Result ExcludeFromCapture(WindowHandle window);
 
+    /// <summary>Lets a window show up in screenshots and screen recordings again.</summary>
+    /// <param name="window">The window.</param>
+    /// <returns>Success, also for a window that was never excluded, or <see cref="ErrorCode.PlatformFailure"/> when Windows refused or the window does not exist.</returns>
+    Result AllowCapture(WindowHandle window);
+
     /// <summary>Tells whether a window is left out of screenshots.</summary>
     /// <param name="window">The window.</param>
     /// <returns>True when <see cref="ExcludeFromCapture"/> is in force for it.</returns>

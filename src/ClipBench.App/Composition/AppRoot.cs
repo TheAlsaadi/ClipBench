@@ -57,6 +57,8 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly IUiDispatcher _dispatcher;
     private readonly StartupOptions _options;
     private SettingsWindow? _settingsWindow;
+    private EventHandler? _settingsChanged;
+    private bool _windowsHidden;
     private bool _disposed;
 
     private AppRoot(
@@ -223,6 +225,18 @@ internal sealed class AppRoot : IAsyncDisposable
                 "You can still start and finish collecting from the tray menu.",
                 cancellationToken);
             services.GetRequiredService<HotkeyBindings>().Pressed += root.OnHotkeyPressed;
+
+            // The windows follow the user's choice about screen capture as soon as it changes.
+            root._windowsHidden = HideFromCapture(options, services);
+            root._settingsChanged = (_, _) => dispatcher.Post(root.ApplyCaptureProtection);
+            services.GetRequiredService<SettingsService>().Changed += root._settingsChanged;
+
+            // The first time ClipBench runs, the Settings window opens on the question about starting with Windows.
+            if (!saved.FirstRunCompleted)
+            {
+                root.OpenSettings(SettingsSection.General);
+            }
+
             guard.ShowRequested += root.OnShowRequested;
             return new StartOutcome(root, null);
         }
@@ -285,6 +299,29 @@ internal sealed class AppRoot : IAsyncDisposable
         _popup.ShowAt(bounds);
     }
 
+    // Puts every window in or out of screenshots and screen recordings to match the setting. Runs on the UI thread.
+    private void ApplyCaptureProtection()
+    {
+        var hide = HideFromCapture(_options, _services);
+        if (_disposed || hide == _windowsHidden)
+        {
+            return;
+        }
+
+        _windowsHidden = hide;
+        List<object> windows = [_popup, _hud];
+        if (_settingsWindow is not null)
+        {
+            windows.Add(_settingsWindow);
+        }
+
+        foreach (var window in windows)
+        {
+            var handle = new Core.Pasting.WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(window));
+            _ = hide ? _platform.WindowEffects.ExcludeFromCapture(handle) : _platform.WindowEffects.AllowCapture(handle);
+        }
+    }
+
     /// <summary>Shows the Settings window with a section open, making the window the first time.</summary>
     /// <param name="section">The section to open.</param>
     public void OpenSettings(SettingsSection section = SettingsSection.General)
@@ -322,6 +359,11 @@ internal sealed class AppRoot : IAsyncDisposable
         _log.Write(ActivityLevel.Information, ActivityEvent.AppStopping);
         _guard.ShowRequested -= OnShowRequested;
         _services.GetRequiredService<HotkeyBindings>().Pressed -= OnHotkeyPressed;
+        if (_settingsChanged is { } changed)
+        {
+            _services.GetRequiredService<SettingsService>().Changed -= changed;
+        }
+
         _tray?.Dispose();
         _popupViewModel.Close();
         _popup.Close();
