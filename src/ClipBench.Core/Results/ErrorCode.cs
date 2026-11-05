@@ -131,4 +131,10 @@ public enum ErrorCode
 
     /// <summary>The most snippets that can exist already do.</summary>
     TooManySnippets,
+
+    /// <summary>A program name for the exclusion list is empty, too long or cannot be the name of an executable.</summary>
+    InvalidProgramName,
+
+    /// <summary>The exclusion list already holds as many programs as it can.</summary>
+    TooManyExcludedPrograms,
 }

@@ -12,6 +12,16 @@ internal sealed class FakeTrayApi(FakeWindow window) : ITrayApi
     /// <summary>What loading the picture returns; zero means it could not be loaded.</summary>
     public nint IconHandle { get; set; } = 0x77;
 
+    /// <summary>The path of the second picture; loading it returns <see cref="AlternateIconHandle"/>.</summary>
+    public string? AlternatePath { get; set; }
+
+    /// <summary>What loading the second picture returns; zero means it could not be loaded.</summary>
+    public nint AlternateIconHandle { get; set; } = 0x88;
+
+    public bool ChangeSucceeds { get; set; } = true;
+
+    public List<nint> IconChanges { get; } = [];
+
     public bool AddSucceeds { get; set; } = true;
 
     public bool ModifySucceeds { get; set; } = true;
@@ -36,7 +46,7 @@ internal sealed class FakeTrayApi(FakeWindow window) : ITrayApi
     {
         window.OnWindowThread.ShouldBeTrue("the icon picture is loaded on the window thread");
         LoadedFrom.Add(path);
-        return IconHandle;
+        return path == AlternatePath ? AlternateIconHandle : IconHandle;
     }
 
     public void DestroyIcon(nint icon)
@@ -50,6 +60,13 @@ internal sealed class FakeTrayApi(FakeWindow window) : ITrayApi
         window.OnWindowThread.ShouldBeTrue("the icon is added on the window thread");
         Added.Add((owner, iconId, callbackMessage, icon, toolTip));
         return AddSucceeds;
+    }
+
+    public bool ChangeIcon(nint owner, uint iconId, nint icon)
+    {
+        window.OnWindowThread.ShouldBeTrue("the icon picture is changed on the window thread");
+        IconChanges.Add(icon);
+        return ChangeSucceeds;
     }
 
     public bool UseVersion4(nint owner, uint iconId)

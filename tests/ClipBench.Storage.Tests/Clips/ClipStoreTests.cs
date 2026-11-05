@@ -1,6 +1,11 @@
+using ClipBench.Core.Boards;
 using ClipBench.Core.Clips;
+using ClipBench.Core.History;
 using ClipBench.Core.Results;
+using ClipBench.Core.Snippets;
+using ClipBench.Storage.Boards;
 using ClipBench.Storage.Clips;
+using ClipBench.Storage.Snippets;
 using ClipBench.Storage.Tests.Support;
 
 namespace ClipBench.Storage.Tests.Clips;
@@ -24,6 +29,33 @@ public class ClipStoreTests : RepositoryTestBase
         loaded.IsSuccess.ShouldBeTrue();
         loaded.Value.UnreadableCount.ShouldBe(0);
         loaded.Value.Clips.ShouldBe(clips.Reverse());
+    }
+
+    [Fact]
+    public async Task Wiping_through_the_store_deletes_clips_boards_and_snippets_and_the_store_still_works()
+    {
+        var repository = await OpenAsync();
+        var store = new ClipStore(repository);
+        var clips = TestClips.OfEveryFormat();
+        foreach (var clip in clips)
+        {
+            await store.SaveAsync(clip, Ct);
+        }
+
+        await repository.SetPinnedAsync(clips[0].Id, true, Ct);
+        await new BoardStore(repository).AddAsync(new Board(BoardId.New(), "Work", 0), Ct);
+        await new SnippetStore(repository).SaveAsync(new Snippet(SnippetId.New(), "Signature", "Kind regards", 0), Ct);
+
+        var wiped = await ((IStoreWipe)store).WipeAsync(Ct);
+
+        wiped.IsSuccess.ShouldBeTrue();
+        (await store.LoadAsync(Ct)).Value.Clips.ShouldBeEmpty();
+        (await new BoardStore(repository).LoadAsync(Ct)).Value.ShouldBeEmpty();
+        (await new SnippetStore(repository).LoadAsync(Ct)).Value.ShouldBeEmpty();
+
+        var fresh = TestClips.Text("after the wipe");
+        (await store.SaveAsync(fresh, Ct)).IsSuccess.ShouldBeTrue();
+        (await store.LoadAsync(Ct)).Value.Clips.ShouldBe([fresh]);
     }
 
     [Fact]

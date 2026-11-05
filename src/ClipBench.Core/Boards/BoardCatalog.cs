@@ -255,6 +255,13 @@ public sealed class BoardCatalog : IDisposable
     private static Result NotFound() =>
         Result.Failure(new ResultError(ErrorCode.BoardNotFound, "That board no longer exists."));
 
+    /// <summary>Empties the list in memory and tells the listeners. The store is not touched: use it after the store was wiped.</summary>
+    public void Forget()
+    {
+        SetBoards([]);
+        RaiseChanged();
+    }
+
     private void SetBoards(ImmutableArray<Board> boards)
     {
         lock (_gate)

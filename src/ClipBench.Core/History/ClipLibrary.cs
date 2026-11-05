@@ -26,6 +26,8 @@ public sealed class ClipLibrary : IDisposable
     private readonly ClipSearch _search = new();
     private readonly SemaphoreSlim _changes = new(1, 1);
     private readonly ConcurrentDictionary<ClipId, SensitiveKind> _sensitivity = new();
+    private readonly Lock _expiryGate = new();
+    private TimeSpan? _sensitiveExpiry;
 
     /// <summary>Creates an empty library.</summary>
     /// <param name="history">The in-memory history, with its limits.</param>
@@ -43,6 +45,34 @@ public sealed class ClipLibrary : IDisposable
     /// the others are still told.
     /// </summary>
     public event EventHandler? Changed;
+
+    /// <summary>
+    /// How long a new clip that looks like a secret is kept, or null to keep it like any other clip. Pinned clips, images
+    /// and file lists never expire. Greater than zero.
+    /// </summary>
+    public TimeSpan? SensitiveExpiry
+    {
+        get
+        {
+            lock (_expiryGate)
+            {
+                return _sensitiveExpiry;
+            }
+        }
+
+        set
+        {
+            if (value is { } expiry)
+            {
+                ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(expiry, TimeSpan.Zero);
+            }
+
+            lock (_expiryGate)
+            {
+                _sensitiveExpiry = value;
+            }
+        }
+    }
 
     /// <summary>A snapshot of the clips, newest first.</summary>
     public ImmutableArray<Clip> Clips => _history.Clips;
@@ -98,7 +128,7 @@ public sealed class ClipLibrary : IDisposable
         await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var added = _history.Add(clip);
+            var added = _history.Add(WithExpiry(clip));
             ForgetSensitivity(added.Evicted);
 
             var saved = await _store.SaveAsync(added.Clip, cancellationToken).ConfigureAwait(false);
@@ -114,6 +144,95 @@ public sealed class ClipLibrary : IDisposable
             }
 
             return deleted.IsFailure ? Result.Failure<AddResult>(deleted.Error) : Result.Success(added);
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
+    /// <summary>
+    /// Removes the clips whose expiry has arrived from the library and from the store, which also clears rows left by
+    /// an earlier run.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>How many clips left the library, or why the store could not be swept. A failure still leaves them out of the library.</returns>
+    public async Task<Result<int>> SweepExpiredAsync(CancellationToken cancellationToken)
+    {
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var expired = _history.RemoveExpired();
+            ForgetSensitivity(expired);
+
+            var swept = await _store.SweepExpiredAsync(cancellationToken).ConfigureAwait(false);
+            if (!expired.IsEmpty)
+            {
+                RaiseChanged();
+            }
+
+            return swept.IsFailure ? Result.Failure<int>(swept.Error) : Result.Success(expired.Length);
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
+    /// <summary>Changes the history limits and removes at once the clips that no longer fit.</summary>
+    /// <param name="options">The new limits.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>Success, or why the removed clips could not be deleted from the store. A failure still leaves them out of the library.</returns>
+    public async Task<Result> ApplyLimitsAsync(HistoryOptions options, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _history.SetOptions(options);
+            var evicted = _history.Trim();
+            if (evicted.IsEmpty)
+            {
+                return Result.Success();
+            }
+
+            ForgetSensitivity(evicted);
+            var deleted = await _store.DeleteAsync([.. evicted.Select(clip => clip.Id)], cancellationToken).ConfigureAwait(false);
+            RaiseChanged();
+            return deleted;
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
+    /// <summary>
+    /// Deletes every clip, pinned or not, from the store and then from the library. It waits for a copy that is being saved,
+    /// so a clip cannot survive the wipe. When the store cannot be wiped the library keeps its clips, because they are still
+    /// on disk.
+    /// </summary>
+    /// <param name="store">Deletes the files' content.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>Success, or why the store could not be wiped.</returns>
+    public async Task<Result> WipeAsync(IStoreWipe store, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var wiped = await store.WipeAsync(cancellationToken).ConfigureAwait(false);
+            if (wiped.IsFailure)
+            {
+                return wiped;
+            }
+
+            _ = _history.Clear(includePinned: true);
+            _sensitivity.Clear();
+            RaiseChanged();
+            return wiped;
         }
         finally
         {
@@ -321,6 +440,17 @@ public sealed class ClipLibrary : IDisposable
 
     /// <summary>Releases the lock that keeps changes in order. Call it once nothing changes the library any more.</summary>
     public void Dispose() => _changes.Dispose();
+
+    // Only a new clip that is not pinned and has no expiry of its own, and only text: a path is not a secret.
+    private Clip WithExpiry(Clip clip) =>
+        SensitiveExpiry is { } expiry
+        && !clip.IsPinned
+        && clip.ExpiresAt is null
+        && clip.Content is not FilesContent
+        && clip.Content.PlainText is { } text
+        && SensitiveDetector.Detect(text) != SensitiveKind.None
+            ? clip with { ExpiresAt = clip.CapturedAt + expiry }
+            : clip;
 
     private static List<ClipPlacement> Placements(IEnumerable<Clip> clips) =>
         [.. clips.Select(clip => new ClipPlacement(clip.Id, clip.OnBoard, clip.BoardPosition))];

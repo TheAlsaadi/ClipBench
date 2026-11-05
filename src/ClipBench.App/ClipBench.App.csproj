@@ -31,6 +31,7 @@
   <ItemGroup>
     <!-- The tray icon loads its picture from this file next to the program. -->
     <Content Include="Assets\ClipBench.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\ClipBench-incognito.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

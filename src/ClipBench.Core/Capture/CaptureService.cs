@@ -74,6 +74,9 @@ public sealed class CaptureService : ICaptureControl, IDisposable
     }
 
     /// <inheritdoc/>
+    public event EventHandler? PausedChanged;
+
+    /// <inheritdoc/>
     public bool IsPaused => Filter.Incognito;
 
     /// <inheritdoc/>
@@ -84,9 +87,17 @@ public sealed class CaptureService : ICaptureControl, IDisposable
     public void UpdateFilter(Func<CaptureFilter, CaptureFilter> change)
     {
         ArgumentNullException.ThrowIfNull(change);
+        bool pausedChanged;
         lock (_gate)
         {
+            var before = _filter.Incognito;
             _filter = change(_filter);
+            pausedChanged = before != _filter.Incognito;
+        }
+
+        if (pausedChanged)
+        {
+            PausedChanged.RaiseEach(this);
         }
     }
 

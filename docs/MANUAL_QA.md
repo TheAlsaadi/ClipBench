@@ -12,7 +12,7 @@ How to start a build for checking: `dotnet build -c Release`, then run `src\Clip
 - [ ] Hovering over the icon shows "ClipBench · capturing".
 - [ ] Starting the app a second time does not start a second copy: the first copy's popup opens instead.
 - [ ] Left-click the icon: the popup opens near the pointer. Pick a clip with Enter while a text field in another program had focus before you clicked: the clip appears there.
-- [ ] Right-click the icon: the menu shows **Open ClipBench** (bold), a line, **Start collecting**, **Restore clipboard after paste** (ticked), **Pause capturing** and **Exit**. Click away: the menu closes.
+- [ ] Right-click the icon: the menu shows **Open ClipBench** (bold), a line, **Start collecting**, **Settings…**, **Turn on incognito** and **Exit**. Click away: the menu closes.
 - [ ] **Exit** closes the app and removes the icon at once (no ghost icon is left when you move the pointer over it).
 - [ ] Restart Explorer (Task Manager, right-click Windows Explorer, Restart): the ClipBench icon comes back by itself.
 
@@ -23,7 +23,7 @@ How to start a build for checking: `dotnet build -c Release`, then run `src\Clip
 - [ ] Copy files in Explorer (Ctrl+C on two or three files). The row shows their names, not their folders.
 - [ ] Copy the same text twice: it is listed once and moves to the top.
 - [ ] Copy a password from a password manager that marks its copy as private (KeePass, 1Password, Bitwarden): it never appears.
-- [ ] Choose **Pause capturing**: copy something, then open the popup: it is not there. The tool tip says "paused" and the item now says **Resume capturing**. Resume, copy again: it appears.
+- [ ] Choose **Turn on incognito**: copy something, then open the popup: it is not there. The tool tip says "incognito", the icon is greyed with a slash and the item now says **Turn off incognito**. Turn it off, copy again: it appears.
 
 ### The popup
 
@@ -90,7 +90,7 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 - [ ] Pasting from the popup while a queue runs ends the queue first and pastes what you chose.
 - [ ] Known limit (ADR 0015): pressing Ctrl+V twice within about a quarter of a second pastes the same clip twice, and the queue counts only one. At a normal pace (Ctrl+V, Tab, Ctrl+V) each press takes the next clip.
 - [ ] A queue paste into a program that runs as administrator stops the queue with a notice.
-- [ ] Untick **Restore clipboard after paste** in the tray menu: after a queue paste the last queued clip is still on the clipboard. Tick it again: your earlier copy is back after each paste. The tick is remembered after a restart.
+- [ ] Switch off **Put my clipboard back after a paste** in Settings → Paste: after a queue paste the last queued clip is still on the clipboard. Tick it again: your earlier copy is back after each paste. The tick is remembered after a restart.
 - [ ] The small window is not in screenshots or screen sharing (Win+Shift+S, Teams or Zoom).
 
 ### Collecting
@@ -110,7 +110,7 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 
 ### The settings file
 
-- [ ] `%LOCALAPPDATA%\ClipBench\settings.json` holds only the separator choice, the custom separator and two switches, never any copied text.
+- [ ] `%LOCALAPPDATA%\ClipBench\settings.json` holds only choices (separator, switches, limits, shortcuts, program names), never any copied text.
 - [ ] Replace its contents with nonsense and restart: ClipBench starts with the defaults and keeps the bad file beside it as `settings.json.bad`.
 
 ## Phase 6: transforms, boards and snippets
@@ -143,12 +143,12 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 
 ### Snippets
 
-- [ ] Tray menu → **Snippets…** (or **Ctrl+E** in the popup's Snippets view) opens the Snippets window. **New snippet**: name `Reply`, text `Dear {input:Name}, today is {date:dddd}.` The warnings list stays empty, and the preview shows `Dear <Name>, today is Saturday.` (the weekday of the day you test). **Ctrl+S** saves.
+- [ ] Tray menu → **Settings…** → **Snippets** (or **Ctrl+E** in the popup's Snippets view) opens the snippet editor. **New snippet**: name `Reply`, text `Dear {input:Name}, today is {date:dddd}.` The warnings list stays empty, and the preview shows `Dear <Name>, today is Saturday.` (the weekday of the day you test). **Ctrl+S** saves.
 - [ ] Type `{nope} and {date` in a snippet: two warnings with their line numbers appear, and the snippet still saves.
 - [ ] Change the text without saving, then click another snippet: it refuses and says to save or discard. **Esc** discards. Delete asks first.
 - [ ] Open the popup in Word, press **Ctrl+B** and choose **Snippets** in the sidebar (Ctrl+PageDown walks the entries), highlight `Reply`, **Enter**: a small form asks for Name. Type `Sam`, **Enter**: `Dear Sam, today is …` is pasted into Word. **Esc** in the form pastes nothing.
 - [ ] `{clipboard}` pastes the text you copied last. A password copied from a password manager is not pasted by a snippet.
-- [ ] The Snippets window and the popup's snippet list are not in screenshots or screen sharing.
+- [ ] The Settings window and the popup's snippet list are not in screenshots or screen sharing.
 - [ ] Quit and start again: the snippets are there.
 
 ### The mouse
@@ -181,6 +181,42 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 ### The database
 
 - [ ] After making boards and snippets, open `%LOCALAPPDATA%\ClipBench\clipbench.db` in a hex editor: neither a board name nor any snippet text can be found in it, or in the `-wal` file.
+
+## Phase 7: privacy center and settings
+
+Every privacy setting has an item here. Open the Settings window from the tray menu (**Settings…**).
+
+### The window
+
+- [ ] The list on the left shows General, Shortcuts, History, Privacy, Paste, Snippets and About; each opens its page. **Esc** hides the window; the tray item opens it again where it was.
+- [ ] Every control can be used with the keyboard alone, and Narrator reads the section names and each switch with its label.
+- [ ] Light and dark mode: every text is readable. Resize the window: nothing is cut off.
+- [ ] The window does not show in a screenshot or a screen recording while **Keep ClipBench's windows out of screenshots** is on; switch it off (Privacy): the popup, the queue window and this window now show in a screenshot with no restart. Switch it on again: they vanish.
+
+### First run
+
+- [ ] Delete `%LOCALAPPDATA%\ClipBench\settings.json` and start ClipBench: the Settings window opens on General with "Welcome to ClipBench". **No thanks** closes the card and nothing is added to the registry (`reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run` has no ClipBench value). Restart: the card does not come back.
+- [ ] Do it again and press **Yes, start with Windows**: the value `ClipBench` appears in that key with the quoted path of the program. Sign out and in: ClipBench is running.
+- [ ] Turn **Start ClipBench when I sign in to Windows** off: the value is gone and the other values of that key are untouched. Move the program folder with the switch on and start the program from its new place: the value now points there.
+- [ ] Windows Settings → Apps → Startup lists ClipBench while it is on.
+
+### Privacy
+
+- [ ] **Incognito** switch: on, copy something: it never appears, the tray icon is the greyed one with a slash and the tool tip says "incognito". The tray item and this switch follow each other. Exit and start ClipBench: incognito is off.
+- [ ] **Hide passwords, keys, tokens and card numbers**: copy the text `4111 1111 1111 1111` (a test card number): the popup shows dots; **Ctrl+R** reveals it. Switch the setting off: it shows in full. Switch it on again.
+- [ ] **Seconds to keep a clip that looks like a secret**: set 15, copy a token (a long random string), open the popup: it is there. Wait 20 seconds and open it again: it is gone. With the default (120), it goes after two minutes. **Pin** such a clip before its time: it stays after the time.
+- [ ] Copy a secret, quit ClipBench before its time, start it again after the time has passed: the clip is gone, and a search of `%LOCALAPPDATA%\ClipBench\clipbench.db` for part of it finds nothing.
+- [ ] **Programs that are never recorded**: KeePass, KeePassXC, 1Password, Bitwarden, Dashlane and the others are listed. Add `notepad.exe`, copy text in Notepad: it is not recorded; copy in another program: it is. **Remove** it: Notepad is recorded again. A name such as `a*b` is refused with a reason. **Restore the default list** brings the defaults back. Empty the list, restart: it stays empty.
+- [ ] If you have a password manager installed that is on the list, copy a password from it: it is not recorded. (Names that are wrong only mean nothing is excluded; tell the maintainer.)
+- [ ] **Delete everything…**: a question appears with **Yes, delete everything** and **Keep my clips**. **Keep my clips** changes nothing. **Yes** deletes: the popup is empty, Pinned and every board are empty, the Snippets list is empty, and the page says "Everything was deleted". Search `clipbench.db` and its `-wal` file for text you copied earlier: not found. Copy something: it is recorded.
+
+### History, paste, shortcuts and About
+
+- [ ] **History**: lower **Most clips to keep** to 10 with more than 10 unpinned clips: the extra ones go at once, pinned ones stay. A value outside a box's range jumps to the nearest end.
+- [ ] **Paste**: the separator list and **Or type your own** change what a multi-paste puts between clips; a bad escape such as `\q` shows a reason. **Also keep each copy as its own clip while collecting** and **Put my clipboard back after a paste** behave as in Phase 5.
+- [ ] **Shortcuts**: click the box, press `Ctrl+Alt+K`: the popup now opens with it and no longer with Win+Alt+V, with no restart. **Reset** puts the default back. A shortcut another program uses shows "Another program already uses…" and the old one keeps working. Giving the popup the collect shortcut is refused. A letter alone is refused with a reason.
+- [ ] **About** shows the version, "MIT License", the sentence that ClipBench makes no network connections and the project's address; clicking it opens your browser.
+- [ ] `%LOCALAPPDATA%\ClipBench\settings.json` holds your choices and the program names, never any copied text. Replace it with nonsense and restart: the defaults are used and the bad file is kept as `settings.json.bad`.
 
 ## Tests that need a person
 

@@ -13,10 +13,12 @@ using ClipBench.Core.Transforms;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
+using ClipBench.Platform.Windows.Hosting;
 using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
+using ClipBench.Presentation.Preferences;
 using ClipBench.Presentation.Queue;
 using ClipBench.Presentation.Snippets;
 using ClipBench.Presentation.Transforms;
@@ -54,9 +56,9 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
     private readonly StartupOptions _options;
-    private SnippetsWindow? _snippetsWindow;
-    private HotkeyId? _hotkey;
-    private HotkeyId? _collectHotkey;
+    private SettingsWindow? _settingsWindow;
+    private EventHandler? _settingsChanged;
+    private bool _windowsHidden;
     private bool _disposed;
 
     private AppRoot(
@@ -127,7 +129,9 @@ internal sealed class AppRoot : IAsyncDisposable
         var dispatcher = new DispatcherQueueDispatcher(queue);
 
         // The tray icon is also how the app tells the user things, so it comes before the services that need to.
-        var trayCreated = WindowsPlatform.CreateTray(Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico"));
+        var trayCreated = WindowsPlatform.CreateTray(
+            Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico"),
+            Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench-incognito.ico"));
         var tray = trayCreated.IsSuccess ? trayCreated.Value : null;
         if (trayCreated.IsFailure)
         {
@@ -139,6 +143,9 @@ internal sealed class AppRoot : IAsyncDisposable
         QueueHudWindow? hud = null;
         try
         {
+            // The applier comes first so that the loaded settings reach the history and the capture as soon as they are read.
+            _ = services.GetRequiredService<SettingsApplier>();
+
             // Settings that cannot be read give the defaults; the app runs either way.
             var settingsLoad = await services.GetRequiredService<SettingsService>().LoadAsync(cancellationToken);
             if (settingsLoad is SettingsLoadStatus.Damaged or SettingsLoadStatus.Unreadable)
@@ -146,6 +153,12 @@ internal sealed class AppRoot : IAsyncDisposable
                 log.Write(
                     ActivityLevel.Warning,
                     settingsLoad == SettingsLoadStatus.Damaged ? ActivityEvent.SettingsDamaged : ActivityEvent.SettingsUnreadable);
+            }
+
+            // A start-with-Windows entry that went missing or points to an old folder is put right.
+            if (services.GetService<StartWithWindowsService>() is { } startup && startup.Reconcile() is { IsFailure: true } reconciled)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.StartupRegistrationFailed, new ActivityDetails { Error = reconciled.Error.Code });
             }
 
             var library = services.GetRequiredService<ClipLibrary>();
@@ -176,13 +189,16 @@ internal sealed class AppRoot : IAsyncDisposable
                 log.Write(ActivityLevel.Warning, ActivityEvent.StoreFailed, new ActivityDetails { Error = snippetsLoad.Error.Code });
             }
 
+            // Secrets that expired while the app was closed go now, and later ones as their time comes.
+            services.GetRequiredService<ExpirySweeper>().Start();
+
             // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
             _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
 
             var popupViewModel = services.GetRequiredService<PopupViewModel>();
             popup = new PopupWindow(popupViewModel, platform.WindowEffects, platform.ForegroundTracker, platform.ScreenLocator);
             var handle = WinRT.Interop.WindowNative.GetWindowHandle(popup);
-            if (!options.AllowScreenCapture)
+            if (HideFromCapture(options, services))
             {
                 _ = platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
             }
@@ -193,17 +209,34 @@ internal sealed class AppRoot : IAsyncDisposable
 
             hud = CreateQueueWindow(services, platform, options);
             var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
-            popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSnippetEditor();
+            popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSettings(SettingsSection.Snippets);
             await root.ShowTrayAsync(cancellationToken);
-            root._hotkey = await root.RegisterShortcutAsync(
-                options.Hotkey ?? Hotkey.Default,
+
+            // A shortcut on the command line is a developer's override; otherwise the user's saved shortcut is used.
+            var saved = services.GetRequiredService<SettingsService>().Current;
+            await root.BindShortcutAsync(
+                HotkeyAction.OpenPopup,
+                options.Hotkey ?? saved.PopupHotkey,
                 "You can still open ClipBench from its tray icon.",
                 cancellationToken);
-            root._collectHotkey = await root.RegisterShortcutAsync(
-                options.CollectHotkey ?? CollectToggle.DefaultShortcut,
+            await root.BindShortcutAsync(
+                HotkeyAction.ToggleCollect,
+                options.CollectHotkey ?? saved.CollectHotkey,
                 "You can still start and finish collecting from the tray menu.",
                 cancellationToken);
-            platform.Hotkeys.Pressed += root.OnHotkeyPressed;
+            services.GetRequiredService<HotkeyBindings>().Pressed += root.OnHotkeyPressed;
+
+            // The windows follow the user's choice about screen capture as soon as it changes.
+            root._windowsHidden = HideFromCapture(options, services);
+            root._settingsChanged = (_, _) => dispatcher.Post(root.ApplyCaptureProtection);
+            services.GetRequiredService<SettingsService>().Changed += root._settingsChanged;
+
+            // The first time ClipBench runs, the Settings window opens on the question about starting with Windows.
+            if (!saved.FirstRunCompleted)
+            {
+                root.OpenSettings(SettingsSection.General);
+            }
+
             guard.ShowRequested += root.OnShowRequested;
             return new StartOutcome(root, null);
         }
@@ -266,27 +299,51 @@ internal sealed class AppRoot : IAsyncDisposable
         _popup.ShowAt(bounds);
     }
 
-    /// <summary>Shows the snippet editor, making the window the first time.</summary>
-    public void OpenSnippetEditor()
+    // Puts every window in or out of screenshots and screen recordings to match the setting. Runs on the UI thread.
+    private void ApplyCaptureProtection()
+    {
+        var hide = HideFromCapture(_options, _services);
+        if (_disposed || hide == _windowsHidden)
+        {
+            return;
+        }
+
+        _windowsHidden = hide;
+        List<object> windows = [_popup, _hud];
+        if (_settingsWindow is not null)
+        {
+            windows.Add(_settingsWindow);
+        }
+
+        foreach (var window in windows)
+        {
+            var handle = new Core.Pasting.WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(window));
+            _ = hide ? _platform.WindowEffects.ExcludeFromCapture(handle) : _platform.WindowEffects.AllowCapture(handle);
+        }
+    }
+
+    /// <summary>Shows the Settings window with a section open, making the window the first time.</summary>
+    /// <param name="section">The section to open.</param>
+    public void OpenSettings(SettingsSection section = SettingsSection.General)
     {
         if (_disposed)
         {
             return;
         }
 
-        if (_snippetsWindow is null)
+        if (_settingsWindow is null)
         {
-            _snippetsWindow = new SnippetsWindow(_services.GetRequiredService<SnippetEditorViewModel>());
+            _settingsWindow = new SettingsWindow(_services.GetRequiredService<SettingsViewModel>());
 
-            // It shows what the user wrote in their snippets, so it is kept out of screen captures like the popup.
-            if (!_options.AllowScreenCapture)
+            // It shows the user's snippets and excluded programs, so it is kept out of screen captures like the popup.
+            if (HideFromCapture(_options, _services))
             {
-                var handle = WinRT.Interop.WindowNative.GetWindowHandle(_snippetsWindow);
+                var handle = WinRT.Interop.WindowNative.GetWindowHandle(_settingsWindow);
                 _ = _platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
             }
         }
 
-        _snippetsWindow.ShowEditor();
+        _settingsWindow.ShowSection(section);
     }
 
     /// <summary>Stops everything in the order that keeps data safe: no new clips, then the history, then Windows.</summary>
@@ -301,12 +358,18 @@ internal sealed class AppRoot : IAsyncDisposable
         _disposed = true;
         _log.Write(ActivityLevel.Information, ActivityEvent.AppStopping);
         _guard.ShowRequested -= OnShowRequested;
-        _platform.Hotkeys.Pressed -= OnHotkeyPressed;
+        _services.GetRequiredService<HotkeyBindings>().Pressed -= OnHotkeyPressed;
+        if (_settingsChanged is { } changed)
+        {
+            _services.GetRequiredService<SettingsService>().Changed -= changed;
+        }
+
         _tray?.Dispose();
         _popupViewModel.Close();
         _popup.Close();
         _hud.Close();
-        _snippetsWindow?.Shutdown();
+        _settingsWindow?.Shutdown();
+        await _services.GetRequiredService<ExpirySweeper>().StopAsync();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
@@ -330,13 +393,30 @@ internal sealed class AppRoot : IAsyncDisposable
 
         var handle = new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(hud));
         _ = platform.WindowEffects.UseRoundedCorners(handle);
-        if (!options.AllowScreenCapture)
+        if (HideFromCapture(options, services))
         {
             _ = platform.WindowEffects.ExcludeFromCapture(handle);
         }
 
         return hud;
     }
+
+    // The version the build was stamped with, without the source revision that follows a plus sign.
+    private static string ProgramVersion()
+    {
+        var stamped = typeof(AppRoot).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), inherit: false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Select(attribute => attribute.InformationalVersion)
+            .FirstOrDefault();
+        var version = stamped is { Length: > 0 } ? stamped : typeof(AppRoot).Assembly.GetName().Version?.ToString(3);
+        var plus = version?.IndexOf('+', StringComparison.Ordinal) ?? -1;
+        return plus > 0 ? version![..plus] : version ?? "development build";
+    }
+
+    // The command-line switch is a developer's override; otherwise the user's setting decides.
+    private static bool HideFromCapture(StartupOptions options, IServiceProvider services) =>
+        !options.AllowScreenCapture && services.GetRequiredService<SettingsService>().Current.HideFromScreenCapture;
 
     private static ServiceProvider BuildServices(WindowsPlatform platform, ClipStorage storage, StoragePaths paths, IActivityLog log, IUiDispatcher dispatcher, TimeProvider time, ITrayIcon? tray)
     {
@@ -351,12 +431,21 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(platform.PasteInjector);
         _ = services.AddSingleton(platform.Hotkeys);
         _ = tray is null ? services.AddSingleton<IUserNotifier, NullNotifier>() : services.AddSingleton<IUserNotifier>(tray);
-        _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
+        var clipStore = new ClipStore(storage.Repository);
+        _ = services.AddSingleton<IClipStore>(clipStore);
+        _ = services.AddSingleton<IStoreWipe>(clipStore);
         _ = services.AddSingleton<ISettingsStore>(new JsonSettingsStore(paths.SettingsPath));
         _ = services.AddSingleton<SettingsService>();
+        _ = services.AddSingleton<IStartupRegistration>(new RegistryStartupRegistration());
+        if (Environment.ProcessPath is { } processPath && Path.IsPathFullyQualified(processPath) && !processPath.Contains('"', StringComparison.Ordinal))
+        {
+            _ = services.AddSingleton(provider => new StartWithWindowsService(provider.GetRequiredService<IStartupRegistration>(), provider.GetRequiredService<SettingsService>(), processPath));
+        }
+
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
+        _ = services.AddSingleton(provider => new ExpirySweeper(provider.GetRequiredService<ClipLibrary>(), provider.GetRequiredService<IActivityLog>(), TimeSpan.FromSeconds(1)));
         _ = services.AddSingleton<IBoardStore>(new BoardStore(storage.Repository));
         _ = services.AddSingleton<BoardCatalog>();
         _ = services.AddSingleton<ISnippetStore>(new SnippetStore(storage.Repository));
@@ -369,6 +458,20 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<ICollectControl>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<CaptureService>();
+        _ = services.AddSingleton<SettingsApplier>();
+        _ = services.AddSingleton<HotkeyBindings>();
+        _ = services.AddSingleton<WipeService>();
+        _ = services.AddSingleton<IWipeAll>(provider => provider.GetRequiredService<WipeService>());
+        _ = services.AddSingleton(provider => new GeneralSettingsViewModel(
+            provider.GetRequiredService<SettingsService>(),
+            provider.GetService<StartWithWindowsService>(),
+            provider.GetRequiredService<IUiDispatcher>()));
+        _ = services.AddSingleton<HotkeysSettingsViewModel>();
+        _ = services.AddSingleton<HistorySettingsViewModel>();
+        _ = services.AddSingleton<PrivacySettingsViewModel>();
+        _ = services.AddSingleton<PasteSettingsViewModel>();
+        _ = services.AddSingleton(new AboutViewModel(ProgramVersion()));
+        _ = services.AddSingleton<SettingsViewModel>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
         _ = services.AddSingleton<QueueRunner>();
@@ -432,7 +535,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray.OpenRequested += (_, _) => _dispatcher.Post(() => TogglePopup(fromTray: true));
         _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
-        _trayViewModel.EditSnippetsRequested += (_, _) => OpenSnippetEditor();
+        _trayViewModel.SettingsRequested += (_, _) => OpenSettings();
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly
@@ -442,7 +545,7 @@ internal sealed class AppRoot : IAsyncDisposable
         {
             // Changes come from the UI thread, the queue and the capture thread. The menu is built and sent from the UI
             // thread, one change after another, so an older menu can never arrive after a newer one.
-            if (e.PropertyName is nameof(TrayViewModel.ToolTip) or nameof(TrayViewModel.RestoreClipboard))
+            if (e.PropertyName is nameof(TrayViewModel.ToolTip))
             {
                 _dispatcher.Post(() =>
                 {
@@ -461,31 +564,31 @@ internal sealed class AppRoot : IAsyncDisposable
         }
     }
 
-    // Returns the registration, or null when another program holds the shortcut; the user is then told what still works.
-    private async Task<HotkeyId?> RegisterShortcutAsync(Hotkey hotkey, string fallback, CancellationToken cancellationToken)
+    // When another program holds the shortcut the user is told what still works.
+    private async Task BindShortcutAsync(HotkeyAction action, Hotkey hotkey, string fallback, CancellationToken cancellationToken)
     {
-        var registered = await _platform.Hotkeys.RegisterAsync(hotkey, cancellationToken);
-        if (registered.IsSuccess)
+        var bound = await _services.GetRequiredService<HotkeyBindings>().BindAsync(action, hotkey, cancellationToken);
+        if (bound.IsSuccess)
         {
             _log.Write(ActivityLevel.Information, ActivityEvent.HotkeyRegistered);
-            return registered.Value;
+            return;
         }
 
-        _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = registered.Error.Code });
+        _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = bound.Error.Code });
+        var why = bound.Error.Code == ErrorCode.HotkeyUnavailable ? "another program uses it" : "it is already used for something else in ClipBench";
         _services.GetRequiredService<IUserNotifier>().Show(
             "ClipBench",
-            $"ClipBench could not claim the shortcut {hotkey} because another program uses it. {fallback}");
-        return null;
+            $"ClipBench could not claim the shortcut {hotkey} because {why}. {fallback}");
     }
 
     // Runs on a pool thread.
-    private void OnHotkeyPressed(object? sender, HotkeyPressedEventArgs e)
+    private void OnHotkeyPressed(object? sender, HotkeyActionEventArgs e)
     {
-        if (_hotkey is { } own && e.Id == own)
+        if (e.Action == HotkeyAction.OpenPopup)
         {
             _dispatcher.Post(() => TogglePopup());
         }
-        else if (_collectHotkey is { } collect && e.Id == collect)
+        else if (e.Action == HotkeyAction.ToggleCollect)
         {
             _dispatcher.Post(() =>
             {

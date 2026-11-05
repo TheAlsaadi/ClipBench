@@ -364,6 +364,8 @@ Each phase lists: **Goal**, **Skills**, **Tests first**, **Implementation**, **A
 
 **Implementation**: A Settings window with sections: General, Hotkeys, History, Privacy, Paste, Snippets, About. The About section shows the version, license, the "no network" promise, and a link to the repo.
 
+*As built (ADR 0017):* the owner approved the choices on 2026-11-05. The shortcuts are editable and re-bound live; incognito is the old pause, is not saved and shows a second tray icon; a secret carries an expiry that pinning cancels; the in-app wipe keeps the database file and key, empty. The first-run question is a card in the Settings window rather than a dialog, and the tray menu now offers Settings… instead of Snippets… and the restore tick.
+
 **Acceptance**: Every privacy setting has a test and a QA checklist item. Update `docs/security/PRIVACY.md`.
 
 ---

@@ -1,5 +1,4 @@
 using ClipBench.Core.Capture;
-using ClipBench.Core.Settings;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
@@ -12,6 +11,12 @@ public sealed class TrayMenuTests : IDisposable
     {
         public bool IsPaused { get; private set; }
 
+        public event EventHandler? PausedChanged
+        {
+            add { }
+            remove { }
+        }
+
         public void SetPaused(bool paused) => IsPaused = paused;
     }
 
@@ -19,16 +24,12 @@ public sealed class TrayMenuTests : IDisposable
     private readonly FakeQueueControl _queue = new();
     private readonly FakeCollectControl _collect = new();
     private readonly FakeNotifier _notifier = new();
-    private readonly FakeSettingsStore _settingsStore = new();
-    private readonly SettingsService _settings;
 
-    public TrayMenuTests() => _settings = new SettingsService(_settingsStore);
+    public void Dispose()
+    {
+    }
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    public void Dispose() => _settings.Dispose();
-
-    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier), _settings);
+    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier));
 
     [Fact]
     public void The_menu_offers_open_collect_pause_and_exit_with_open_as_the_default()
@@ -40,11 +41,23 @@ public sealed class TrayMenuTests : IDisposable
             (1, "Open ClipBench", true),
             (0, string.Empty, false),
             (5, "Start collecting", false),
-            (7, "Restore clipboard after paste", false),
-            (8, "Snippets\u2026", false),
-            (2, "Pause capturing", false),
+            (8, "Settings\u2026", false),
+            (2, "Turn on incognito", false),
             (3, "Exit", false),
         ]);
+    }
+
+    [Fact]
+    public void The_icon_shows_its_second_picture_only_while_incognito_is_on()
+    {
+        var tray = Create();
+        TrayMenu.Build(tray).UseAlternateIcon.ShouldBeFalse();
+
+        tray.TogglePauseCommand.Execute(null);
+        TrayMenu.Build(tray).UseAlternateIcon.ShouldBeTrue();
+
+        tray.TogglePauseCommand.Execute(null);
+        TrayMenu.Build(tray).UseAlternateIcon.ShouldBeFalse();
     }
 
     [Fact]
@@ -55,8 +68,8 @@ public sealed class TrayMenuTests : IDisposable
 
         var model = TrayMenu.Build(tray);
 
-        model.ToolTip.ShouldBe("ClipBench \u00B7 paused");
-        model.Menu.Single(item => item.Id == TrayMenu.PauseId).Text.ShouldBe("Resume capturing");
+        model.ToolTip.ShouldBe("ClipBench \u00B7 incognito");
+        model.Menu.Single(item => item.Id == TrayMenu.PauseId).Text.ShouldBe("Turn off incognito");
     }
 
     [Fact]
@@ -110,21 +123,20 @@ public sealed class TrayMenuTests : IDisposable
             (0, string.Empty),
             (TrayMenu.StopQueueId, "Stop paste queue"),
             (TrayMenu.CollectId, "Start collecting"),
-            (TrayMenu.RestoreId, "Restore clipboard after paste"),
-            (TrayMenu.SnippetsId, "Snippets\u2026"),
-            (TrayMenu.PauseId, "Pause capturing"),
+            (TrayMenu.SettingsId, "Settings\u2026"),
+            (TrayMenu.PauseId, "Turn on incognito"),
             (TrayMenu.ExitId, "Exit"),
         ]);
     }
 
     [Fact]
-    public void Choosing_snippets_asks_for_the_snippet_editor_once()
+    public void Choosing_settings_asks_for_the_settings_window_once()
     {
         var tray = Create();
         var asked = 0;
-        tray.EditSnippetsRequested += (_, _) => asked++;
+        tray.SettingsRequested += (_, _) => asked++;
 
-        TrayMenu.Execute(tray, TrayMenu.SnippetsId);
+        TrayMenu.Execute(tray, TrayMenu.SettingsId);
 
         asked.ShouldBe(1);
     }
@@ -156,33 +168,16 @@ public sealed class TrayMenuTests : IDisposable
             (0, string.Empty),
             (TrayMenu.CollectId, "Finish collecting (2)"),
             (TrayMenu.CancelCollectId, "Cancel collecting"),
-            (TrayMenu.RestoreId, "Restore clipboard after paste"),
-            (TrayMenu.SnippetsId, "Snippets\u2026"),
-            (TrayMenu.PauseId, "Pause capturing"),
+            (TrayMenu.SettingsId, "Settings\u2026"),
+            (TrayMenu.PauseId, "Turn on incognito"),
             (TrayMenu.ExitId, "Exit"),
         ]);
     }
 
     [Fact]
-    public async Task The_restore_item_is_ticked_while_the_clipboard_is_put_back_after_a_paste()
+    public void Nothing_on_the_menu_is_ticked()
     {
-        var tray = Create();
-        TrayMenu.Build(tray).Menu.Single(item => item.Id == TrayMenu.RestoreId).IsChecked.ShouldBeTrue();
-
-        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
-
-        TrayMenu.Build(tray).Menu.Single(item => item.Id == TrayMenu.RestoreId).IsChecked.ShouldBeFalse();
-        TrayMenu.Build(tray).Menu.Where(item => item.Id != TrayMenu.RestoreId).ShouldAllBe(item => !item.IsChecked);
-    }
-
-    [Fact]
-    public void Choosing_the_restore_item_switches_it()
-    {
-        var tray = Create();
-
-        TrayMenu.Execute(tray, TrayMenu.RestoreId);
-
-        _settings.Current.RestorePreviousClipboard.ShouldBeFalse();
+        TrayMenu.Build(Create()).Menu.ShouldAllBe(item => !item.IsChecked);
     }
 
     [Fact]

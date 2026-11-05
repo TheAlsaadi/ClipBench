@@ -39,6 +39,47 @@ public sealed class CaptureServiceTests : IDisposable
     private static string[] Texts(ClipLibrary library) =>
         [.. library.Clips.Select(clip => ((TextContent)clip.Content).Text)];
 
+    // --- incognito ---
+
+    [Fact]
+    public void Turning_incognito_on_and_off_is_announced_each_time_it_changes()
+    {
+        var changes = new List<bool>();
+        _service.PausedChanged += (_, _) => changes.Add(_service.IsPaused);
+
+        _service.SetPaused(true);
+        _service.SetPaused(true);
+        _service.SetPaused(false);
+
+        changes.ShouldBe([true, false]);
+    }
+
+    [Fact]
+    public void A_filter_that_changes_incognito_is_announced_and_one_that_does_not_is_not()
+    {
+        var raised = 0;
+        _service.PausedChanged += (_, _) => raised++;
+
+        _service.UpdateFilter(filter => filter with { ExcludedProcesses = ["notepad"] });
+        raised.ShouldBe(0);
+
+        _service.UpdateFilter(filter => filter with { Incognito = true });
+        raised.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_listener_that_throws_does_not_stop_the_others_or_the_change()
+    {
+        var reached = false;
+        _service.PausedChanged += (_, _) => throw new InvalidOperationException("a bug in a listener");
+        _service.PausedChanged += (_, _) => reached = true;
+
+        _service.SetPaused(true);
+
+        reached.ShouldBeTrue();
+        _service.IsPaused.ShouldBeTrue();
+    }
+
     // --- starting ---
 
     [Fact]

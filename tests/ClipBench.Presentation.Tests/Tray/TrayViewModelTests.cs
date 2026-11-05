@@ -1,6 +1,5 @@
 using ClipBench.Core.Capture;
 using ClipBench.Core.Pasting;
-using ClipBench.Core.Settings;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Tests.Support;
 using ClipBench.Presentation.Tray;
@@ -15,10 +14,19 @@ public sealed class TrayViewModelTests : IDisposable
 
         public List<bool> Calls { get; } = [];
 
+        public event EventHandler? PausedChanged;
+
         public void SetPaused(bool paused)
         {
             IsPaused = paused;
             Calls.Add(paused);
+            PausedChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void ChangeElsewhere(bool paused)
+        {
+            IsPaused = paused;
+            PausedChanged?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -26,16 +34,12 @@ public sealed class TrayViewModelTests : IDisposable
     private readonly FakeQueueControl _queue = new();
     private readonly FakeCollectControl _collect = new();
     private readonly FakeNotifier _notifier = new();
-    private readonly FakeSettingsStore _settingsStore = new();
-    private readonly SettingsService _settings;
 
-    public TrayViewModelTests() => _settings = new SettingsService(_settingsStore);
+    public void Dispose()
+    {
+    }
 
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    public void Dispose() => _settings.Dispose();
-
-    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier), _settings);
+    private TrayViewModel Create() => new(_capture, _queue, new CollectToggle(_collect, _notifier));
 
     private static string[] ChangedProperties(TrayViewModel tray, Action act)
     {
@@ -51,8 +55,35 @@ public sealed class TrayViewModelTests : IDisposable
         var tray = Create();
 
         tray.IsPaused.ShouldBeFalse();
-        tray.PauseLabel.ShouldBe("Pause capturing");
+        tray.PauseLabel.ShouldBe("Turn on incognito");
         tray.ToolTip.ShouldBe("ClipBench · capturing");
+    }
+
+    [Fact]
+    public void Incognito_turned_on_elsewhere_changes_the_icon_state_the_label_and_the_tool_tip()
+    {
+        using var tray = Create();
+        var changed = ChangedProperties(tray, () => _capture.ChangeElsewhere(true));
+
+        tray.IsPaused.ShouldBeTrue();
+        tray.PauseLabel.ShouldBe("Turn off incognito");
+        tray.ToolTip.ShouldBe("ClipBench · incognito");
+        changed.ShouldContain(nameof(TrayViewModel.ToolTip));
+
+        _capture.ChangeElsewhere(false);
+
+        tray.IsPaused.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void After_it_is_disposed_it_no_longer_follows_capture()
+    {
+        var tray = Create();
+        tray.Dispose();
+
+        _capture.ChangeElsewhere(true);
+
+        tray.IsPaused.ShouldBeFalse();
     }
 
     [Fact]
@@ -64,8 +95,8 @@ public sealed class TrayViewModelTests : IDisposable
         var tray = Create();
 
         tray.IsPaused.ShouldBeTrue();
-        tray.PauseLabel.ShouldBe("Resume capturing");
-        tray.ToolTip.ShouldBe("ClipBench · paused");
+        tray.PauseLabel.ShouldBe("Turn off incognito");
+        tray.ToolTip.ShouldBe("ClipBench · incognito");
         _capture.Calls.ShouldBeEmpty();
     }
 
@@ -78,8 +109,8 @@ public sealed class TrayViewModelTests : IDisposable
 
         _capture.IsPaused.ShouldBeTrue();
         tray.IsPaused.ShouldBeTrue();
-        tray.PauseLabel.ShouldBe("Resume capturing");
-        tray.ToolTip.ShouldBe("ClipBench · paused");
+        tray.PauseLabel.ShouldBe("Turn off incognito");
+        tray.ToolTip.ShouldBe("ClipBench · incognito");
         changed.ShouldContain(nameof(TrayViewModel.PauseLabel));
         changed.ShouldContain(nameof(TrayViewModel.ToolTip));
     }
@@ -94,7 +125,7 @@ public sealed class TrayViewModelTests : IDisposable
 
         _capture.Calls.ShouldBe([true, false]);
         tray.IsPaused.ShouldBeFalse();
-        tray.PauseLabel.ShouldBe("Pause capturing");
+        tray.PauseLabel.ShouldBe("Turn on incognito");
     }
 
     [Fact]
@@ -235,73 +266,27 @@ public sealed class TrayViewModelTests : IDisposable
         _collect.SubscriberCount.ShouldBe(0);
     }
 
-    // --- restoring the clipboard ---
+    // --- opening the settings ---
 
     [Fact]
-    public void Restoring_the_clipboard_follows_the_settings()
+    public void The_settings_command_asks_for_the_settings_window_once_each_time()
     {
         var tray = Create();
+        var asked = 0;
+        tray.SettingsRequested += (_, _) => asked++;
 
-        tray.RestoreClipboard.ShouldBeTrue();
-    }
+        tray.OpenSettingsCommand.Execute(null);
+        tray.OpenSettingsCommand.Execute(null);
 
-    [Fact]
-    public async Task The_restore_command_switches_the_setting_and_saves_it()
-    {
-        var tray = Create();
-
-        await tray.ToggleRestoreCommand.ExecuteAsync(null);
-
-        tray.RestoreClipboard.ShouldBeFalse();
-        _settingsStore.Saved.Single().RestorePreviousClipboard.ShouldBeFalse();
-        await tray.ToggleRestoreCommand.ExecuteAsync(null);
-        tray.RestoreClipboard.ShouldBeTrue();
-    }
-
-    [Fact]
-    public async Task A_change_of_the_setting_made_elsewhere_is_announced()
-    {
-        var tray = Create();
-        List<string> changed = [];
-        tray.PropertyChanged += (_, args) => changed.Add(args.PropertyName!);
-
-        await _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
-
-        changed.ShouldContain(nameof(TrayViewModel.RestoreClipboard));
-    }
-
-    [Fact]
-    public async Task A_settings_change_that_leaves_the_restore_switch_alone_is_not_announced_as_one()
-    {
-        var tray = Create();
-        List<string> changed = [];
-        tray.PropertyChanged += (_, args) => changed.Add(args.PropertyName!);
-
-        await _settings.UpdateAsync(settings => settings with { Separator = SeparatorChoice.Tab }, Ct);
-
-        changed.ShouldNotContain(nameof(TrayViewModel.RestoreClipboard));
-    }
-
-    [Fact]
-    public void Disposing_stops_following_the_settings()
-    {
-        var tray = Create();
-        var raised = 0;
-        tray.PropertyChanged += (_, _) => raised++;
-
-        tray.Dispose();
-        _ = _settings.UpdateAsync(settings => settings with { RestorePreviousClipboard = false }, Ct);
-
-        raised.ShouldBe(0);
+        asked.ShouldBe(2);
     }
 
     [Fact]
     public void Missing_services_are_a_bug()
     {
         var toggle = new CollectToggle(_collect, _notifier);
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(null!, _queue, toggle, _settings));
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, null!, toggle, _settings));
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, null!, _settings));
-        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, toggle, null!));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(null!, _queue, toggle));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, null!, toggle));
+        Should.Throw<ArgumentNullException>(() => new TrayViewModel(_capture, _queue, null!));
     }
 }

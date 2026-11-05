@@ -32,6 +32,37 @@ public class RealWindowEffectsTests
     }
 
     [Fact]
+    public void Allowing_capture_makes_an_excluded_window_visible_to_screenshots_again()
+    {
+        using var form = TestEditForm.Create();
+        var window = new WindowHandle(form.Handle);
+        _effects.ExcludeFromCapture(window);
+
+        var result = _effects.AllowCapture(window);
+
+        result.IsSuccess.ShouldBeTrue();
+        _effects.IsExcludedFromCapture(window).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Allowing_capture_of_a_window_that_was_never_excluded_is_fine()
+    {
+        using var form = TestEditForm.Create();
+
+        _effects.AllowCapture(new WindowHandle(form.Handle)).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_window_that_does_not_exist_cannot_be_allowed_into_captures()
+    {
+        var result = _effects.AllowCapture(new WindowHandle(0x7FFF_FFF0));
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(ErrorCode.PlatformFailure);
+        _effects.AllowCapture(WindowHandle.None).IsFailure.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Excluding_twice_is_fine()
     {
         using var form = TestEditForm.Create();

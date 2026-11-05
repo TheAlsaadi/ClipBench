@@ -21,6 +21,12 @@ public sealed record Clip(ClipId Id, ClipContent Content, DateTimeOffset Capture
     /// <summary>Where the clip comes in its board, counting from 0. Only meaningful while <see cref="OnBoard"/> is set.</summary>
     public int BoardPosition { get; init; }
 
+    /// <summary>
+    /// When the clip must disappear, or null for never. Set for a clip that looks like a secret. Pinning a clip or
+    /// putting it on a board cancels it, because that is a choice to keep the clip.
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; init; }
+
     /// <summary>The size of the content in bytes.</summary>
     public long SizeInBytes => Content.SizeInBytes;
 

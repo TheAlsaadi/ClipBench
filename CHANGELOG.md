@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Privacy center and settings (ADR 0017, `docs/security/PRIVACY.md`). A **Settings window** (tray menu **Settings…**,
+  Ctrl+E in the popup, and by itself the first time ClipBench runs) with General, Shortcuts, History, Privacy, Paste,
+  Snippets and About. The snippet editor moved into it.
+- **Secrets expire.** A new clip that looks like a secret is deleted after two minutes by default (15 seconds to an
+  hour), from memory and disk. Pinning cancels it. Hiding secrets can be switched off.
+- **Exclusion list.** Programs whose copies are never recorded, by executable name. It starts with KeePass, KeePassXC,
+  1Password, Bitwarden, Dashlane, NordPass, Enpass, RoboForm, Keeper, Proton Pass and the Windows credential prompt;
+  entries can be added, removed or restored.
+- **Incognito** (the old Pause) shows a second tray icon and is never saved between runs.
+- **Start with Windows**, off by default, asked at the first run: one value in the user's own `Run` key.
+- **Delete everything**, after a confirmation: clips (pinned too), boards and snippets, scrubbed from the files.
+- **History limits** (count, age, size) and the **shortcuts** can be changed in Settings and apply at once, as does the
+  choice to keep ClipBench's windows out of screenshots and screen sharing.
+- The settings file gained the keys for all of these. An older file loads with the defaults, and a number out of its
+  range is moved to the nearest end.
+
+### Changed
+
+- The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
+  and the **Restore clipboard after paste** tick (now a switch under Paste).
+- Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.
+
 - Transforms, boards and snippets (ADR 0016). **Transforms**: Shift+Enter in the popup, or the Transform button,
   opens a picker over the list. Type to narrow it, move with the arrow keys, and Enter pastes the highlighted
   transform applied to the text that would have been pasted (the highlighted clip, or the marked clips joined by

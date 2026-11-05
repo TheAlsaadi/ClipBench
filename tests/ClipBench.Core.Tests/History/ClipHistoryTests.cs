@@ -25,6 +25,41 @@ public class ClipHistoryTests
     private static string[] Texts(ClipHistory history) =>
         [.. history.Clips.Select(clip => ((TextContent)clip.Content).Text)];
 
+    // --- changing the limits ---
+
+    [Fact]
+    public void New_limits_apply_at_the_next_trim()
+    {
+        var history = Create();
+        var one = history.Add(TestClips.Text("one")).Clip;
+        var two = history.Add(TestClips.Text("two")).Clip;
+        var three = history.Add(TestClips.Text("three")).Clip;
+
+        history.SetOptions(new HistoryOptions { MaxCount = 2 });
+
+        history.Count.ShouldBe(3);
+        history.Trim().ShouldBe([one]);
+        history.Clips.ShouldBe([three, two]);
+    }
+
+    [Fact]
+    public void New_limits_apply_to_clips_added_afterwards()
+    {
+        var history = Create();
+        history.SetOptions(new HistoryOptions { MaxCount = 1 });
+        var first = history.Add(TestClips.Text("first")).Clip;
+
+        var second = history.Add(TestClips.Text("second"));
+
+        second.Evicted.ShouldBe([first]);
+    }
+
+    [Fact]
+    public void Missing_limits_are_a_bug()
+    {
+        Should.Throw<ArgumentNullException>(() => Create().SetOptions(null!));
+    }
+
     // --- adding and ordering ---
 
     [Fact]

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using ClipBench.Core.Clips;
 using ClipBench.Core.History;
 using ClipBench.Core.Pasting;
+using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
 using ClipBench.Presentation.Boards;
@@ -579,6 +580,10 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         }
     }
 
+    // With masking off, a secret is shown like any other text, so it counts as none.
+    private SensitiveKind MaskedKind(Clip clip) =>
+        _settings.Current.MaskSensitive ? _library.GetSensitivity(clip) : SensitiveKind.None;
+
     private void Refresh(bool keepSelection)
     {
         if (_sidebar.Scope == PopupScope.Snippets)
@@ -603,7 +608,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
             _ => _library.Search(SearchText),
         };
         var rows = results
-            .Select(result => new ClipRowViewModel(result.Clip, _library.GetSensitivity(result.Clip), now))
+            .Select(result => new ClipRowViewModel(result.Clip, MaskedKind(result.Clip), now))
             .ToList();
 
         Rows.Clear();

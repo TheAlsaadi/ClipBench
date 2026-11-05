@@ -24,12 +24,15 @@ internal sealed class TrayIcon : ITrayIcon
     private readonly ITrayMenu _menu;
     private readonly nint _window;
     private readonly string _iconPath;
+    private readonly string? _alternateIconPath;
     private readonly EventPump<int> _pump;
     private readonly IDisposable? _ownedWindow;
 
     // These three belong to the window thread.
     private TrayModel _model = new("ClipBench", []);
     private nint _icon;
+    private nint _alternateIcon;
+    private nint _shownIcon;
     private bool _shown;
 
     private int _disposed;
@@ -42,7 +45,8 @@ internal sealed class TrayIcon : ITrayIcon
     /// <param name="menu">Shows the menu.</param>
     /// <param name="iconPath">The .ico file that holds the picture.</param>
     /// <param name="ownedWindow">The window thread that runs the icon, when the icon owns it: it is disposed after the icon is gone.</param>
-    public TrayIcon(IMessageSource source, IThreadInvoker invoker, nint window, ITrayApi api, ITrayMenu menu, string iconPath, IDisposable? ownedWindow = null)
+    /// <param name="alternateIconPath">The .ico file of the second picture, or null for none. A picture that cannot be loaded is left out.</param>
+    public TrayIcon(IMessageSource source, IThreadInvoker invoker, nint window, ITrayApi api, ITrayMenu menu, string iconPath, IDisposable? ownedWindow = null, string? alternateIconPath = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(invoker);
@@ -54,6 +58,7 @@ internal sealed class TrayIcon : ITrayIcon
         _api = api;
         _menu = menu;
         _iconPath = iconPath;
+        _alternateIconPath = alternateIconPath;
         _ownedWindow = ownedWindow;
         _pump = new EventPump<int>(Deliver);
 
@@ -123,7 +128,7 @@ internal sealed class TrayIcon : ITrayIcon
                 if (_shown)
                 {
                     _ = _api.Delete(_window, IconId);
-                    _api.DestroyIcon(_icon);
+                    DestroyIcons();
                     _shown = false;
                 }
             },
@@ -146,13 +151,16 @@ internal sealed class TrayIcon : ITrayIcon
             return Failure("ClipBench's icon picture could not be loaded.");
         }
 
-        if (!AddToNotificationArea(icon, model.ToolTip))
+        // A second picture that cannot be loaded only means the state is not drawn; the icon still works.
+        var alternate = _alternateIconPath is null ? 0 : _api.LoadIcon(_alternateIconPath);
+        _icon = icon;
+        _alternateIcon = alternate;
+        if (!AddToNotificationArea(CurrentIcon, model.ToolTip))
         {
-            _api.DestroyIcon(icon);
+            DestroyIcons();
             return Failure("Windows would not add ClipBench's icon to the notification area.");
         }
 
-        _icon = icon;
         _shown = true;
         return Result.Success();
     }
@@ -165,9 +173,39 @@ internal sealed class TrayIcon : ITrayIcon
             return Result.Success();
         }
 
-        return _api.Modify(_window, IconId, TrayText.Fit(model.ToolTip, TrayText.MaxToolTip))
-            ? Result.Success()
-            : Failure("Windows would not change the icon's tool tip.");
+        // Compared with the picture Windows really shows, so a change that was refused is tried again.
+        var pictureChanged = CurrentIcon == _shownIcon || ChangePicture(CurrentIcon);
+        var toolTipChanged = _api.Modify(_window, IconId, TrayText.Fit(model.ToolTip, TrayText.MaxToolTip));
+        if (!toolTipChanged)
+        {
+            return Failure("Windows would not change the icon's tool tip.");
+        }
+
+        return pictureChanged ? Result.Success() : Failure("Windows would not change the icon's picture.");
+    }
+
+    private bool ChangePicture(nint icon)
+    {
+        if (!_api.ChangeIcon(_window, IconId, icon))
+        {
+            return false;
+        }
+
+        _shownIcon = icon;
+        return true;
+    }
+
+    // The second picture while the model asks for it and it could be loaded, otherwise the normal one.
+    private nint CurrentIcon => _model.UseAlternateIcon && _alternateIcon != 0 ? _alternateIcon : _icon;
+
+    private void DestroyIcons()
+    {
+        _api.DestroyIcon(_icon);
+        if (_alternateIcon != 0)
+        {
+            _api.DestroyIcon(_alternateIcon);
+            _alternateIcon = 0;
+        }
     }
 
     // Runs on the window thread.
@@ -205,7 +243,7 @@ internal sealed class TrayIcon : ITrayIcon
             return false;
         }
 
-        _ = AddToNotificationArea(_icon, _model.ToolTip);
+        _ = AddToNotificationArea(CurrentIcon, _model.ToolTip);
         return true;
     }
 
@@ -217,6 +255,7 @@ internal sealed class TrayIcon : ITrayIcon
             return false;
         }
 
+        _shownIcon = icon;
         if (_api.UseVersion4(_window, IconId))
         {
             return true;

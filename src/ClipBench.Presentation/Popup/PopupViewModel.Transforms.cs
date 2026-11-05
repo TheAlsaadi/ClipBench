@@ -52,7 +52,7 @@ public sealed partial class PopupViewModel
             text = joined.Value;
         }
 
-        _transforms.Open(text, clips.Any(clip => _library.GetSensitivity(clip) != SensitiveKind.None));
+        _transforms.Open(text, clips.Any(clip => MaskedKind(clip) != SensitiveKind.None));
     }
 
     [RelayCommand]

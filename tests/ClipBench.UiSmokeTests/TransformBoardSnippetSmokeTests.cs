@@ -111,7 +111,7 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
 
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_E);
         Window? editor = null;
-        AppUnderTest.WaitFor(() => (editor = app.FindWindow("ClipBench snippets")) is not null, 15_000).ShouldBeTrue("the snippets window did not open");
+        AppUnderTest.WaitFor(() => (editor = app.FindWindow("ClipBench settings")) is not null, 15_000).ShouldBeTrue("the settings window did not open on the snippets");
         AppUnderTest.WaitFor(() => editor!.FindFirstDescendant(cf => cf.ByAutomationId("SnippetNameBox"))?.Properties.HasKeyboardFocus.ValueOrDefault == true, 10_000)
             .ShouldBeTrue("the name box did not get the focus");
 
@@ -125,7 +125,7 @@ public sealed class TransformBoardSnippetSmokeTests(AppUnderTest app) : IClassFi
                 && editor.FindFirstDescendant(cf => cf.ByAutomationId("SnippetNames"))!.FindAllChildren().Any(item => item.Name == "Smoke greeting"), 10_000)
             .ShouldBeTrue("the snippet was not saved");
         Keyboard.Type(VirtualKeyShort.ESCAPE);
-        AppUnderTest.WaitFor(() => app.FindWindow("ClipBench snippets") is null, 10_000).ShouldBeTrue("the snippets window did not hide");
+        AppUnderTest.WaitFor(() => app.FindWindow("ClipBench settings") is null, 10_000).ShouldBeTrue("the settings window did not hide");
 
         // The editor is gone: paste the snippet from the popup into a window made for it, which Windows puts in front.
         target.Dispose();

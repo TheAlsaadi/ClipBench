@@ -40,12 +40,12 @@ public sealed partial class ClipRepository : IAsyncDisposable
         """;
 
     private const string SelectOne = """
-        SELECT format, captured_at, is_pinned, content, source_app, board_id, board_position FROM clips
+        SELECT format, captured_at, is_pinned, content, source_app, board_id, board_position, expires_at FROM clips
         WHERE id = $id AND (expires_at IS NULL OR expires_at > $now);
         """;
 
     private const string SelectAll = """
-        SELECT id, format, captured_at, is_pinned, content, source_app, board_id, board_position FROM clips
+        SELECT id, format, captured_at, is_pinned, content, source_app, board_id, board_position, expires_at FROM clips
         WHERE expires_at IS NULL OR expires_at > $now
         ORDER BY captured_at DESC, id DESC;
         """;
@@ -60,6 +60,7 @@ public sealed partial class ClipRepository : IAsyncDisposable
     private const string UpdatePinned = """
         UPDATE clips SET
             is_pinned = $pinned,
+            expires_at = CASE WHEN $pinned = 1 THEN NULL ELSE expires_at END,
             board_id = CASE WHEN $pinned = 0 THEN NULL ELSE board_id END,
             board_position = CASE WHEN $pinned = 0 THEN 0 ELSE board_position END
         WHERE id = $id;
@@ -140,12 +141,12 @@ public sealed partial class ClipRepository : IAsyncDisposable
     /// <summary>
     /// Saves a clip, replacing the stored clip with the same id, and any other clip with the same content,
     /// so the database never holds the same content twice. <see cref="ClipHistory"/> already removes
-    /// duplicates, so the replacement is a safety net.
+    /// duplicates, so the replacement is a safety net. The clip's <see cref="Clip.ExpiresAt"/> is stored with it.
     /// </summary>
     /// <param name="clip">The clip as it should now be stored, pin included.</param>
     /// <param name="cancellationToken">Cancels the operation.</param>
     /// <returns>Success, <see cref="ErrorCode.ContentTooLarge"/> (nothing is saved), or a storage failure.</returns>
-    public Task<Result> SaveAsync(Clip clip, CancellationToken cancellationToken) => SaveAsync(clip, null, cancellationToken);
+    public Task<Result> SaveAsync(Clip clip, CancellationToken cancellationToken) => SaveAsync(clip, clip?.ExpiresAt, cancellationToken);
 
     /// <summary>Saves a clip that expires at a given time. See <see cref="SaveAsync(Clip, CancellationToken)"/>.</summary>
     /// <param name="clip">The clip as it should now be stored, pin included.</param>
@@ -219,7 +220,7 @@ public sealed partial class ClipRepository : IAsyncDisposable
                     return Result.Failure<Clip>(new ResultError(ErrorCode.ClipNotFound, "That clip is no longer in the history."));
                 }
 
-                return ReadClip(id, (ClipFormat)reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2) != 0, reader.GetFieldValue<byte[]>(3), SourceOrNull(reader, 4), BoardOf(reader, 5), BoardPositionOf(reader, 6));
+                return ReadClip(id, (ClipFormat)reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2) != 0, reader.GetFieldValue<byte[]>(3), SourceOrNull(reader, 4), BoardOf(reader, 5), BoardPositionOf(reader, 6), ExpiryOf(reader, 7));
             },
             cancellationToken);
 
@@ -239,7 +240,7 @@ public sealed partial class ClipRepository : IAsyncDisposable
                 while (reader.Read())
                 {
                     var id = IdFrom(reader, 0);
-                    var clip = ReadClip(id, (ClipFormat)reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetFieldValue<byte[]>(4), SourceOrNull(reader, 5), BoardOf(reader, 6), BoardPositionOf(reader, 7));
+                    var clip = ReadClip(id, (ClipFormat)reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3) != 0, reader.GetFieldValue<byte[]>(4), SourceOrNull(reader, 5), BoardOf(reader, 6), BoardPositionOf(reader, 7), ExpiryOf(reader, 8));
                     if (clip.IsSuccess)
                     {
                         clips.Add(clip.Value);
@@ -654,7 +655,7 @@ public sealed partial class ClipRepository : IAsyncDisposable
     }
 
     // Opens one stored clip. Anything that is not exactly what was written fails closed.
-    private Result<Clip> ReadClip(ClipId id, ClipFormat format, long capturedTicks, bool pinned, byte[] sealedContent, byte[]? sealedSource, BoardId? board, int boardPosition)
+    private Result<Clip> ReadClip(ClipId id, ClipFormat format, long capturedTicks, bool pinned, byte[] sealedContent, byte[]? sealedSource, BoardId? board, int boardPosition, DateTimeOffset? expiresAt = null)
     {
         // The time is a plain column, so it can hold any number. One that is not a date is a damaged record.
         if (!TryTime(capturedTicks, out var capturedAt))
@@ -680,7 +681,7 @@ public sealed partial class ClipRepository : IAsyncDisposable
             var source = OpenText(sealedSource, id, "source_app", format);
             return source.IsFailure
                 ? Result.Failure<Clip>(source.Error)
-                : Result.Success(new Clip(id, content.Value, capturedAt, source.Value, pinned) { OnBoard = board, BoardPosition = board is null ? 0 : boardPosition });
+                : Result.Success(new Clip(id, content.Value, capturedAt, source.Value, pinned) { OnBoard = board, BoardPosition = board is null ? 0 : boardPosition, ExpiresAt = expiresAt });
         }
         finally
         {
@@ -765,6 +766,10 @@ public sealed partial class ClipRepository : IAsyncDisposable
 
     private static int BoardPositionOf(SqliteDataReader reader, int ordinal) =>
         (int)Math.Clamp(reader.GetInt64(ordinal), int.MinValue, int.MaxValue);
+
+    // A column that holds a number that is not a date is read as no expiry; the sweep is by the number itself.
+    private static DateTimeOffset? ExpiryOf(SqliteDataReader reader, int ordinal) =>
+        !reader.IsDBNull(ordinal) && TryTime(reader.GetInt64(ordinal), out var time) ? time : null;
 
     private static byte[]? SourceOrNull(SqliteDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? null : reader.GetFieldValue<byte[]>(ordinal);
 

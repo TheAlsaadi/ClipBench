@@ -246,6 +246,9 @@ public sealed class FileActivityLogTests : IDisposable
 
         public Task<Result> SetBoardsAsync(IReadOnlyList<ClipPlacement> placements, CancellationToken cancellationToken) => Task.FromResult(Result.Success());
 
+        public Task<Result<System.Collections.Immutable.ImmutableArray<ClipId>>> SweepExpiredAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success(System.Collections.Immutable.ImmutableArray<ClipId>.Empty));
+
         public Task<Result> DeleteAsync(IReadOnlyCollection<ClipId> ids, CancellationToken cancellationToken) => Task.FromResult(Result.Success());
     }
 

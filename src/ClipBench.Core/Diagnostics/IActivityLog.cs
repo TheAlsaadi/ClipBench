@@ -80,6 +80,12 @@ public enum ActivityEvent
     /// <summary>The saved settings could not be read; the defaults are in use and the file was left alone.</summary>
     SettingsUnreadable,
 
+    /// <summary>The user wiped everything: every clip, board and snippet was deleted.</summary>
+    HistoryWiped,
+
+    /// <summary>The entry that starts ClipBench with Windows could not be read or written.</summary>
+    StartupRegistrationFailed,
+
     /// <summary>A paste queue started, with the number of clips as the count.</summary>
     QueueStarted,
 

@@ -67,6 +67,19 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
     }
 
     /// <inheritdoc/>
+    public Result AllowCapture(WindowHandle window)
+    {
+        if (window.IsNone)
+        {
+            return Failure("That window does not exist.");
+        }
+
+        return PInvoke.SetWindowDisplayAffinity(ToHwnd(window), WINDOW_DISPLAY_AFFINITY.WDA_NONE)
+            ? Result.Success()
+            : Failure("Windows would not let the window show up in screen capture again.");
+    }
+
+    /// <inheritdoc/>
     public bool IsExcludedFromCapture(WindowHandle window)
     {
         if (window.IsNone)

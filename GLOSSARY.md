@@ -88,21 +88,27 @@ Two or more Transforms applied one after the other, in the order chosen, to the 
 ### Privacy
 
 **Sensitive clip**:
-A Clip that looks like a secret, such as a card number, key or token. It is masked in the interface and expires quickly.
+A Clip that looks like a secret, such as a card number, key or token. It is masked in the interface (unless masking is turned off) and expires after two minutes by default. Pinning it cancels the expiry.
 
 **Privacy marker**:
 A clipboard format that an application sets to ask that its content not be recorded. A Clip that carries one is never captured.
 
 **Exclusion list**:
-The applications whose clipboard changes are never captured.
+The programs whose clipboard changes are never captured, kept as executable names (such as `KeePass`) in the Settings. It starts with common password managers.
+
+**Expiry**:
+The moment a Sensitive clip is deleted, from memory and from disk. It is part of the Clip and is cancelled by pinning.
 
 **Incognito**:
-The state in which ClipBench captures nothing until it is switched off.
+The state in which ClipBench captures nothing until it is switched off. It is not saved: it is off again at the next start. The tray icon changes while it is on.
 _Avoid_: pause, private mode
 
 **Wipe**:
-Deleting the entire History together with its encryption key. The stored values are overwritten before the files are deleted.
+Deleting every Clip (pinned ones too), Board and Snippet, from disk and from memory, after a confirmation. The database file is rebuilt and its log emptied so the old values do not stay in the files; the file and its key stay, empty, because the app keeps running. Start fresh and deleting the folder remove the key as well.
 _Avoid_: reset, clear all
+
+**Start with Windows**:
+One value, named `ClipBench`, in the user's own `Run` registry key, that starts ClipBench at sign-in. Off by default and asked once, at the first run.
 
 ### Storage
 
@@ -182,8 +188,11 @@ The small window in the corner of the screen that shows a running Queue: which c
 _Avoid_: overlay, toast
 
 **Settings**:
-The user's choices that last between runs, kept in `settings.json`: the Separator, whether the clipboard is put back after a paste, and whether copies are also kept while collecting. Never clip content.
+The user's choices that last between runs, kept in `settings.json`: the Separator, the paste switches, the history limits, the Expiry time, masking, screen-capture protection, starting with Windows, the two Shortcuts and the Exclusion list. Never clip content.
 _Avoid_: preferences, options
+
+**Settings window**:
+The window with the sections General, Shortcuts, History, Privacy, Paste, Snippets and About. It opens from the tray menu (**Settings…**), with Ctrl+E in the popup, and by itself the first time ClipBench runs.
 
 **Notice**:
 A short message shown next to the tray icon when something that happened in the background did not work, such as a shortcut another program already uses. Its text is always written by the app, never taken from a clip.

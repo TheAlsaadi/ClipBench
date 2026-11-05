@@ -24,6 +24,57 @@ public class ClipLibraryTests
     private static string[] Texts(ClipLibrary library) =>
         [.. library.Clips.Select(clip => ((TextContent)clip.Content).Text)];
 
+    // --- changing the limits ---
+
+    [Fact]
+    public async Task Lowering_the_limits_removes_the_clips_that_no_longer_fit_from_the_library_and_the_store()
+    {
+        using var library = Create();
+        await library.AddAsync(TestClips.Text("one"), Ct);
+        await library.AddAsync(TestClips.Text("two"), Ct);
+        await library.AddAsync(TestClips.Text("three"), Ct);
+        var oldest = library.Clips[^1];
+        var raised = 0;
+        library.Changed += (_, _) => raised++;
+
+        var result = await library.ApplyLimitsAsync(new HistoryOptions { MaxCount = 2 }, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        Texts(library).ShouldBe(["three", "two"]);
+        _store.Deleted.ShouldBe([oldest.Id]);
+        raised.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Limits_that_remove_nothing_change_nothing_and_raise_nothing()
+    {
+        using var library = Create();
+        await library.AddAsync(TestClips.Text("one"), Ct);
+        var raised = 0;
+        library.Changed += (_, _) => raised++;
+
+        var result = await library.ApplyLimitsAsync(new HistoryOptions { MaxCount = 50 }, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        _store.Deleted.ShouldBeEmpty();
+        raised.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_store_that_cannot_delete_is_reported_but_the_clips_are_gone_from_the_library()
+    {
+        using var library = Create();
+        await library.AddAsync(TestClips.Text("one"), Ct);
+        await library.AddAsync(TestClips.Text("two"), Ct);
+        _store.Failure = _storeError;
+
+        var result = await library.ApplyLimitsAsync(new HistoryOptions { MaxCount = 1 }, Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(_storeError);
+        Texts(library).ShouldBe(["two"]);
+    }
+
     // --- loading ---
 
     [Fact]
