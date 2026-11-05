@@ -124,8 +124,8 @@ public sealed class HotkeyBindings : IDisposable
             _disposed = true;
         }
 
+        // The semaphore is not disposed: a change in flight may still be about to release it, and it holds no handle.
         _service.Pressed -= OnPressed;
-        _changes.Dispose();
     }
 
     // Runs on a pool thread.

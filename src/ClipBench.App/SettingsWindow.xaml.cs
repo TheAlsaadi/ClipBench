@@ -92,11 +92,7 @@ public sealed partial class SettingsWindow : Window
     public void ShowSection(SettingsSection section)
     {
         ViewModel.Show(section);
-        if (section == SettingsSection.Snippets)
-        {
-            // Like the old snippet window: unsaved changes are dropped and the first snippet is chosen.
-            ViewModel.Snippets.Reset();
-        }
+        ResetSnippetsUnlessDirty(section);
 
         AppWindow.Show();
         Activate();
@@ -251,15 +247,21 @@ public sealed partial class SettingsWindow : Window
         }
     }
 
+    // Opening the snippets starts from the first one, but never throws away text the user has not saved.
+    private void ResetSnippetsUnlessDirty(SettingsSection section)
+    {
+        if (section == SettingsSection.Snippets && !ViewModel.Snippets.IsDirty)
+        {
+            ViewModel.Snippets.Reset();
+        }
+    }
+
     private void SectionList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SectionList.SelectedItem is SettingsSectionItem item && ViewModel.SelectedSection != item.Section)
         {
             ViewModel.Show(item.Section);
-            if (item.Section == SettingsSection.Snippets)
-            {
-                ViewModel.Snippets.Reset();
-            }
+            ResetSnippetsUnlessDirty(item.Section);
         }
     }
 

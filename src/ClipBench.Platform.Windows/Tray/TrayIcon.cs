@@ -32,6 +32,7 @@ internal sealed class TrayIcon : ITrayIcon
     private TrayModel _model = new("ClipBench", []);
     private nint _icon;
     private nint _alternateIcon;
+    private nint _shownIcon;
     private bool _shown;
 
     private int _disposed;
@@ -166,14 +167,14 @@ internal sealed class TrayIcon : ITrayIcon
 
     private Result UpdateOnWindowThread(TrayModel model)
     {
-        var before = CurrentIcon;
         _model = model;
         if (!_shown)
         {
             return Result.Success();
         }
 
-        var pictureChanged = CurrentIcon == before || _api.ChangeIcon(_window, IconId, CurrentIcon);
+        // Compared with the picture Windows really shows, so a change that was refused is tried again.
+        var pictureChanged = CurrentIcon == _shownIcon || ChangePicture(CurrentIcon);
         var toolTipChanged = _api.Modify(_window, IconId, TrayText.Fit(model.ToolTip, TrayText.MaxToolTip));
         if (!toolTipChanged)
         {
@@ -181,6 +182,17 @@ internal sealed class TrayIcon : ITrayIcon
         }
 
         return pictureChanged ? Result.Success() : Failure("Windows would not change the icon's picture.");
+    }
+
+    private bool ChangePicture(nint icon)
+    {
+        if (!_api.ChangeIcon(_window, IconId, icon))
+        {
+            return false;
+        }
+
+        _shownIcon = icon;
+        return true;
     }
 
     // The second picture while the model asks for it and it could be loaded, otherwise the normal one.
@@ -243,6 +255,7 @@ internal sealed class TrayIcon : ITrayIcon
             return false;
         }
 
+        _shownIcon = icon;
         if (_api.UseVersion4(_window, IconId))
         {
             return true;

@@ -104,13 +104,23 @@ public sealed class ExpirySweeper : IDisposable
     public void Dispose()
     {
         CancellationTokenSource? stop;
+        Task loop;
         lock (_gate)
         {
             stop = _stop;
             _stop = null;
+            loop = _loop;
         }
 
-        stop?.Cancel();
+        if (stop is null)
+        {
+            return;
+        }
+
+        stop.Cancel();
+
+        // The loop may still be inside a sweep; the source goes once it has seen the cancellation.
+        _ = loop.ContinueWith(_ => stop.Dispose(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
     }
 
     private async Task RunAsync(CancellationToken cancellationToken)

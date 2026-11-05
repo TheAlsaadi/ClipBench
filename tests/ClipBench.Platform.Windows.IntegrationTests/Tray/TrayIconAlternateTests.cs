@@ -88,6 +88,20 @@ public sealed class TrayIconAlternateTests : IDisposable
     }
 
     [Fact]
+    public async Task A_picture_change_that_failed_is_tried_again_with_the_next_update()
+    {
+        await _icon.ShowAsync(Model(alternate: false), Ct);
+        _api.ChangeSucceeds = false;
+        (await _icon.UpdateAsync(Model(alternate: true), Ct)).IsFailure.ShouldBeTrue();
+
+        _api.ChangeSucceeds = true;
+        var retried = await _icon.UpdateAsync(Model(alternate: true), Ct);
+
+        retried.IsSuccess.ShouldBeTrue();
+        _api.IconChanges.ShouldBe([Alternate, Alternate]);
+    }
+
+    [Fact]
     public async Task When_the_taskbar_is_created_again_the_icon_comes_back_with_the_current_picture()
     {
         await _icon.ShowAsync(Model(alternate: false), Ct);

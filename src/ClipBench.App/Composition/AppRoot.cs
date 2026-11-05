@@ -445,7 +445,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
-        _ = services.AddSingleton(provider => new ExpirySweeper(provider.GetRequiredService<ClipLibrary>(), provider.GetRequiredService<IActivityLog>(), TimeSpan.FromSeconds(5)));
+        _ = services.AddSingleton(provider => new ExpirySweeper(provider.GetRequiredService<ClipLibrary>(), provider.GetRequiredService<IActivityLog>(), TimeSpan.FromSeconds(1)));
         _ = services.AddSingleton<IBoardStore>(new BoardStore(storage.Repository));
         _ = services.AddSingleton<BoardCatalog>();
         _ = services.AddSingleton<ISnippetStore>(new SnippetStore(storage.Repository));
@@ -575,9 +575,10 @@ internal sealed class AppRoot : IAsyncDisposable
         }
 
         _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = bound.Error.Code });
+        var why = bound.Error.Code == ErrorCode.HotkeyUnavailable ? "another program uses it" : "it is already used for something else in ClipBench";
         _services.GetRequiredService<IUserNotifier>().Show(
             "ClipBench",
-            $"ClipBench could not claim the shortcut {hotkey} because another program uses it. {fallback}");
+            $"ClipBench could not claim the shortcut {hotkey} because {why}. {fallback}");
     }
 
     // Runs on a pool thread.
