@@ -54,6 +54,9 @@ public sealed record Hotkey
     /// <summary>The shortcut that opens the popup until the user picks another: Win+Alt+V (ADR 0004).</summary>
     public static Hotkey Default { get; } = new(HotkeyModifiers.Windows | HotkeyModifiers.Alt, 'V');
 
+    /// <summary>The shortcut that starts and finishes collecting until the user picks another: Win+Alt+C.</summary>
+    public static Hotkey DefaultCollect { get; } = new(HotkeyModifiers.Windows | HotkeyModifiers.Alt, 'C');
+
     /// <summary>The names of the keys a shortcut can use, as they are shown and typed.</summary>
     public static IReadOnlyList<string> KeyNames { get; } = [.. _keys.Select(key => key.Name)];
 

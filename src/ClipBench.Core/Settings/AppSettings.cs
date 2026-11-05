@@ -93,6 +93,20 @@ public sealed record AppSettings
         init => field = value ?? throw new ArgumentNullException(nameof(value));
     } = Privacy.ExclusionList.Default;
 
+    /// <summary>The shortcut that opens the popup.</summary>
+    public Hotkeys.Hotkey PopupHotkey
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = Hotkeys.Hotkey.Default;
+
+    /// <summary>The shortcut that starts and finishes collecting.</summary>
+    public Hotkeys.Hotkey CollectHotkey
+    {
+        get;
+        init => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = Hotkeys.Hotkey.DefaultCollect;
+
     /// <summary>True to start ClipBench when the user signs in to Windows.</summary>
     public bool StartWithWindows { get; init; }
 
@@ -133,8 +147,19 @@ public sealed record AppSettings
             ? Separator
             : SeparatorChoice.NewLine;
 
+        // A shortcut that would stop people typing, or that does two things, goes back to its default.
+        var popup = IsUsable(PopupHotkey) ? PopupHotkey : Hotkeys.Hotkey.Default;
+        var collect = IsUsable(CollectHotkey) ? CollectHotkey : Hotkeys.Hotkey.DefaultCollect;
+        if (popup == collect)
+        {
+            collect = Hotkeys.Hotkey.DefaultCollect;
+            popup = popup == collect ? Hotkeys.Hotkey.Default : popup;
+        }
+
         return this with
         {
+            PopupHotkey = popup,
+            CollectHotkey = collect,
             Separator = choice,
             CustomSeparator = customIsReadable ? CustomSeparator : string.Empty,
             HistoryMaxCount = HistoryMaxCountRange.Clamp(HistoryMaxCount),
@@ -143,6 +168,9 @@ public sealed record AppSettings
             SensitiveExpirySeconds = SensitiveExpirySecondsRange.Clamp(SensitiveExpirySeconds),
         };
     }
+
+    // The same rule the typed form follows: a plain typing key alone is refused.
+    private static bool IsUsable(Hotkeys.Hotkey hotkey) => Hotkeys.Hotkey.Parse(hotkey.ToString()).IsSuccess;
 
     private Pasting.Separator? ReadCustom()
     {

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
@@ -32,6 +33,8 @@ public sealed class JsonSettingsStore : ISettingsStore
     private const string StartWithWindowsKey = "startWithWindows";
     private const string FirstRunKey = "firstRunCompleted";
     private const string ExcludedProgramsKey = "excludedPrograms";
+    private const string PopupHotkeyKey = "popupHotkey";
+    private const string CollectHotkeyKey = "collectHotkey";
 
     private static readonly byte[] _byteOrderMark = [0xEF, 0xBB, 0xBF];
     private static readonly string[] _separatorNames = Enum.GetNames<SeparatorChoice>();
@@ -166,6 +169,8 @@ public sealed class JsonSettingsStore : ISettingsStore
                 StartWithWindows = ReadBoolean(root, StartWithWindowsKey) ?? defaults.StartWithWindows,
                 FirstRunCompleted = ReadBoolean(root, FirstRunKey) ?? defaults.FirstRunCompleted,
                 ExcludedPrograms = ReadExclusions(root) ?? defaults.ExcludedPrograms,
+                PopupHotkey = ReadHotkey(root, PopupHotkeyKey) ?? defaults.PopupHotkey,
+                CollectHotkey = ReadHotkey(root, CollectHotkeyKey) ?? defaults.CollectHotkey,
             };
         }
         catch (JsonException)
@@ -198,6 +203,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         return ExclusionList.FromNames(value.EnumerateArray().Select(entry => entry.ValueKind == JsonValueKind.String ? entry.GetString() : null));
     }
 
+    // The shortcut as a person would type it. Text that is not a usable shortcut keeps the default.
+    private static Hotkey? ReadHotkey(JsonElement root, string key) =>
+        ReadString(root, key) is { } text && Hotkey.Parse(text) is { IsSuccess: true } parsed ? parsed.Value : null;
+
     // A number that is not a whole number, or does not fit, counts as unusable.
     private static int? ReadInteger(JsonElement root, string key) =>
         root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : null;
@@ -221,6 +230,8 @@ public sealed class JsonSettingsStore : ISettingsStore
             writer.WriteBoolean(HideFromCaptureKey, settings.HideFromScreenCapture);
             writer.WriteBoolean(StartWithWindowsKey, settings.StartWithWindows);
             writer.WriteBoolean(FirstRunKey, settings.FirstRunCompleted);
+            writer.WriteString(PopupHotkeyKey, settings.PopupHotkey.ToString());
+            writer.WriteString(CollectHotkeyKey, settings.CollectHotkey.ToString());
             writer.WriteStartArray(ExcludedProgramsKey);
             foreach (var name in settings.ExcludedPrograms.Names)
             {

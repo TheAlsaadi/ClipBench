@@ -1,4 +1,5 @@
 using ClipBench.Core.History;
+using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Privacy;
 using ClipBench.Core.Settings;
@@ -169,6 +170,71 @@ public class AppSettingsTests
     public void A_missing_exclusion_list_is_a_bug()
     {
         Should.Throw<ArgumentNullException>(() => AppSettings.Default with { ExcludedPrograms = null! });
+    }
+
+    [Fact]
+    public void The_default_shortcuts_open_the_popup_and_toggle_collecting()
+    {
+        AppSettings.Default.PopupHotkey.ShouldBe(Hotkey.Default);
+        AppSettings.Default.CollectHotkey.ShouldBe(Hotkey.DefaultCollect);
+        Hotkey.DefaultCollect.ToString().ShouldBe("Win+Alt+C");
+    }
+
+    [Fact]
+    public void Normalizing_keeps_shortcuts_that_can_be_used()
+    {
+        var settings = AppSettings.Default with
+        {
+            PopupHotkey = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'K'),
+            CollectHotkey = new Hotkey(HotkeyModifiers.None, 0x7A),
+        };
+
+        settings.Normalize().ShouldBe(settings);
+    }
+
+    [Fact]
+    public void Normalizing_replaces_a_shortcut_on_a_typing_key_alone_with_its_default()
+    {
+        var settings = AppSettings.Default with
+        {
+            PopupHotkey = new Hotkey(HotkeyModifiers.Shift, 'K'),
+            CollectHotkey = new Hotkey(HotkeyModifiers.None, 'A'),
+        };
+
+        var normalized = settings.Normalize();
+
+        normalized.PopupHotkey.ShouldBe(Hotkey.Default);
+        normalized.CollectHotkey.ShouldBe(Hotkey.DefaultCollect);
+    }
+
+    [Fact]
+    public void Normalizing_does_not_let_one_shortcut_do_both_things()
+    {
+        var same = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Alt, 'K');
+        var settings = AppSettings.Default with { PopupHotkey = same, CollectHotkey = same };
+
+        var normalized = settings.Normalize();
+
+        normalized.PopupHotkey.ShouldBe(same);
+        normalized.CollectHotkey.ShouldBe(Hotkey.DefaultCollect);
+    }
+
+    [Fact]
+    public void When_both_shortcuts_are_the_collect_default_the_popup_goes_back_to_its_own()
+    {
+        var settings = AppSettings.Default with { PopupHotkey = Hotkey.DefaultCollect, CollectHotkey = Hotkey.DefaultCollect };
+
+        var normalized = settings.Normalize();
+
+        normalized.PopupHotkey.ShouldBe(Hotkey.Default);
+        normalized.CollectHotkey.ShouldBe(Hotkey.DefaultCollect);
+    }
+
+    [Fact]
+    public void A_missing_shortcut_is_a_bug()
+    {
+        Should.Throw<ArgumentNullException>(() => AppSettings.Default with { PopupHotkey = null! });
+        Should.Throw<ArgumentNullException>(() => AppSettings.Default with { CollectHotkey = null! });
     }
 
     [Fact]

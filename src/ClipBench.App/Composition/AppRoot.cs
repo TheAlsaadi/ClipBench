@@ -56,8 +56,6 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly IUiDispatcher _dispatcher;
     private readonly StartupOptions _options;
     private SnippetsWindow? _snippetsWindow;
-    private HotkeyId? _hotkey;
-    private HotkeyId? _collectHotkey;
     private bool _disposed;
 
     private AppRoot(
@@ -210,15 +208,20 @@ internal sealed class AppRoot : IAsyncDisposable
             var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
             popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSnippetEditor();
             await root.ShowTrayAsync(cancellationToken);
-            root._hotkey = await root.RegisterShortcutAsync(
-                options.Hotkey ?? Hotkey.Default,
+
+            // A shortcut on the command line is a developer's override; otherwise the user's saved shortcut is used.
+            var saved = services.GetRequiredService<SettingsService>().Current;
+            await root.BindShortcutAsync(
+                HotkeyAction.OpenPopup,
+                options.Hotkey ?? saved.PopupHotkey,
                 "You can still open ClipBench from its tray icon.",
                 cancellationToken);
-            root._collectHotkey = await root.RegisterShortcutAsync(
-                options.CollectHotkey ?? CollectToggle.DefaultShortcut,
+            await root.BindShortcutAsync(
+                HotkeyAction.ToggleCollect,
+                options.CollectHotkey ?? saved.CollectHotkey,
                 "You can still start and finish collecting from the tray menu.",
                 cancellationToken);
-            platform.Hotkeys.Pressed += root.OnHotkeyPressed;
+            services.GetRequiredService<HotkeyBindings>().Pressed += root.OnHotkeyPressed;
             guard.ShowRequested += root.OnShowRequested;
             return new StartOutcome(root, null);
         }
@@ -316,7 +319,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _disposed = true;
         _log.Write(ActivityLevel.Information, ActivityEvent.AppStopping);
         _guard.ShowRequested -= OnShowRequested;
-        _platform.Hotkeys.Pressed -= OnHotkeyPressed;
+        _services.GetRequiredService<HotkeyBindings>().Pressed -= OnHotkeyPressed;
         _tray?.Dispose();
         _popupViewModel.Close();
         _popup.Close();
@@ -399,6 +402,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<ICaptureRouter>(provider => provider.GetRequiredService<CollectController>());
         _ = services.AddSingleton<CaptureService>();
         _ = services.AddSingleton<SettingsApplier>();
+        _ = services.AddSingleton<HotkeyBindings>();
         _ = services.AddSingleton<WipeService>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
@@ -492,31 +496,30 @@ internal sealed class AppRoot : IAsyncDisposable
         }
     }
 
-    // Returns the registration, or null when another program holds the shortcut; the user is then told what still works.
-    private async Task<HotkeyId?> RegisterShortcutAsync(Hotkey hotkey, string fallback, CancellationToken cancellationToken)
+    // When another program holds the shortcut the user is told what still works.
+    private async Task BindShortcutAsync(HotkeyAction action, Hotkey hotkey, string fallback, CancellationToken cancellationToken)
     {
-        var registered = await _platform.Hotkeys.RegisterAsync(hotkey, cancellationToken);
-        if (registered.IsSuccess)
+        var bound = await _services.GetRequiredService<HotkeyBindings>().BindAsync(action, hotkey, cancellationToken);
+        if (bound.IsSuccess)
         {
             _log.Write(ActivityLevel.Information, ActivityEvent.HotkeyRegistered);
-            return registered.Value;
+            return;
         }
 
-        _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = registered.Error.Code });
+        _log.Write(ActivityLevel.Warning, ActivityEvent.HotkeyFailed, new ActivityDetails { Error = bound.Error.Code });
         _services.GetRequiredService<IUserNotifier>().Show(
             "ClipBench",
             $"ClipBench could not claim the shortcut {hotkey} because another program uses it. {fallback}");
-        return null;
     }
 
     // Runs on a pool thread.
-    private void OnHotkeyPressed(object? sender, HotkeyPressedEventArgs e)
+    private void OnHotkeyPressed(object? sender, HotkeyActionEventArgs e)
     {
-        if (_hotkey is { } own && e.Id == own)
+        if (e.Action == HotkeyAction.OpenPopup)
         {
             _dispatcher.Post(() => TogglePopup());
         }
-        else if (_collectHotkey is { } collect && e.Id == collect)
+        else if (e.Action == HotkeyAction.ToggleCollect)
         {
             _dispatcher.Post(() =>
             {

@@ -26,7 +26,7 @@ public sealed class CollectToggle
     }
 
     /// <summary>The global shortcut that starts and finishes collecting until the user picks another: Win+Alt+C (ADR 0015).</summary>
-    public static Hotkey DefaultShortcut { get; } = new(HotkeyModifiers.Windows | HotkeyModifiers.Alt, 'C');
+    public static Hotkey DefaultShortcut => Hotkey.DefaultCollect;
 
     /// <summary>The collect session, to read its state and follow its changes.</summary>
     public ICollectControl Collect { get; }

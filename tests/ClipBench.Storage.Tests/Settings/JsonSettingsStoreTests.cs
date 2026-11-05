@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using ClipBench.Core.Hotkeys;
 using ClipBench.Core.Privacy;
 using ClipBench.Core.Results;
 using ClipBench.Core.Settings;
@@ -25,6 +26,8 @@ public sealed class JsonSettingsStoreTests : IDisposable
         StartWithWindows = true,
         FirstRunCompleted = true,
         ExcludedPrograms = ExclusionList.FromNames(["KeePass", "My Tool"]),
+        PopupHotkey = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'K'),
+        CollectHotkey = new Hotkey(HotkeyModifiers.Windows | HotkeyModifiers.Control, 0x78),
     };
 
     private readonly TempDirectory _folder = new();
@@ -116,6 +119,41 @@ public sealed class JsonSettingsStoreTests : IDisposable
 
         using var json = JsonDocument.Parse(await File.ReadAllTextAsync(SettingsPath, Ct));
         json.RootElement.GetProperty("excludedPrograms").EnumerateArray().Select(name => name.GetString()).ShouldBe(["KeePass", "My Tool"]);
+    }
+
+    [Fact]
+    public async Task The_shortcuts_are_written_as_the_text_a_person_would_type()
+    {
+        await Create().SaveAsync(_changed, Ct);
+
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(SettingsPath, Ct));
+        json.RootElement.GetProperty("popupHotkey").GetString().ShouldBe("Ctrl+Shift+K");
+        json.RootElement.GetProperty("collectHotkey").GetString().ShouldBe("Win+Ctrl+F9");
+    }
+
+    [Theory]
+    [InlineData("""{ "popupHotkey": "Ctrl+Alt+Q" }""", "Ctrl+Alt+Q")]
+    [InlineData("""{ "popupHotkey": "alt+ctrl+q" }""", "Ctrl+Alt+Q")]
+    public async Task A_typed_shortcut_is_read_in_any_order_and_case(string json, string expected)
+    {
+        await WriteAsync(json);
+
+        (await Create().LoadAsync(Ct)).Settings.PopupHotkey.ToString().ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("""{ "popupHotkey": "K" }""")]
+    [InlineData("""{ "popupHotkey": "Shift+K" }""")]
+    [InlineData("""{ "popupHotkey": "Ctrl+Nonsense" }""")]
+    [InlineData("""{ "popupHotkey": "" }""")]
+    [InlineData("""{ "popupHotkey": 7 }""")]
+    [InlineData("""{ "popupHotkey": null }""")]
+    [InlineData("""{ "collectHotkey": "Ctrl+" }""")]
+    public async Task A_shortcut_that_cannot_be_used_keeps_its_default(string json)
+    {
+        await WriteAsync(json);
+
+        (await Create().LoadAsync(Ct)).ShouldBe(new SettingsLoad(AppSettings.Default, SettingsLoadStatus.Loaded));
     }
 
     [Fact]
