@@ -56,7 +56,7 @@ public class AppUnderTest : IAsyncLifetime
         // The first-run question opens the Settings window by itself; most tests are about the popup, so it counts as answered.
         if (FirstRunAnswered)
         {
-            await File.WriteAllTextAsync(SettingsPath, "{ \"version\": 1, \"firstRunCompleted\": true }", Ct);
+            await File.WriteAllTextAsync(SettingsPath, "{ \"version\": 1, \"firstRunCompleted\": true, \"captureTextHotkey\": \"F22\" }", Ct);
         }
 
         var start = new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
@@ -130,6 +130,12 @@ public class AppUnderTest : IAsyncLifetime
         var items = top.SelectMany(window => window.FindAllDescendants(cf => cf.ByControlType(ControlType.MenuItem))).Select(item => item.Name);
         return $"pointer {Mouse.Position}; app windows: {string.Join(" | ", top.Select(window => window.Name + "@" + window.BoundingRectangle))}; menu items: {string.Join(", ", items)}; focused: {_automation.FocusedElement()?.Name}";
     }
+
+    /// <summary>True while a selection overlay of the app is on screen: one dimmed window for each monitor.</summary>
+    public bool OverlayIsShown() => _automation!
+        .GetDesktop()
+        .FindAllChildren(cf => cf.ByProcessId(Process.Id))
+        .Any(window => window.Properties.ClassName.ValueOrDefault?.StartsWith("ClipBench.SelectionOverlay", StringComparison.Ordinal) == true);
 
     /// <summary>The queue window when it is on screen, or null.</summary>
     public Window? FindQueueWindow() => _application!
