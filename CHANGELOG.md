@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The picture gets a margin and is enlarged threefold before it is read (Windows returns nothing for text of 13 pixels or less,
   or for text cut tightly at the edge, otherwise), every recognition language in your Windows profile is tried, keeping the best
   reading, so Arabic next to English works, and Arabic and Hebrew lines come back in reading order, not in the order they are drawn.
+  Each word is taken from the engine that reads it best, so an Arabic name in an English window keeps its `>` separators
+  instead of getting `(`, and a line is read right to left only when its Arabic letters are at least twice the others.
   Windows still drops fragments that are mostly symbols (`x > 0` may come back empty).
   If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
   Settings.

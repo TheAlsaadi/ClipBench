@@ -237,6 +237,7 @@ Every privacy setting has an item here. Open the Settings window from the tray m
 - [ ] No file with a picture of the screen appears anywhere in `%LOCALAPPDATA%\ClipBench` or `%TEMP%` after copying text this way.
 - [ ] Small interface text (menus, a spreadsheet, a code editor at 100% zoom, 10 to 13 pixels) is read: select a few lines of it and paste. A capital I against a lowercase l, or an O against a 0, may still be mixed up in some fonts; that is what the recognizer cannot tell apart.
 - [ ] Select an Arabic name written "first name, family name" and paste: the first name comes first. Then a line of Arabic with a number, and an English sentence with an Arabic name inside it: each keeps its order.
+- [ ] In File Explorer (English), select the address bar breadcrumb of a folder under a path with an Arabic name: the separators come out as `>`, never `(` or `)`, and the segments stay in the order drawn.
 - [ ] Select a line of code or a terminal prompt tightly (no empty space around it) in a light and a dark theme: the words are read. Symbols such as `>` inside short or symbol-heavy pieces may be dropped by Windows; note which ones.
 - [ ] With English first and Arabic added in your Windows languages, a line of Arabic, a line of English and a mixed line are each read, without choosing a language.
 - [ ] Text in other languages that you have a pack for (Arabic, Chinese, Japanese) is read. Chinese and Japanese text comes out with spaces between characters; that is how Windows returns it.
