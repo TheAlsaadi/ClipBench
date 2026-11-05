@@ -80,6 +80,18 @@ MonitorFromPoint
 GetMonitorInfo
 GetDpiForMonitor
 
+// Reading the pixels of a region the user chose (never a window of another program, never the whole screen), and listing the monitors
+EnumDisplayMonitors
+GetDC
+ReleaseDC
+CreateCompatibleDC
+CreateCompatibleBitmap
+SelectObject
+BitBlt
+GetDIBits
+DeleteObject
+DeleteDC
+
 // Window effects: hidden from screenshots and screen sharing, rounded corners
 SetWindowDisplayAffinity
 GetWindowDisplayAffinity
