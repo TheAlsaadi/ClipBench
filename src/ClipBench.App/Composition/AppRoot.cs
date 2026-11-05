@@ -13,6 +13,7 @@ using ClipBench.Core.Transforms;
 using ClipBench.Core.Tray;
 using ClipBench.Platform.Windows;
 using ClipBench.Platform.Windows.Diagnostics;
+using ClipBench.Platform.Windows.Hosting;
 using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
@@ -151,6 +152,12 @@ internal sealed class AppRoot : IAsyncDisposable
                 log.Write(
                     ActivityLevel.Warning,
                     settingsLoad == SettingsLoadStatus.Damaged ? ActivityEvent.SettingsDamaged : ActivityEvent.SettingsUnreadable);
+            }
+
+            // A start-with-Windows entry that went missing or points to an old folder is put right.
+            if (services.GetService<StartWithWindowsService>() is { } startup && startup.Reconcile() is { IsFailure: true } reconciled)
+            {
+                log.Write(ActivityLevel.Warning, ActivityEvent.StartupRegistrationFailed, new ActivityDetails { Error = reconciled.Error.Code });
             }
 
             var library = services.GetRequiredService<ClipLibrary>();
@@ -367,6 +374,12 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<IClipStore>(new ClipStore(storage.Repository));
         _ = services.AddSingleton<ISettingsStore>(new JsonSettingsStore(paths.SettingsPath));
         _ = services.AddSingleton<SettingsService>();
+        _ = services.AddSingleton<IStartupRegistration>(new RegistryStartupRegistration());
+        if (Environment.ProcessPath is { } processPath && Path.IsPathFullyQualified(processPath) && !processPath.Contains('"', StringComparison.Ordinal))
+        {
+            _ = services.AddSingleton(provider => new StartWithWindowsService(provider.GetRequiredService<IStartupRegistration>(), provider.GetRequiredService<SettingsService>(), processPath));
+        }
+
         _ = services.AddSingleton(new HistoryOptions());
         _ = services.AddSingleton<ClipHistory>();
         _ = services.AddSingleton<ClipLibrary>();
