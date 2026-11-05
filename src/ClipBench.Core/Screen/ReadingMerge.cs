@@ -1,3 +1,4 @@
+using System.Text;
 using ClipBench.Core.Results;
 
 namespace ClipBench.Core.Screen;
@@ -8,7 +9,8 @@ namespace ClipBench.Core.Screen;
 /// <param name="Y">The top edge.</param>
 /// <param name="Width">The width.</param>
 /// <param name="Height">The height.</param>
-public readonly record struct RecognizedWord(string Text, double X, double Y, double Width, double Height);
+/// <param name="Confidence">How sure the engine is of the word, from 0 to 100, or null when the engine gives no figure.</param>
+public readonly record struct RecognizedWord(string Text, double X, double Y, double Width, double Height, double? Confidence = null);
 
 /// <summary>A line of words as the recognizer returned it.</summary>
 /// <param name="Text">The line's text as the recognizer gave it.</param>
@@ -42,9 +44,21 @@ public static class ReadingMerge
     // A reading with fewer right-to-left letters than this is taken to be noise from an engine of another script.
     private const int MinRightToLeftLetters = 2;
 
-    // A Windows reading beats the preferred Latin one when it has at least this many more letters outside Basic Latin:
-    // an accented, Cyrillic or Asian alphabet that the English model cannot read and guessed at.
-    private const int NonAsciiLead = 2;
+    // A Windows reading beats the preferred Latin one when it has at least this many more letters that the English model cannot read
+    // (another alphabet, or a letter with an accent) and so guessed at.
+    private const int UnreadableLead = 2;
+
+    // Letters up to here are Latin, with or without accents; beyond it are the Latin extensions and other alphabets.
+    private const int LastLatinLetter = 0x24F;
+
+    // A word that an engine read with at least this confidence (0 to 100) is not replaced by right-to-left letters read in the same place.
+    // The Arabic engine makes up Arabic letters for tiny Latin text; the English model gave 0 to what it made of a real Arabic name,
+    // and under 30 to 1% of the words it read right.
+    private const double TrustedConfidence = 30;
+
+    // A word made only of symbols that the Latin engine read with less confidence than this is replaced by the symbols another engine read in the
+    // same place. The English model reads a chevron icon as ">>" with about 42; clean symbols in code are read with 70 and more.
+    private const double SureOfSymbols = 60;
 
     // Two words that share at least this much of the smaller one's area are the same place read twice.
     private const double OverlapShare = 0.5;
@@ -83,6 +97,17 @@ public static class ReadingMerge
         var latin = latinIndex >= 0 && latinIndex < readings.Count && rightToLeft[latinIndex] == 0 && texts[latinIndex].Any(c => !char.IsWhiteSpace(c))
             ? latinIndex
             : -1;
+        if (latin >= 0)
+        {
+            var rivals = Enumerable.Range(0, readings.Count).Where(i => i != latin && rightToLeft[i] == 0).Select(i => readings[i]).ToList();
+            var refined = Refine(readings[latin], rivals);
+            if (!ReferenceEquals(refined, readings[latin]))
+            {
+                readings = [.. readings.Select((reading, i) => i == latin ? refined : reading)];
+                texts[latin] = Joined(refined);
+            }
+        }
+
         var richest = rightToLeft.IndexOf(rightToLeft.Max());
         var others = Enumerable.Range(0, readings.Count).Where(i => rightToLeft[i] == 0).ToList();
 
@@ -94,6 +119,37 @@ public static class ReadingMerge
         return Merge(readings[richest], readings[Pick(texts, others, latin)]);
     }
 
+    // The Latin reading with each symbol it is unsure of swapped for the symbol another reading has there. The same reading when nothing changes.
+    private static IReadOnlyList<RecognizedLine> Refine(IReadOnlyList<RecognizedLine> latin, List<IReadOnlyList<RecognizedLine>> rivals)
+    {
+        var symbols = rivals.SelectMany(reading => reading).SelectMany(line => line.Words).Where(IsSymbolsOnly).ToList();
+        if (symbols.Count == 0)
+        {
+            return latin;
+        }
+
+        var changed = false;
+        var lines = new List<RecognizedLine>(latin.Count);
+        foreach (var line in latin)
+        {
+            var words = new List<RecognizedWord>(line.Words.Count);
+            var lineChanged = false;
+            foreach (var word in line.Words)
+            {
+                var swap = word.Confidence < SureOfSymbols && IsSymbolsOnly(word) ? symbols.FindIndex(known => Overlap(known, word)) : -1;
+                words.Add(swap >= 0 ? symbols[swap] : word);
+                lineChanged |= swap >= 0;
+            }
+
+            changed |= lineChanged;
+            lines.Add(lineChanged ? new RecognizedLine(string.Join(' ', words.Select(word => word.Text)), words) : line);
+        }
+
+        return changed ? lines : latin;
+    }
+
+    private static bool IsSymbolsOnly(RecognizedWord word) => word.Text.Any(c => !char.IsWhiteSpace(c)) && !word.Text.Any(char.IsLetterOrDigit);
+
     // The reading to use among the candidates: the Latin one, unless another reading has clearly more of a script it cannot read.
     private static int Pick(List<string> texts, List<int> candidates, int latin)
     {
@@ -104,15 +160,19 @@ public static class ReadingMerge
             return best;
         }
 
-        return best >= 0 && NonAsciiLetters(texts[best]) >= NonAsciiLetters(texts[latin]) + NonAsciiLead ? best : latin;
+        return best >= 0 && UnreadableLetters(texts[best]) >= UnreadableLetters(texts[latin]) + UnreadableLead ? best : latin;
     }
 
-    private static int NonAsciiLetters(string text) => text.Count(c => c > 0x7F && char.IsLetter(c));
+    // Letters of another alphabet, and Latin letters with an accent. Not the o-slash and its like: they have no accent, and the Arabic
+    // engine reads a slashed zero as one, so counting them would hand a terminal back to the engine that misread it.
+    private static int UnreadableLetters(string text) =>
+        text.Count(c => char.IsLetter(c) && (c > LastLatinLetter || (c > 0x7F && c.ToString().Normalize(NormalizationForm.FormD).Length > 1)));
 
     private static List<RecognizedLine> Merge(IReadOnlyList<RecognizedLine> rightToLeft, IReadOnlyList<RecognizedLine> other)
     {
         var arabic = rightToLeft.SelectMany(line => line.Words).ToList();
-        var chosen = arabic.Where(word => LineOrder.ContainsRightToLeft(word.Text)).ToList();
+        var trusted = other.SelectMany(line => line.Words).Where(word => word.Confidence >= TrustedConfidence).ToList();
+        var chosen = arabic.Where(word => LineOrder.ContainsRightToLeft(word.Text) && !trusted.Any(known => Overlap(known, word))).ToList();
 
         foreach (var word in other.SelectMany(line => line.Words))
         {

@@ -204,6 +204,87 @@ public class ReadingMergeTests
         ReadingMerge.Choose([oneAccent, plain], latinIndex: 1).ShouldBeSameAs(plain);
     }
 
+    // A word with the confidence (0 to 100) the Latin engine gave it.
+    private static RecognizedWord WC(string text, double x, double width, double confidence) => new(text, x, 5, width, 10, confidence);
+
+    [Fact]
+    public void Arabic_letters_the_arabic_engine_made_up_do_not_replace_a_word_the_latin_engine_read_with_confidence()
+    {
+        // The Arabic engine reads "x > 0" at 14 pixels as a zero and a lam-alef, two right-to-left letters.
+        var latin = Reading(Line(WC("x", 0, 10, 90), WC(">", 20, 10, 85), WC("0", 40, 10, 88)));
+        var arabic = Reading(Line(W("O", 0, 10), W(Word2(0x0644, 0x0627), 20, 30)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([arabic, latin], latinIndex: 1)).ShouldBe("x > 0");
+    }
+
+    [Fact]
+    public void A_word_the_latin_engine_is_not_sure_of_gives_way_to_arabic_letters_in_the_same_place()
+    {
+        // The owner's breadcrumb: the English model made "ichalltax0" of an Arabic name, with confidence 0.
+        var latin = Reading(Line(WC(">", 0, 16, 84), WC("ichalltax0", 30, 150, 0), WC("Minecraft-mod-porting", 250, 400, 88)));
+        var arabic = Reading(Line(W("(", 0, 17), W(Alsaadi, 30, 70), W(Mohammed, 110, 70), W("Minecraft-mod-porting>", 250, 420)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([arabic, latin], latinIndex: 1)).ShouldBe("> " + Mohammed + " " + Alsaadi + " Minecraft-mod-porting");
+    }
+
+    [Fact]
+    public void A_word_has_no_confidence_unless_its_engine_gives_one()
+    {
+        new RecognizedWord("a", 0, 0, 1, 1).Confidence.ShouldBeNull();
+        new RecognizedWord("a", 0, 0, 1, 1, 42).Confidence.ShouldBe(42);
+    }
+
+    [Fact]
+    public void A_symbol_the_latin_engine_is_unsure_of_gives_way_to_the_symbol_another_engine_read_in_the_same_place()
+    {
+        // The English model reads a chevron icon as ">>" with confidence 42; the Windows engine reads ">".
+        var latin = Reading(Line(WC("path", 0, 40, 90), WC(">>", 60, 16, 42), WC("name", 100, 40, 88)));
+        var windows = Reading(Line(W("path", 0, 40), W(">", 60, 16), W("name", 100, 40)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([latin, windows], latinIndex: 0)).ShouldBe("path > name");
+    }
+
+    [Fact]
+    public void A_symbol_read_with_confidence_a_word_with_letters_or_a_place_nobody_else_read_is_left_alone()
+    {
+        var sure = Reading(Line(WC("=>", 0, 20, 80), WC("value", 40, 50, 90)));
+        var unsureLetters = Reading(Line(WC("v4lue", 40, 50, 42)));
+        var unsureAlone = Reading(Line(WC(">>", 0, 20, 42)));
+        var windows = Reading(Line(W("=", 0, 10), W("value", 40, 50)));
+        var elsewhere = Reading(Line(W(">", 300, 10)));
+        var wordsOnly = Reading(Line(W("x", 0, 20)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([sure, windows], latinIndex: 0)).ShouldBe("=> value");
+        ReadingMerge.ToText(ReadingMerge.Choose([unsureLetters, windows], latinIndex: 0)).ShouldBe("v4lue");
+        ReadingMerge.ToText(ReadingMerge.Choose([unsureAlone, elsewhere], latinIndex: 0)).ShouldBe(">>");
+        ReadingMerge.ToText(ReadingMerge.Choose([unsureAlone, wordsOnly], latinIndex: 0)).ShouldBe(">>");
+    }
+
+    [Fact]
+    public void The_slashed_zero_the_arabic_engine_reads_is_not_taken_for_an_alphabet_the_english_model_cannot_read()
+    {
+        // The Arabic engine reads a slashed zero as the Danish letter o-slash (U+00F8) and has no accent in its reading of code.
+        var slash = ((char)0x00F8).ToString();
+        var windows = Reading(Line(W("C:/Users/m" + slash + "hm" + slash + "d/C1ipBench" + slash + slash, 0, 200)));
+        var latin = Reading(Line(W("C:/Users/mohmed/ClipBench00", 0, 200)));
+
+        ReadingMerge.Choose([windows, latin], latinIndex: 1).ShouldBeSameAs(latin);
+    }
+
+    [Fact]
+    public void Other_alphabets_and_letters_with_an_accent_are_what_the_english_model_cannot_read()
+    {
+        var cyrillic = Reading(Line(W(Word2(0x043F, 0x0440, 0x0438, 0x0432, 0x0435, 0x0442), 0, 60)));
+        var greek = Reading(Line(W(Word2(0x03B1, 0x03B2, 0x03B3), 0, 60)));
+        var guess = Reading(Line(W("npuBeT", 0, 60)));
+        var accents = Reading(Line(W("caf" + (char)0x00E9 + " d" + (char)0x00E9 + "j" + (char)0x00E0, 0, 60)));
+        var plain = Reading(Line(W("cafe deja", 0, 60)));
+
+        ReadingMerge.Choose([cyrillic, guess], latinIndex: 1).ShouldBeSameAs(cyrillic);
+        ReadingMerge.Choose([greek, guess], latinIndex: 1).ShouldBeSameAs(greek);
+        ReadingMerge.Choose([accents, plain], latinIndex: 1).ShouldBeSameAs(accents);
+    }
+
     [Fact]
     public void Arabic_words_come_from_the_arabic_engine_and_all_the_rest_from_the_preferred_reading()
     {

@@ -176,7 +176,7 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
                             continue;
                         }
 
-                        words.Add(new RecognizedWord(text, box.X1, box.Y1, box.Width, box.Height));
+                        words.Add(new RecognizedWord(text, box.X1, box.Y1, box.Width, box.Height, word.Confidence));
                     }
 
                     if (words.Count > 0)

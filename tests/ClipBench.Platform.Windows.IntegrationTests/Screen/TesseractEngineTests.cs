@@ -147,6 +147,20 @@ public class TesseractEngineTests
     }
 
     [Fact]
+    public async Task Each_word_carries_the_confidence_of_the_engine()
+    {
+        using var picture = Code("alpha beta");
+        using var prepared = ImageScaler.Prepare(picture)!;
+
+        var result = await Engine().ReadAsync(prepared, Ct);
+
+        var words = result.Value.SelectMany(line => line.Words).ToList();
+        words.ShouldNotBeEmpty();
+        words.ShouldAllBe(word => word.Confidence != null && word.Confidence >= 0 && word.Confidence <= 100);
+        words.ShouldAllBe(word => word.Confidence >= 50, "clean text at a normal size is read with confidence");
+    }
+
+    [Fact]
     public async Task A_blank_picture_gives_no_text()
     {
         var pixels = new byte[200 * 40 * 4];
