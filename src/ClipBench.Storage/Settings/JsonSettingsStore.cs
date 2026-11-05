@@ -22,6 +22,14 @@ public sealed class JsonSettingsStore : ISettingsStore
     private const string CustomSeparatorKey = "customSeparator";
     private const string RestoreKey = "restorePreviousClipboard";
     private const string KeepCopiesKey = "keepCopiesWhileCollecting";
+    private const string HistoryMaxCountKey = "historyMaxCount";
+    private const string HistoryMaxAgeDaysKey = "historyMaxAgeDays";
+    private const string HistoryMaxMegabytesKey = "historyMaxMegabytes";
+    private const string SensitiveExpiryKey = "sensitiveExpirySeconds";
+    private const string MaskSensitiveKey = "maskSensitive";
+    private const string HideFromCaptureKey = "hideFromScreenCapture";
+    private const string StartWithWindowsKey = "startWithWindows";
+    private const string FirstRunKey = "firstRunCompleted";
 
     private static readonly byte[] _byteOrderMark = [0xEF, 0xBB, 0xBF];
     private static readonly string[] _separatorNames = Enum.GetNames<SeparatorChoice>();
@@ -147,6 +155,14 @@ public sealed class JsonSettingsStore : ISettingsStore
                 CustomSeparator = ReadString(root, CustomSeparatorKey) ?? defaults.CustomSeparator,
                 RestorePreviousClipboard = ReadBoolean(root, RestoreKey) ?? defaults.RestorePreviousClipboard,
                 KeepCopiesWhileCollecting = ReadBoolean(root, KeepCopiesKey) ?? defaults.KeepCopiesWhileCollecting,
+                HistoryMaxCount = ReadInteger(root, HistoryMaxCountKey) ?? defaults.HistoryMaxCount,
+                HistoryMaxAgeDays = ReadInteger(root, HistoryMaxAgeDaysKey) ?? defaults.HistoryMaxAgeDays,
+                HistoryMaxMegabytes = ReadInteger(root, HistoryMaxMegabytesKey) ?? defaults.HistoryMaxMegabytes,
+                SensitiveExpirySeconds = ReadInteger(root, SensitiveExpiryKey) ?? defaults.SensitiveExpirySeconds,
+                MaskSensitive = ReadBoolean(root, MaskSensitiveKey) ?? defaults.MaskSensitive,
+                HideFromScreenCapture = ReadBoolean(root, HideFromCaptureKey) ?? defaults.HideFromScreenCapture,
+                StartWithWindows = ReadBoolean(root, StartWithWindowsKey) ?? defaults.StartWithWindows,
+                FirstRunCompleted = ReadBoolean(root, FirstRunKey) ?? defaults.FirstRunCompleted,
             };
         }
         catch (JsonException)
@@ -167,6 +183,10 @@ public sealed class JsonSettingsStore : ISettingsStore
     private static bool? ReadBoolean(JsonElement root, string key) =>
         root.TryGetProperty(key, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
 
+    // A number that is not a whole number, or does not fit, counts as unusable.
+    private static int? ReadInteger(JsonElement root, string key) =>
+        root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : null;
+
     private static byte[] Serialize(AppSettings settings)
     {
         using var buffer = new MemoryStream();
@@ -178,6 +198,14 @@ public sealed class JsonSettingsStore : ISettingsStore
             writer.WriteString(CustomSeparatorKey, settings.CustomSeparator);
             writer.WriteBoolean(RestoreKey, settings.RestorePreviousClipboard);
             writer.WriteBoolean(KeepCopiesKey, settings.KeepCopiesWhileCollecting);
+            writer.WriteNumber(HistoryMaxCountKey, settings.HistoryMaxCount);
+            writer.WriteNumber(HistoryMaxAgeDaysKey, settings.HistoryMaxAgeDays);
+            writer.WriteNumber(HistoryMaxMegabytesKey, settings.HistoryMaxMegabytes);
+            writer.WriteNumber(SensitiveExpiryKey, settings.SensitiveExpirySeconds);
+            writer.WriteBoolean(MaskSensitiveKey, settings.MaskSensitive);
+            writer.WriteBoolean(HideFromCaptureKey, settings.HideFromScreenCapture);
+            writer.WriteBoolean(StartWithWindowsKey, settings.StartWithWindows);
+            writer.WriteBoolean(FirstRunKey, settings.FirstRunCompleted);
             writer.WriteEndObject();
         }
 

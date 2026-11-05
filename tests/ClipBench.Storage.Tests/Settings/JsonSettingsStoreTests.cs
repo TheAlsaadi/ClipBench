@@ -15,6 +15,14 @@ public sealed class JsonSettingsStoreTests : IDisposable
         CustomSeparator = @" | \t",
         RestorePreviousClipboard = false,
         KeepCopiesWhileCollecting = true,
+        HistoryMaxCount = 250,
+        HistoryMaxAgeDays = 7,
+        HistoryMaxMegabytes = 64,
+        SensitiveExpirySeconds = 300,
+        MaskSensitive = false,
+        HideFromScreenCapture = false,
+        StartWithWindows = true,
+        FirstRunCompleted = true,
     };
 
     private readonly TempDirectory _folder = new();
@@ -83,6 +91,31 @@ public sealed class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task The_privacy_and_history_choices_are_written_under_their_own_names()
+    {
+        await Create().SaveAsync(_changed, Ct);
+
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(SettingsPath, Ct));
+        var root = json.RootElement;
+        root.GetProperty("historyMaxCount").GetInt32().ShouldBe(250);
+        root.GetProperty("historyMaxAgeDays").GetInt32().ShouldBe(7);
+        root.GetProperty("historyMaxMegabytes").GetInt32().ShouldBe(64);
+        root.GetProperty("sensitiveExpirySeconds").GetInt32().ShouldBe(300);
+        root.GetProperty("maskSensitive").GetBoolean().ShouldBeFalse();
+        root.GetProperty("hideFromScreenCapture").GetBoolean().ShouldBeFalse();
+        root.GetProperty("startWithWindows").GetBoolean().ShouldBeTrue();
+        root.GetProperty("firstRunCompleted").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_file_from_before_the_privacy_settings_loads_with_their_defaults()
+    {
+        await WriteAsync("""{ "version": 1, "separator": "Tab", "restorePreviousClipboard": false }""");
+
+        (await Create().LoadAsync(Ct)).Settings.ShouldBe(AppSettings.Default with { Separator = SeparatorChoice.Tab, RestorePreviousClipboard = false });
+    }
+
+    [Fact]
     public async Task Keys_it_does_not_know_are_ignored()
     {
         await WriteAsync("""{ "separator": "Tab", "theme": "dark", "nested": { "a": [1, 2, 3] } }""");
@@ -108,6 +141,15 @@ public sealed class JsonSettingsStoreTests : IDisposable
     [InlineData("""{ "customSeparator": 7 }""")]
     [InlineData("""{ "restorePreviousClipboard": "no" }""")]
     [InlineData("""{ "keepCopiesWhileCollecting": 1 }""")]
+    [InlineData("""{ "historyMaxCount": "250" }""")]
+    [InlineData("""{ "historyMaxCount": 2.5 }""")]
+    [InlineData("""{ "historyMaxAgeDays": 99999999999 }""")]
+    [InlineData("""{ "historyMaxMegabytes": null }""")]
+    [InlineData("""{ "sensitiveExpirySeconds": true }""")]
+    [InlineData("""{ "maskSensitive": 0 }""")]
+    [InlineData("""{ "hideFromScreenCapture": "yes" }""")]
+    [InlineData("""{ "startWithWindows": "true" }""")]
+    [InlineData("""{ "firstRunCompleted": [] }""")]
     public async Task A_key_with_a_value_it_cannot_use_keeps_its_default(string json)
     {
         await WriteAsync(json);
