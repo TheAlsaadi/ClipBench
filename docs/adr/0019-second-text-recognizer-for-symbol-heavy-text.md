@@ -2,93 +2,102 @@
 status: proposed
 ---
 
-# A second text recognizer for symbol-heavy text (Tesseract), pending a measured trial
+# A second text recognizer for symbol-heavy text (Tesseract): trial done, decision needed
 
-**Not approved.** No package is added by this record. It asks the owner for two things: permission to run a trial that downloads two files (below), and, if the trial passes its thresholds, approval to add one package. Facts about packages and versions were read on 2026-11-05 from nuget.org, GitHub and Microsoft Learn; where a fact could not be confirmed it is listed under "Not known yet".
+**Not approved.** No package is added by this record. The trial it asked for was run on 2026-11-05 with the owner's permission, in a folder outside the repository. This version records what it found and the decisions that are the owner's to make. Facts about packages were read on 2026-11-05 from nuget.org, GitHub and Microsoft Learn, and from the package itself after it was downloaded.
 
 ## Why
 
-Phase 8 reads text from the screen with the recognizer built into Windows (`Windows.Media.Ocr`, ADR 0018). Measured on the owner's own screenshots and on drawn test pictures, it fails in one family of cases that margins, enlargement and merging of languages could not fix:
+Phase 8 reads text from the screen with the recognizer built into Windows (`Windows.Media.Ocr`, ADR 0018). It fails in one family of cases that margins, enlargement and merging of languages could not fix:
 
-- **It drops text that is mostly symbols.** In 252 trials `>` survived 65% of the time. `x > 0` came back empty, `C:\Users\me> dir` came back as `dir`, and `=> value` as `value`. A thin chevron is read as `(` by the Arabic engine.
-- **On a VS Code terminal screenshot (a long path in Cascadia Mono, light on dark), both English engines returned nothing for the path.** Only the Arabic engine read it, and it returned the pieces of the path in right-to-left order inside a single word, read the slashed zero as `ø`, and the bullet icon as `O`. This is its raw output, before any ClipBench code.
-- Code-like text cut tightly reads at about 0.72 similarity at best (prose: 0.97), with 16 of 120 lines read empty.
+- **It drops or scrambles text that is mostly symbols.** In 252 trials `>` survived 65% of the time. `x > 0` came back empty, `C:\Users\me> dir` came back as `dir`, and `=> value` as `value`.
+- **On the owner's VS Code terminal screenshot (a long path in Cascadia Mono, light on dark), both English engines returned nothing for the path.** Only the Arabic engine read it, and it returned the pieces of the path in right-to-left order inside one word, read the slashed zero as `ø`, and the bullet icon as `O`. That is its raw output, before any ClipBench code.
+- **Adding the Arabic engine costs accuracy on plain English.** It rescues code (0.71 to 0.835), but on prose it lowers 0.975 (English engine alone) to 0.922, because it scrambles numbers and punctuation and the letter-count choice sometimes prefers it (`Order No. 5081-B6 Total $1,204.75` came back as `Order B6-No.SO81 Total S1,2O4.75`).
 
-What was tried and did not help: margins, 2x to 5x enlargement, bicubic filters, inversion, grayscale, thresholding, `en-GB`, and taking each word from the engine that reads it best (which fixed the Arabic and chevron case, ADR 0018 decision 16). The remaining errors come from the engine, so they need a second engine.
+Tried and not enough: margins, 2x to 5x enlargement, bicubic filters, inversion, grayscale, thresholding, `en-GB`, and taking each word from the engine that reads it best (which did fix the Arabic-name and chevron case, ADR 0018 decision 16).
 
 ## What is proposed
 
-Add a **second recognizer behind the existing seam** (`IWordRecognizer`, ADR 0018 decision 16): a Tesseract engine for the Latin script, used next to the Windows engines. Windows would keep reading Arabic and Hebrew, where it is good and Tesseract would need extra models; Tesseract would read the left-to-right text, symbols and paths, with its own word confidence used to drop doubtful words. The merge code already combines readings by word position.
+Add a **second recognizer behind the existing seam** (`IWordRecognizer`, ADR 0018 decision 16): a Tesseract engine for the Latin script. Windows would keep reading Arabic and Hebrew, where Tesseract needs extra models and was seen to give junk (`ichalltax0`, confidence 0, for an Arabic name that Windows read exactly). The merge code already combines readings by word position, so the Arabic words come from Windows and everything else from Tesseract.
 
-Nothing else about the design changes: only text is kept, never pixels, no network, no elevation, nothing written to disk by the recognizer.
+Nothing else about the design changes: only text is kept, never pixels, no elevation, nothing written to disk by the recognizer.
 
 ## The candidates
 
 | Option | Maintainer and license | Verdict |
 |---|---|---|
-| **`TesseractOCR` 5.5.2** (NuGet, last updated 2026-03-05) | Kees van Spelde (`Sicos1977`), Apache-2.0; credits the original wrapper's author Charles Weld. About 752,000 downloads. | **Proposed, after the trial.** Newest of the wrappers, wraps Tesseract 5.5 and Leptonica 1.85, ships native Windows binaries for x86, x64 and **arm64** (the project builds for both x64 and ARM64). Single maintainer. |
-| `Tesseract` 5.2.0 (NuGet, `charlesw`) | Charles Weld, Apache-2.0. About 11 million downloads. | **Rejected.** Last updated 2022-11-30, wraps Tesseract 5.2.0 while the engine is at 5.5.x, and the README names only x86 and x64 runtimes, so there would be no ARM64 build. |
-| **Windows AI text recognition** (`Microsoft.Windows.AI.Imaging.TextRecognizer`) | Microsoft, part of the Windows App SDK the project already references, so no new package. | **Not usable as the answer, but worth a later optional path.** Microsoft's documentation says it runs only on devices with a neural processing unit and is described as more accurate than `Windows.Media.Ocr`. The owner's machine (Intel Core i7-13700KF desktop, no NPU found) cannot run it, and most Windows 11 PCs cannot. Its model is installed by Windows on first use, which needs a decision under ADR 0002 before it is used. |
-| Bundle `tesseract.exe` and start it as a process | Tesseract: Apache-2.0. | **Rejected.** A third-party unsigned program started with screen content on its input, the picture would have to go through a pipe as an encoded image (so a file-format parser reads it) or through a temp file, which the security rules forbid, and the process cost on every capture. |
-| ONNX Runtime with an open model (PaddleOCR family) | Microsoft (runtime, MIT) and the model authors (Apache-2.0). | **Not evaluated.** We would write the detection, recognition and decoding steps ourselves and own their bugs. Named here so the choice is not hidden, not researched. |
-| Keep Windows only | n/a | Zero cost. The limits above stay, and the manual QA list says so. |
+| **`TesseractOCR` 5.5.2** (NuGet, last updated 2026-03-05) | Kees van Spelde (`Sicos1977`), Apache-2.0; credits the original wrapper's author Charles Weld. About 752,000 downloads. | **The one the trial used, and it passed.** Single maintainer. Contains Tesseract 5.5.0 (what the native library reports) while upstream is at 5.5.4. **It has no ARM64 build**: the package holds only `x86` and `x64` native folders, whatever its README says. |
+| `Tesseract` 5.2.0 (NuGet, `charlesw`) | Charles Weld, Apache-2.0. About 11 million downloads. | **Rejected.** Last updated 2022-11-30, wraps Tesseract 5.2.0, x86 and x64 only. |
+| **Windows AI text recognition** (`Microsoft.Windows.AI.Imaging.TextRecognizer`) | Microsoft, part of the Windows App SDK the project already references, so no new package. | **Not usable as the answer.** Microsoft's documentation says it runs only on devices with a neural processing unit. The owner's machine (Intel Core i7-13700KF desktop, no NPU found) cannot run it. Its model is installed by Windows on first use, which would need a decision under ADR 0002. A possible later optional path. |
+| Bundle `tesseract.exe` and start it as a process | Tesseract: Apache-2.0. | **Rejected.** An unsigned third-party program with screen content on its input; the picture would go through a pipe as an encoded image (a file-format parser reads it) or a temp file, which the security rules forbid. |
+| ONNX Runtime with an open model (PaddleOCR family) | Microsoft (runtime, MIT) and the model authors (Apache-2.0). | **Not evaluated.** We would write the detection, recognition and decoding ourselves. |
+| Keep Windows only | n/a | Costs nothing. The limits above stay. |
 
-## What would be added (if approved after the trial)
+## Trial results (2026-11-05, Intel Core i7-13700KF, Windows 11 build 26300, x64)
+
+Same drawn pictures and the same measure as the earlier Windows measurements, with ClipBench's real recognizer (English and Arabic engines, margin, 3x enlargement, merge) run in the same program as the baseline. The settings (3x enlargement, one uniform block of text, light-on-dark pictures inverted) were chosen on the code pictures only; across all 18 settings tried the code score stayed between 0.941 and 0.960.
+
+| Measure | Threshold | ClipBench today | Tesseract |
+|---|---|---|---|
+| Code-like text, mean similarity (120 pictures) | at least 0.85 | 0.835 | **0.958** |
+| `>` kept in the 252 cases | at least 90% | 65% | **93%** |
+| Code pictures read empty | at most 5 of 120 | 0 | **0** |
+| Owner's terminal screenshot, characters right | at least 90% | 43.9% | **96.3%** (every slashed zero, read as `@`, counts as wrong) |
+| Prose, mean similarity (72 pictures) | not below 0.95 | 0.922 | **0.994** |
+| Time for a 1000 x 100 pixel selection | at most 1 s | 71 ms median | **74 ms median**, 76 ms slowest |
+
+All six thresholds are met. Two things in the table differ from this record's first version: the first version quoted 0.72 for code from the English engine alone, while the real current figure with both engines is 0.835, and it quoted 0.97 for prose, which is true of the English engine alone and not of today's two-engine reading (0.922).
+
+What else was measured:
+
+- **Raw pixels work.** A Leptonica picture is created with `Image.Create` and filled word by word; no file or image-format decoder runs (`LoadFromFile` and `LoadFromMemory` were never called). Words come back with text, confidence and boxes.
+- **No network and no files in use.** While 25 reads ran, no TCP or UDP endpoint appeared for the process (sampled every 50 ms), and no file was created or changed in the user temp folder or beside the program. The model is read from the install folder.
+- **But the native library contains a network client.** `tesseract55.dll` imports `socket`, `connect`, `send`, `recv`, `select`, `getaddrinfo`, `WSAStartup`, `WSACleanup` and `closesocket` from `ws2_32.dll`, and contains the text `http://`. This is almost certainly the libcurl that Tesseract uses to open an image from a URL. ClipBench would never pass it a URL, and the runtime check above saw nothing. It is still shipped code that can make connections, and ADR 0002 and the privacy document promise there are none. See "Decisions".
+- **Size.** x64 native files 7.1 MB (`leptonica-1.85.0.dll` 4.3 MB, `tesseract55.dll` 2.8 MB), `eng.traineddata` 4,113,088 bytes (SHA-256 `7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2`), managed wrapper 0.16 MB, logging abstractions 0.07 MB: about 11.3 MB uncompressed. The x86 files and `tesseract.exe` that come in the package would be left out.
+- **Memory.** About 35 MB more working set once the engine has read one picture; a 1900 x 600 pixel selection took the process peak to 211 MB (the enlarged copy and Tesseract's own working buffers). Start-up of the engine was 66 ms.
+- **Confidence is not a general filter.** Dropping words under confidence 30 lowered code from 0.958 to 0.877 and `>` kept from 93% to 86%. It is only useful for the zero-confidence junk Tesseract gives for scripts it has no model for, and the merge already takes those words from Windows.
+- **What it still gets wrong.** Slashed zeros come back as `@`, a bullet icon as `®`, and on the owner's breadcrumb one chevron gained a stray `»`. These are font and icon shapes.
+
+## What would be added (if approved)
+
+Restore on .NET 10 pulled exactly three packages for the trial:
 
 | Item | Version | License | Publisher | Role |
 |---|---|---|---|---|
-| TesseractOCR | 5.5.2 | Apache-2.0 | Kees van Spelde | wrapper and native `Tesseract` and `Leptonica` DLLs |
-| Microsoft.Extensions.Logging.Abstractions | 10.0.3 or newer | MIT | Microsoft | dependency of the wrapper; ADR 0012 decided against logging packages, so this arrives only because of the wrapper and no ClipBench code uses it |
-| System.Reflection.Emit | 4.7.0 or newer | MIT | Microsoft | dependency of the wrapper |
-| `eng.traineddata` from `tessdata_fast` | not tagged upstream | Apache-2.0 | Tesseract OCR project | the English model, a data file we would ship |
+| TesseractOCR | 5.5.2 | Apache-2.0 | Kees van Spelde | wrapper and the native `tesseract55.dll` and `leptonica-1.85.0.dll` |
+| Microsoft.Extensions.Logging.Abstractions | 10.0.3 | MIT | Microsoft | dependency of the wrapper; ADR 0012 decided against logging packages, so no ClipBench code would use it |
+| Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.3 | MIT | Microsoft | dependency of the one above (the app already uses this package, ADR 0012) |
+| `eng.traineddata` from `tessdata_fast` | not tagged upstream | Apache-2.0 | Tesseract OCR project | the English model, a data file we would ship, pinned by the SHA-256 above |
 
-The lock files are the authority for what restore really pulls in. The Visual C++ runtime that the wrapper's native files need (built with Visual Studio 2022) has to be shipped app-local or checked present, which the trial must settle for a self-contained app.
+The `System.Reflection.Emit` dependency the package lists is not restored on .NET 10.
 
-## Risks, and how each is handled
+## Risks, and what the trial showed
 
-- **Native code reads screen pixels in our process.** Tesseract and Leptonica are C and C++, so a malformed input could in principle corrupt memory. The input is a pixel buffer we build ourselves, never a file from outside; the trial must show that an image can be handed over as raw pixels without a file-format decoder running. If it cannot, this option is rejected.
-- **Pixel copies we cannot zero.** Like Windows' recognizer, the native engine keeps its own copies while it works and frees them without zeroing. The threat model already says so for Windows; it would say so again.
-- **No network.** The architecture test that forbids `System.Net.Http` and `System.Net.Sockets` in `src/` assemblies must still pass with the new package, and the trial checks the native DLLs' imports for networking libraries.
-- **Supply chain and one maintainer.** The package and the model are pinned by version and lock file; the model's SHA-256 would be recorded in the repository and checked by the build, because the upstream repository publishes no tags or checksums. If the package goes stale, the engine sits behind one interface and can be removed or replaced.
-- **Size.** The native DLLs and the English model add to the installer and portable zip, for each architecture. The trial measures it.
-- **It is not free of errors.** Tesseract works best on text around 30 pixels tall, and screen text is smaller; the enlargement already in place helps but is not proof. Slashed zeros, `l` against `1` and `I` against `l` are font problems that no engine solves for every font.
+- **Native code reads screen pixels in our process.** Tesseract and Leptonica are C and C++. The input is a pixel buffer we build ourselves, never a file from outside, and the trial shows that works. A memory error in the engine would still be a memory error in the app.
+- **Pixel copies we cannot zero.** Like Windows' recognizer, the native engine keeps its own copies and frees them without zeroing. The threat model already says so for Windows.
+- **A network client inside the DLL** (above). Not exercised, but present.
+- **Supply chain and one maintainer.** The package and the model are pinned; the upstream model repository publishes no tags or checksums, so the build would check our recorded SHA-256. The engine sits behind one interface and can be removed.
+- **No ARM64 build in the package.** ClipBench builds for both x64 and ARM64. An ARM64 install would keep working with the Windows engines only.
+- **The Visual C++ runtime is not in ClipBench's self-contained output.** The two native files import `vcruntime140.dll`, `vcruntime140_1.dll` and `msvcp140.dll`. They are present on the owner's machine, but a clean machine may lack them, so they would have to be shipped with the app.
+- **Behind upstream.** Tesseract 5.5.0 inside the package against 5.5.4 upstream.
+- **Large selections.** Peak memory rises by about 150 MB for a 1900 x 600 selection.
 
-## Trial before a decision (needs the owner's yes to two downloads)
+## Decisions for the owner
 
-Run in a scratch folder outside the repository, with nothing added to the project:
+1. **The network client in the DLL.** Options: (a) accept it, state it plainly in the privacy document and threat model ("a shipped library contains an unused network client; ClipBench never gives it a URL, and a test watches the process for sockets"), and add a check that fails if the process ever opens a connection; (b) build Tesseract from source without libcurl for x64 and ARM64, which removes it and gives an ARM64 build but makes us own a native build (effort not yet estimated); (c) reject Tesseract.
+2. **ARM64.** Ship the Tesseract engine on x64 only, with ARM64 falling back to the Windows engines (recommended unless option 1(b) is chosen), or hold the whole change until there is an ARM64 build.
+3. **The Visual C++ runtime.** Ship the three DLLs app-local in the installer and the zip (Microsoft's license allows it), or require the redistributable.
+4. **Whether to fix today's prose regression first,** independently of this record: trust the English engine's reading when no line has a right-to-left letter and use the Arabic engine only for words in its own script. Not measured as a fix yet. It would raise prose from 0.922 back toward 0.975 and give back some of the code gain (0.835 toward 0.71), which Tesseract makes unnecessary.
 
-1. `TesseractOCR` 5.5.2 from nuget.org, with its dependencies.
-2. `eng.traineddata` from the `tessdata_fast` repository (a few megabytes; the exact size is measured and reported).
-
-The trial reads the same pictures the Windows engines were measured on and nothing new, so the numbers compare: the code-like tight crops (3 fonts, 4 sizes, light and dark), the 252 `>` cases, the prose lines, the owner's terminal screenshot and the Explorer breadcrumb. Proposed thresholds, which the owner may change:
-
-| Measure | Windows only today | Tesseract must reach |
-|---|---|---|
-| Code-like text, mean similarity | 0.72 | at least 0.85 |
-| `>` kept in the 252 cases | 65% | at least 90% |
-| Code lines read empty | 16 of 120 | at most 5 of 120 |
-| The terminal screenshot, characters right | unreadable | at least 90% (a slashed zero read as `0` or `O` counts as right) |
-| Prose, mean similarity | 0.97 | not below 0.95 |
-| Time for a 1000 x 100 pixel selection on the owner's machine | about 0.1 s per language | at most 1 s |
-
-The trial also answers the "Not known yet" list below. If a threshold fails, this record is closed as rejected and nothing is added.
-
-## Not known yet
-
-- Whether the wrapper can take a raw pixel buffer, or only decodes files and encoded images. Its README examples all load from a file; the trial reads the API.
-- The wrapper's real update history (the NuGet page gives only the last date), and which Tesseract version it contains (the README says 5.5.0 or 5.5.2 in different places).
-- The size of the native files and of `eng.traineddata`.
-- Whether the Visual C++ runtime is already present in the self-contained layout.
-- Whether ARM64 works: this project has no ARM64 machine to test on. The package claims it; ClipBench would ship it untested on that architecture, as it ships the ARM64 build today.
-- The date and contents of Tesseract 5.5.4, the current upstream release. The wrapper lags upstream by at least one release.
+**Recommendation:** accept Tesseract, with 1(a) and 2 (x64 only) and 3 (ship the runtime app-local), because it is the only option measured that fixes paths, symbols, code and prose together (0.958, 93%, 96.3%, 0.994) at the same speed. Choose 1(b) instead if the owner wants the "no network code shipped" statement to stay literally true; that is more work and is not researched here.
 
 ## If accepted
 
-- The package, its dependencies and the model are listed with their licenses in a new third-party notices file (the repository has none yet, and shipping Apache-2.0 code asks for the license text and notices to travel with the installer), the central package file gets one labelled group, and the architecture tests allow exactly this reference from the Windows platform assembly and no other.
-- A test renders the trial's pictures and fails if the engine returns nothing, as the Windows engine tests do today, skipped when the model is absent.
-- `docs/security/THREAT_MODEL.md` section 5 and `docs/security/PRIVACY.md` gain the native-code and in-memory-copy statements above. ADR 0018 stays as the record of the Windows engines and points here.
-- The installer and the portable zip grow by the measured size.
+- A new package group in `Directory.Packages.props` with the exact versions, lock files, the model in the repository or fetched by a build step that checks the SHA-256, a third-party notices file (the repository has none yet) with the Apache-2.0 and MIT texts, and architecture tests that allow exactly this reference from the Windows platform assembly and no other. The installer and the zip exclude `x86`, `arm64` (absent) and `tesseract.exe`.
+- A `TesseractEngine` implementing `IWordRecognizer`, created once and kept (66 ms start-up), used for words without right-to-left letters; the merge takes Arabic and Hebrew words from the Windows engines. Tests render the trial's pictures and fail if the engine returns nothing, skipped when the model is absent. A test fails if the process opens a network connection while reading.
+- `docs/security/THREAT_MODEL.md` section 5 and `docs/security/PRIVACY.md` gain the native-code, in-memory-copy and network-client statements. ADR 0018 stays as the record of the Windows engines.
+- The installer and zip grow by about 11 MB uncompressed for x64, plus the runtime DLLs.
 
 ## If rejected
 
-The limits stay documented in ADR 0018 decision 14 and in the manual QA list, and copying from a terminal remains better done with the terminal's own selection.
+The limits stay documented in ADR 0018 decision 14 and in the manual QA list; copying from a terminal remains better done with the terminal's own selection. Decision 4 above would be the next thing to do.
