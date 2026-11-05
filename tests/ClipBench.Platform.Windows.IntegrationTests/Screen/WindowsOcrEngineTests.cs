@@ -3,6 +3,7 @@ using System.Drawing.Imaging;
 using ClipBench.Core.Results;
 using ClipBench.Core.Screen;
 using ClipBench.Platform.Windows.Screen;
+using Windows.Globalization;
 using Windows.Media.Ocr;
 
 namespace ClipBench.Platform.Windows.IntegrationTests.Screen;
@@ -11,16 +12,17 @@ public class WindowsOcrEngineTests
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    // Black text on white, drawn with GDI+ at a size the recognizer reads well, as a picture in memory.
-    private static ScreenImage Render(string text, int width = 900, int height = 160)
+    // Black text on white, drawn with GDI+ the way Windows draws interface text (ClearType), as a picture in memory.
+    private static ScreenImage Render(string text, int pixelSize = 48, string family = "Arial", int width = 900, int height = 0)
     {
+        height = height > 0 ? height : Math.Max(40, pixelSize * 3);
         using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
         using (var graphics = Graphics.FromImage(bitmap))
         {
             graphics.Clear(Color.White);
-            graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-            using var font = new Font("Arial", 48, FontStyle.Regular, GraphicsUnit.Pixel);
-            graphics.DrawString(text, font, Brushes.Black, new PointF(20, 40));
+            graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            using var font = new Font(family, pixelSize, FontStyle.Regular, GraphicsUnit.Pixel);
+            graphics.DrawString(text, font, Brushes.Black, new PointF(pixelSize / 2f, pixelSize));
         }
 
         var data = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -36,13 +38,27 @@ public class WindowsOcrEngineTests
         }
     }
 
-    [Fact]
-    public async Task Without_a_recognition_language_the_message_says_what_to_install_and_where()
+    private static OcrEngine? Engine(string tag) => OcrEngine.TryCreateFromLanguage(new Language(tag));
+
+    private static void RequireLanguage(string tag)
     {
-        var engine = new WindowsOcrEngine(() => null);
+        if (Engine(tag) is null)
+        {
+            Assert.Skip($"Windows has no text-recognition feature for {tag} on this machine.");
+        }
+    }
+
+    private static string Letters(params int[] codePoints) => string.Concat(codePoints.Select(cp => (char)cp));
+
+    // --- the factory: which languages are read ---
+
+    [Fact]
+    public async Task Without_any_recognition_language_the_message_says_what_to_install_and_where()
+    {
+        var recognizer = WindowsOcr.CreateRecognizer(() => ["zz-ZZ"]);
         using var image = new ScreenImage(10, 10, new byte[400]);
 
-        var result = await engine.RecognizeAsync(image, Ct);
+        var result = await recognizer.RecognizeAsync(image, Ct);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(ErrorCode.OcrLanguageMissing);
@@ -54,44 +70,41 @@ public class WindowsOcrEngineTests
     [Fact]
     public async Task A_cancelled_reading_throws_before_anything_is_read()
     {
-        var engine = new WindowsOcrEngine(() => null);
+        var recognizer = WindowsOcr.CreateRecognizer(() => []);
         using var image = new ScreenImage(10, 10, new byte[400]);
         using var source = new CancellationTokenSource();
         await source.CancelAsync();
 
-        await Should.ThrowAsync<OperationCanceledException>(() => engine.RecognizeAsync(image, source.Token));
+        await Should.ThrowAsync<OperationCanceledException>(() => recognizer.RecognizeAsync(image, source.Token));
     }
 
     [Fact]
     public async Task A_picture_that_has_been_let_go_of_cannot_be_read()
     {
-        var engine = new WindowsOcrEngine(() => null);
+        var recognizer = WindowsOcr.CreateRecognizer(() => []);
         var image = new ScreenImage(10, 10, new byte[400]);
         image.Dispose();
 
-        await Should.ThrowAsync<ObjectDisposedException>(() => engine.RecognizeAsync(image, Ct));
+        await Should.ThrowAsync<ObjectDisposedException>(() => recognizer.RecognizeAsync(image, Ct));
     }
 
     [Fact]
-    public async Task Missing_parts_are_a_bug()
+    public void Missing_parts_are_a_bug()
     {
+        Should.Throw<ArgumentNullException>(() => WindowsOcr.CreateRecognizer(null!));
         Should.Throw<ArgumentNullException>(() => new WindowsOcrEngine(null!));
-        await Should.ThrowAsync<ArgumentNullException>(() => new WindowsOcrEngine(() => null).RecognizeAsync(null!, Ct));
     }
+
+    // --- one language ---
 
     [Fact]
     [Trait("Category", "Integration")]
     public async Task A_picture_with_known_text_is_read_back_by_the_real_recognizer()
     {
-        if (OcrEngine.TryCreateFromUserProfileLanguages() is null)
-        {
-            Assert.Skip("Windows has no text-recognition language installed for this user, so the real recognizer cannot run.");
-        }
-
+        RequireLanguage("en-US");
         using var image = Render("HELLO ClipBench 2026");
-        var engine = new WindowsOcrEngine();
 
-        var result = await engine.RecognizeAsync(image, Ct);
+        var result = await new WindowsOcrEngine(Engine("en-US")!).RecognizeAsync(image, Ct);
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
         result.Value.ShouldContain("HELLO", Case.Insensitive);
@@ -103,14 +116,10 @@ public class WindowsOcrEngineTests
     [Trait("Category", "Integration")]
     public async Task A_blank_picture_gives_no_text_and_no_error()
     {
-        if (OcrEngine.TryCreateFromUserProfileLanguages() is null)
-        {
-            Assert.Skip("Windows has no text-recognition language installed for this user.");
-        }
-
+        RequireLanguage("en-US");
         using var image = Render(string.Empty);
 
-        var result = await new WindowsOcrEngine().RecognizeAsync(image, Ct);
+        var result = await new WindowsOcrEngine(Engine("en-US")!).RecognizeAsync(image, Ct);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Trim().ShouldBeEmpty();
@@ -120,17 +129,80 @@ public class WindowsOcrEngineTests
     [Trait("Category", "Integration")]
     public async Task A_picture_larger_than_the_recognizer_reads_is_refused_with_a_message()
     {
-        if (OcrEngine.TryCreateFromUserProfileLanguages() is null)
-        {
-            Assert.Skip("Windows has no text-recognition language installed for this user.");
-        }
-
+        RequireLanguage("en-US");
         var side = (int)OcrEngine.MaxImageDimension + 1;
         using var image = new ScreenImage(side, 1, new byte[side * 4]);
 
-        var result = await new WindowsOcrEngine().RecognizeAsync(image, Ct);
+        var result = await new WindowsOcrEngine(Engine("en-US")!).RecognizeAsync(image, Ct);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(ErrorCode.OcrFailed);
+    }
+
+    // --- the recognizer the app uses: small text and more than one language ---
+
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData(10, "Segoe UI")]
+    [InlineData(11, "Segoe UI")]
+    [InlineData(12, "Arial")]
+    [InlineData(13, "Verdana")]
+    [InlineData(13, "Consolas")]
+    public async Task Small_interface_text_is_read_which_the_recognizer_alone_returns_nothing_for(int pixelSize, string family)
+    {
+        RequireLanguage("en-US");
+        using var image = Render("Invoice 2026-10 for ACME Corp", pixelSize, family);
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["en-US"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.ShouldContain("Invoice", Case.Insensitive);
+        result.Value.ShouldContain("ACME");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Arabic_text_is_read_when_English_is_the_first_language()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+        var arabic = Letters(0x641, 0x627, 0x62A, 0x648, 0x631, 0x629) + " " + Letters(0x631, 0x642, 0x645) + " 2026 " + Letters(0x644, 0x644, 0x634, 0x631, 0x643, 0x629);
+        using var image = Render(arabic, 28, "Segoe UI");
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["en-US", "ar-SA"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.Count(c => c is >= (char)0x600 and <= (char)0x6FF).ShouldBeGreaterThanOrEqualTo(10);
+        result.Value.ShouldContain("2026");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task English_is_still_read_when_Arabic_is_the_first_language()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+        using var image = Render("Invoice 2026-10 for ACME Corp", 22, "Segoe UI");
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["ar-SA", "en-US"]).RecognizeAsync(image, Ct);
+
+        // "Invoice" may come back as "lnvoice": a capital I and a lowercase l look the same in this font, to people and to the recognizer.
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.ShouldContain("voice", Case.Insensitive);
+        result.Value.ShouldContain("2026-10");
+        result.Value.ShouldContain("ACME");
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task A_language_listed_twice_or_in_another_case_is_read_once()
+    {
+        RequireLanguage("en-US");
+        using var image = Render("HELLO ClipBench 2026", 32);
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["en-US", "EN-us", "en-US"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldContain("HELLO", Case.Insensitive);
     }
 }

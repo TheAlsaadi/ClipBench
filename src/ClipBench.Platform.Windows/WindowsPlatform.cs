@@ -80,7 +80,7 @@ public sealed class WindowsPlatform : IDisposable
     public IScreenCapturer ScreenCapturer { get; } = new GdiScreenCapturer();
 
     /// <summary>Reads text in pictures with the text recognition of Windows.</summary>
-    public ITextRecognizer TextRecognizer { get; } = new WindowsOcrEngine();
+    public ITextRecognizer TextRecognizer { get; } = WindowsOcr.CreateRecognizer();
 
     /// <summary>Creates the platform: the background window and everything that runs on it.</summary>
     /// <param name="timeProvider">The clock for every wait.</param>
