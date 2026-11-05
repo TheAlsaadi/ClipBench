@@ -79,6 +79,45 @@ public class WindowsOcrEngineTests
         }
     }
 
+    // A File Explorer breadcrumb in an English window: chevron, Arabic name, chevron, folder, chevron, light text on a dark bar.
+    private static ScreenImage RenderBreadcrumb(string arabicName, string folder)
+    {
+        const int pixelSize = 14;
+        var background = Color.FromArgb(56, 56, 56);
+        var foreground = Color.FromArgb(240, 240, 240);
+        var width = 520;
+        var height = 28;
+        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(background);
+            graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            using var text = new Font("Segoe UI", pixelSize, FontStyle.Regular, GraphicsUnit.Pixel);
+            using var icons = new Font("Segoe MDL2 Assets", 10, FontStyle.Regular, GraphicsUnit.Pixel);
+            using var brush = new SolidBrush(foreground);
+            using var rightToLeft = new StringFormat(StringFormatFlags.DirectionRightToLeft);
+            var chevron = ((char)0xE76C).ToString();
+
+            graphics.DrawString(chevron, icons, brush, 10, 9);
+            graphics.DrawString(arabicName, text, brush, new RectangleF(40, 5, 120, 20), rightToLeft);
+            graphics.DrawString(chevron, icons, brush, 170, 9);
+            graphics.DrawString(folder, text, brush, 195, 5);
+            graphics.DrawString(chevron, icons, brush, 195 + 165, 9);
+        }
+
+        var data = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            var pixels = new byte[width * height * 4];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+            return new ScreenImage(width, height, pixels);
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
+    }
+
     private static OcrEngine? Engine(string tag) => OcrEngine.TryCreateFromLanguage(new Language(tag));
 
     private static void RequireLanguage(string tag)
@@ -262,7 +301,7 @@ public class WindowsOcrEngineTests
     {
         RequireLanguage("en-US");
         RequireLanguage("ar-SA");
-        var sentence = Letters(0x645, 0x631, 0x62D, 0x628, 0x627) + " " + Letters(0x628, 0x643, 0x645) + " " + Letters(0x641, 0x64A) + " ClipBench 2026";
+        var sentence = Letters(0x645, 0x631, 0x62D, 0x628, 0x627) + " " + Letters(0x628, 0x643, 0x645) + " " + Letters(0x641, 0x64A) + " " + Letters(0x631, 0x642, 0x645) + " " + Letters(0x644, 0x644, 0x634, 0x631, 0x643, 0x629) + " ClipBench 2026";
         using var image = Render(sentence, 28, "Segoe UI", 600, rightToLeft: true);
 
         var result = await WindowsOcr.CreateRecognizer(() => ["ar-SA", "en-US"]).RecognizeAsync(image, Ct);
@@ -284,6 +323,25 @@ public class WindowsOcrEngineTests
 
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
         result.Value.Trim().ShouldBe(sentence);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task A_breadcrumb_with_an_Arabic_name_keeps_its_order_and_its_chevron_as_a_greater_than_sign()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+        var mohammed = Letters(0x645, 0x62D, 0x645, 0x62F);
+        var alsaadi = Letters(0x627, 0x644, 0x635, 0x627, 0x639, 0x62F, 0x64A);
+        using var image = RenderBreadcrumb(mohammed + " " + alsaadi, "Minecraft-mod-porting");
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["en-US", "ar-SA"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.ShouldNotContain("(");
+        result.Value.ShouldNotContain(")");
+        // The chevrons at the two ends of the drawn bar are not found by either engine in this picture; the one in the middle is.
+        result.Value.ShouldContain(mohammed + " " + alsaadi + " > Minecraft-mod-porting");
     }
 
     [Fact]

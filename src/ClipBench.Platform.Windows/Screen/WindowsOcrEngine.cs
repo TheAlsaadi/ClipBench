@@ -13,7 +13,7 @@ namespace ClipBench.Platform.Windows.Screen;
 /// its own. Use <see cref="WindowsOcr.CreateRecognizer()"/> for the recognizer the app uses, which enlarges small text
 /// and tries every language the user has set up.
 /// </summary>
-public sealed class WindowsOcrEngine : ITextRecognizer
+public sealed class WindowsOcrEngine : IWordRecognizer, ITextRecognizer
 {
     private readonly OcrEngine _engine;
 
@@ -28,15 +28,15 @@ public sealed class WindowsOcrEngine : ITextRecognizer
     /// <summary>The tag of the language this engine reads, such as <c>en-US</c>.</summary>
     internal string LanguageTag => _engine.RecognizerLanguage.LanguageTag;
 
-    // Windows lists the words of a line left to right as drawn, which is backwards for Arabic and Hebrew.
-    // Lines with no such letters are returned exactly as Windows gives them.
-    private static string LineText(OcrLine line) =>
-        LineOrder.ContainsRightToLeft(line.Text)
-            ? LineOrder.ToLogical([.. line.Words.OrderBy(word => word.BoundingRect.X).Select(word => word.Text)])
-            : line.Text;
-
     /// <inheritdoc/>
     public async Task<Result<string>> RecognizeAsync(ScreenImage image, CancellationToken cancellationToken)
+    {
+        var lines = await ReadAsync(image, cancellationToken).ConfigureAwait(false);
+        return lines.IsSuccess ? Result.Success(ReadingMerge.ToText(lines.Value)) : Result.Failure<string>(lines.Error);
+    }
+
+    /// <inheritdoc/>
+    public async Task<Result<IReadOnlyList<RecognizedLine>>> ReadAsync(ScreenImage image, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(image);
         cancellationToken.ThrowIfCancellationRequested();
@@ -44,7 +44,7 @@ public sealed class WindowsOcrEngine : ITextRecognizer
 
         if (image.Width > OcrEngine.MaxImageDimension || image.Height > OcrEngine.MaxImageDimension)
         {
-            return Result.Failure<string>(new ResultError(ErrorCode.OcrFailed, "That area is larger than Windows can read. Choose a smaller area."));
+            return Result.Failure<IReadOnlyList<RecognizedLine>>(new ResultError(ErrorCode.OcrFailed, "That area is larger than Windows can read. Choose a smaller area."));
         }
 
         try
@@ -56,12 +56,17 @@ public sealed class WindowsOcrEngine : ITextRecognizer
                 image.Height,
                 BitmapAlphaMode.Ignore);
             var result = await _engine.RecognizeAsync(bitmap).AsTask(cancellationToken).ConfigureAwait(false);
-            return Result.Success(string.Join("\r\n", result.Lines.Select(LineText)));
+            return Result.Success<IReadOnlyList<RecognizedLine>>([.. result.Lines.Select(ToLine)]);
         }
         catch (Exception exception) when (exception is not (OperationCanceledException or OutOfMemoryException))
         {
             // The message names nothing from the picture; the type is not shown either.
-            return Result.Failure<string>(new ResultError(ErrorCode.OcrFailed, "Windows could not read the text in that area."));
+            return Result.Failure<IReadOnlyList<RecognizedLine>>(new ResultError(ErrorCode.OcrFailed, "Windows could not read the text in that area."));
         }
     }
+
+    private static RecognizedLine ToLine(OcrLine line) =>
+        new(
+            line.Text,
+            [.. line.Words.Select(word => new RecognizedWord(word.Text, word.BoundingRect.X, word.BoundingRect.Y, word.BoundingRect.Width, word.BoundingRect.Height))]);
 }
