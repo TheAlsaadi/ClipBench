@@ -5,7 +5,8 @@ namespace ClipBench.Core.Screen;
 /// <summary>
 /// Reads a picture of text well on a real desktop: it gives the picture a margin and enlarges it (<see cref="ImageScaler"/>) and reads the picture
 /// with the engine of every language the user has set up, keeping the reading with the most letters, except that the words of a
-/// right-to-left script are taken from the engine of that script and the rest from an engine of another (<see cref="ReadingMerge"/>). One engine
+/// right-to-left script are taken from the engine of that script and the rest from an engine of another (<see cref="ReadingMerge"/>), preferring a Latin-script
+/// engine (<see cref="ILatinWordRecognizer"/>) for the rest. One engine
 /// reads one language only: Arabic text through an English engine comes out as a few digits, and a chevron through an
 /// Arabic engine as "(", so the languages are tried and compared rather than guessed. Every enlarged copy is
 /// zeroed as soon as the reading is done.
@@ -47,6 +48,7 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
         {
             var picture = prepared ?? image;
             var readings = new List<IReadOnlyList<RecognizedLine>>(engines.Count);
+            var latinIndex = -1;
             ResultError? firstFailure = null;
 
             foreach (var engine in engines)
@@ -55,6 +57,11 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
                 var result = await engine.ReadAsync(picture, cancellationToken).ConfigureAwait(false);
                 if (result.IsSuccess)
                 {
+                    if (latinIndex < 0 && engine is ILatinWordRecognizer)
+                    {
+                        latinIndex = readings.Count;
+                    }
+
                     readings.Add(result.Value);
                 }
                 else
@@ -69,7 +76,7 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
                 return Result.Failure<string>(firstFailure!.Value);
             }
 
-            return Result.Success(ReadingMerge.ToText(ReadingMerge.Choose(readings)));
+            return Result.Success(ReadingMerge.ToText(ReadingMerge.Choose(readings, latinIndex)));
         }
         finally
         {

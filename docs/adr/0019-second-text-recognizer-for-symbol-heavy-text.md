@@ -1,10 +1,10 @@
 ---
-status: proposed
+status: accepted
 ---
 
-# A second text recognizer for symbol-heavy text (Tesseract): trial done, decision needed
+# A second text recognizer for symbol-heavy text (Tesseract)
 
-**Not approved.** No package is added by this record. The trial it asked for was run on 2026-11-05 with the owner's permission, in a folder outside the repository. This version records what it found and the decisions that are the owner's to make. Facts about packages were read on 2026-11-05 from nuget.org, GitHub and Microsoft Learn, and from the package itself after it was downloaded.
+**Accepted on 2026-11-05** (see "Decision" below). The trial this record asked for was run on 2026-11-05 with the owner's permission, in a folder outside the repository, and met every threshold. Facts about packages were read on 2026-11-05 from nuget.org, GitHub and Microsoft Learn, and from the package itself after it was downloaded.
 
 ## Why
 
@@ -90,6 +90,19 @@ The `System.Reflection.Emit` dependency the package lists is not restored on .NE
 4. **Whether to fix today's prose regression first,** independently of this record: trust the English engine's reading when no line has a right-to-left letter and use the Arabic engine only for words in its own script. Not measured as a fix yet. It would raise prose from 0.922 back toward 0.975 and give back some of the code gain (0.835 toward 0.71), which Tesseract makes unnecessary.
 
 **Recommendation:** accept Tesseract, with 1(a) and 2 (x64 only) and 3 (ship the runtime app-local), because it is the only option measured that fixes paths, symbols, code and prose together (0.958, 93%, 96.3%, 0.994) at the same speed. Choose 1(b) instead if the owner wants the "no network code shipped" statement to stay literally true; that is more work and is not researched here.
+
+## Decision
+
+On 2026-11-05 the owner, asked to choose, left the choice to the assistant ("choose the best you think"). The recommendation above was taken as written:
+
+1. **Network client:** accepted and stated plainly in `docs/security/PRIVACY.md` and `docs/security/THREAT_MODEL.md`. ClipBench never gives the engine a URL. A test reads text with the engine while it watches the process's connections.
+2. **ARM64:** the Tesseract engine ships for x64 only. Where it cannot start (ARM64, a missing model or runtime) ClipBench reads with the Windows engines alone, as before, and nothing fails.
+3. **Visual C++ runtime:** shipped with the app (app-local) in the installer and the zip when Phase 10 builds them. Until then `docs/RELEASING` style notes live in this record.
+4. **Prose regression of the Arabic engine:** not fixed separately. On x64 Tesseract replaces the Windows English reading, which removes it. On ARM64 it stays and is recorded as a known limit.
+5. **Choosing between readings:** the Tesseract reading is used for everything that is not Arabic or Hebrew, unless a Windows engine read at least two more non-ASCII letters (an accented, Cyrillic or Asian alphabet the English model cannot read). Arabic and Hebrew words always come from the Windows engine for that script. The model is `eng` only; other Latin languages with accents are read by their Windows engine through the same rule.
+6. **The model file** is committed under `third_party/tessdata/` with its SHA-256, and a test fails if the file changes.
+
+This is still the owner's to overrule: reverting is one package reference, one factory method and the model file.
 
 ## If accepted
 

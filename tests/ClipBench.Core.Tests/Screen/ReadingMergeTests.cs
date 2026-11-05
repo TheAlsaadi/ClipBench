@@ -160,10 +160,87 @@ public class ReadingMergeTests
         text.ShouldBe("alpha " + Mohammed + "\r\nbeta");
     }
 
+    // --- a Latin-script reading that is preferred (the Tesseract engine) ---
+
+    private static string Word2(params int[] codePoints) => string.Concat(codePoints.Select(cp => (char)cp));
+
+    [Fact]
+    public void A_preferred_latin_reading_wins_even_when_another_reading_has_more_letters()
+    {
+        var windows = Reading(Line(W("hello", 0, 50), W("world", 60, 50)));
+        var latin = Reading(Line(W("x", 0, 10), W(">", 20, 10), W("0", 40, 10)));
+
+        ReadingMerge.Choose([windows, latin], latinIndex: 1).ShouldBeSameAs(latin);
+    }
+
+    [Fact]
+    public void A_preferred_reading_with_nothing_in_it_gives_way_to_the_best_of_the_others()
+    {
+        var windows = Reading(Line(W("hello", 0, 50)));
+
+        ReadingMerge.Choose([windows, Reading()], latinIndex: 1).ShouldBeSameAs(windows);
+        ReadingMerge.Choose([windows, Reading(Line(W(" ", 0, 10)))], latinIndex: 1).ShouldBeSameAs(windows);
+    }
+
+    [Fact]
+    public void A_preferred_reading_of_symbols_only_is_still_the_reading_because_code_can_be_all_symbols()
+    {
+        var windows = Reading(Line(W("hello", 0, 50)));
+        var symbols = Reading(Line(W("=>", 0, 20)));
+
+        ReadingMerge.Choose([windows, symbols], latinIndex: 1).ShouldBeSameAs(symbols);
+    }
+
+    [Fact]
+    public void A_reading_with_two_more_letters_the_english_model_cannot_read_beats_the_preferred_one()
+    {
+        // A Cyrillic or accented text read by its own Windows engine, while the English model guessed ASCII.
+        var french = Reading(Line(W(Word2(0x00E9, 0x00E8, 0x00E0), 0, 40)));
+        var guess = Reading(Line(W("eea", 0, 40)));
+        var oneAccent = Reading(Line(W("caf" + (char)0x00E9, 0, 40)));
+        var plain = Reading(Line(W("cafe", 0, 40)));
+
+        ReadingMerge.Choose([french, guess], latinIndex: 1).ShouldBeSameAs(french);
+        ReadingMerge.Choose([oneAccent, plain], latinIndex: 1).ShouldBeSameAs(plain);
+    }
+
+    [Fact]
+    public void Arabic_words_come_from_the_arabic_engine_and_all_the_rest_from_the_preferred_reading()
+    {
+        var english = Reading(Line(W("path", 0, 40), W("noise", 100, 60), W(">", 200, 10)));
+        var latin = Reading(Line(W("path", 0, 40), W("ichalltax0", 100, 60), W(">", 200, 10), W("C:/Users", 300, 80)));
+        var arabic = Reading(Line(W("(", 0, 10), W(Mohammed, 100, 60), W("(", 200, 10), W("Users:C", 300, 80)));
+
+        var text = ReadingMerge.ToText(ReadingMerge.Choose([english, arabic, latin], latinIndex: 2));
+
+        text.ShouldBe("path " + Mohammed + " > C:/Users");
+    }
+
+    [Fact]
+    public void A_preferred_reading_that_has_right_to_left_letters_is_not_trusted_as_the_latin_one()
+    {
+        var windows = Reading(Line(W("hello", 0, 50)));
+        var odd = Reading(Line(W(Mohammed, 0, 50)));
+
+        // A reading with right-to-left letters is no Latin reading: the choice is the one made with no preferred reading.
+        ReadingMerge.ToText(ReadingMerge.Choose([windows, odd], latinIndex: 1))
+            .ShouldBe(ReadingMerge.ToText(ReadingMerge.Choose([windows, odd], latinIndex: -1)));
+    }
+
+    [Fact]
+    public void Choose_without_a_preferred_reading_behaves_as_before()
+    {
+        var english = Reading(Line(W("2026", 0, 40)));
+        var other = Reading(Line(W("hello", 0, 50)));
+
+        ReadingMerge.Choose([english, other], latinIndex: -1).ShouldBeSameAs(other);
+    }
+
     [Fact]
     public void Missing_parts_are_a_bug()
     {
         Should.Throw<ArgumentNullException>(() => ReadingMerge.ToText(null!));
         Should.Throw<ArgumentNullException>(() => ReadingMerge.Choose(null!));
+        Should.Throw<ArgumentNullException>(() => ReadingMerge.Choose(null!, 0));
     }
 }

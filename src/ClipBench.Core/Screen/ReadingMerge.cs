@@ -26,6 +26,12 @@ public interface IWordRecognizer
 }
 
 /// <summary>
+/// A recognizer that reads Latin letters, digits and symbols (code, paths, prose) better than the engines of Windows, but only that
+/// script. Its reading is preferred for everything that is not Arabic or Hebrew (<see cref="ReadingMerge.Choose(IReadOnlyList{IReadOnlyList{RecognizedLine}}, int)"/>).
+/// </summary>
+public interface ILatinWordRecognizer : IWordRecognizer;
+
+/// <summary>
 /// Combines readings of one picture made with the engines of different languages. An engine reads the script of its
 /// language and guesses at the rest: the Arabic engine reads Arabic and English but turns a chevron into "(", the English
 /// engine reads the chevron and English but turns Arabic into noise. So each word is taken from the engine that is
@@ -35,6 +41,10 @@ public static class ReadingMerge
 {
     // A reading with fewer right-to-left letters than this is taken to be noise from an engine of another script.
     private const int MinRightToLeftLetters = 2;
+
+    // A Windows reading beats the preferred Latin one when it has at least this many more letters outside Basic Latin:
+    // an accented, Cyrillic or Asian alphabet that the English model cannot read and guessed at.
+    private const int NonAsciiLead = 2;
 
     // Two words that share at least this much of the smaller one's area are the same place read twice.
     private const double OverlapShare = 0.5;
@@ -54,7 +64,13 @@ public static class ReadingMerge
     /// One of the readings as it is (the one with the most letters, the earlier winning a tie), or when one has right-to-left
     /// letters and another has none, the two combined.
     /// </returns>
-    public static IReadOnlyList<RecognizedLine> Choose(IReadOnlyList<IReadOnlyList<RecognizedLine>> readings)
+    public static IReadOnlyList<RecognizedLine> Choose(IReadOnlyList<IReadOnlyList<RecognizedLine>> readings) => Choose(readings, -1);
+
+    /// <summary>Chooses the reading to use, preferring the reading of a Latin-script engine.</summary>
+    /// <param name="readings">The readings, one per language.</param>
+    /// <param name="latinIndex">The index of the reading made by an <see cref="ILatinWordRecognizer"/>, or -1 when there is none.</param>
+    /// <returns>The reading to use.</returns>
+    public static IReadOnlyList<RecognizedLine> Choose(IReadOnlyList<IReadOnlyList<RecognizedLine>> readings, int latinIndex)
     {
         ArgumentNullException.ThrowIfNull(readings);
         if (readings.Count == 0)
@@ -64,17 +80,34 @@ public static class ReadingMerge
 
         var texts = readings.Select(Joined).ToList();
         var rightToLeft = texts.Select(text => text.Count(LineOrder.IsRightToLeftLetter)).ToList();
+        var latin = latinIndex >= 0 && latinIndex < readings.Count && rightToLeft[latinIndex] == 0 && texts[latinIndex].Any(c => !char.IsWhiteSpace(c))
+            ? latinIndex
+            : -1;
         var richest = rightToLeft.IndexOf(rightToLeft.Max());
         var others = Enumerable.Range(0, readings.Count).Where(i => rightToLeft[i] == 0).ToList();
 
         if (rightToLeft[richest] < MinRightToLeftLetters || others.Count == 0)
         {
-            return readings[RecognitionChoice.PickBest(texts)];
+            return readings[Pick(texts, [.. Enumerable.Range(0, readings.Count)], latin)];
         }
 
-        var best = others[RecognitionChoice.PickBest([.. others.Select(i => texts[i])])];
-        return Merge(readings[richest], readings[best]);
+        return Merge(readings[richest], readings[Pick(texts, others, latin)]);
     }
+
+    // The reading to use among the candidates: the Latin one, unless another reading has clearly more of a script it cannot read.
+    private static int Pick(List<string> texts, List<int> candidates, int latin)
+    {
+        var rivals = candidates.Where(i => i != latin).ToList();
+        var best = rivals.Count == 0 ? -1 : rivals[RecognitionChoice.PickBest([.. rivals.Select(i => texts[i])])];
+        if (latin < 0)
+        {
+            return best;
+        }
+
+        return best >= 0 && NonAsciiLetters(texts[best]) >= NonAsciiLetters(texts[latin]) + NonAsciiLead ? best : latin;
+    }
+
+    private static int NonAsciiLetters(string text) => text.Count(c => c > 0x7F && char.IsLetter(c));
 
     private static List<RecognizedLine> Merge(IReadOnlyList<RecognizedLine> rightToLeft, IReadOnlyList<RecognizedLine> other)
     {

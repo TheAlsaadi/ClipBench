@@ -10,6 +10,13 @@ public class AdaptiveRecognizerTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    // A Latin-script engine such as Tesseract: its reading is preferred for everything that is not Arabic or Hebrew.
+    private sealed class LatinEngine(IReadOnlyList<RecognizedLine> lines) : ILatinWordRecognizer
+    {
+        public Task<Result<IReadOnlyList<RecognizedLine>>> ReadAsync(ScreenImage image, CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success(lines));
+    }
+
     private sealed class FakeEngine(Func<ScreenImage, Result<IReadOnlyList<RecognizedLine>>> answer) : IWordRecognizer
     {
         public FakeEngine(Func<ScreenImage, Result<string>> text)
@@ -291,5 +298,27 @@ public class AdaptiveRecognizerTests
         var result = await Create(english, arabic).RecognizeAsync(image, Ct);
 
         result.Value.ShouldBe("> " + mohammed + " " + alsaadi + " > Minecraft-mod-porting >");
+    }
+
+    [Fact]
+    public async Task A_latin_engine_is_preferred_over_an_engine_with_more_letters()
+    {
+        var windows = Says("hello world again");
+        var latin = new LatinEngine([new RecognizedLine("x > 0", [new RecognizedWord("x", 0, 0, 10, 10), new RecognizedWord(">", 20, 0, 10, 10), new RecognizedWord("0", 40, 0, 10, 10)])]);
+        using var image = Image();
+
+        var result = await Create(windows, latin).RecognizeAsync(image, Ct);
+
+        result.Value.ShouldBe("x > 0");
+    }
+
+    [Fact]
+    public async Task Without_a_latin_engine_the_reading_with_the_most_letters_still_wins()
+    {
+        using var image = Image();
+
+        var result = await Create(Says("12"), Says("hello")).RecognizeAsync(image, Ct);
+
+        result.Value.ShouldBe("hello");
     }
 }
