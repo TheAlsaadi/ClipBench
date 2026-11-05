@@ -37,7 +37,7 @@ Settings → Privacy → **Delete everything…**, then confirm. Every clip (pin
 
 Press **Win+Alt+O** (or **Copy text from the screen** in the tray menu), drag a rectangle over the text, and let go. The text is read on your PC by the text recognition that is part of Windows, put on your clipboard and added to your history like any copy. **Esc** or a right click cancels.
 
-- Only the rectangle you drag is read, into memory. The picture is **never saved**, not even temporarily, and it is cleared from ClipBench's memory the moment the text has been read, and so is the enlarged copy ClipBench makes of small text to read it better. (Windows' recognizer keeps its own copy for a moment while it works, one per language it tries, which ClipBench cannot clear.) Because only text is kept, there is no picture to pin.
+- Only the rectangle you drag is read, into memory. The picture is **never saved**, not even temporarily, and it is cleared from ClipBench's memory the moment the text has been read, and so is the enlarged copy, with a small margin, that ClipBench makes to read it better. (Windows' recognizer keeps its own copy for a moment while it works, one per language it tries, which ClipBench cannot clear.) Because only text is kept, there is no picture to pin.
 - The dimmed overlay and its border are never part of what is read, and are kept out of screenshots.
 - Text that looks like a secret is hidden and expires, like any copy. With **incognito** on, the text goes on your clipboard but is not added to your history, and the notice says so.
 - ClipBench tells you how many characters were copied, never which.
