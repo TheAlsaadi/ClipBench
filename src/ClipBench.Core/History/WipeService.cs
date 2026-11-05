@@ -12,7 +12,7 @@ namespace ClipBench.Core.History;
 /// a paste queue hold copies of clips in memory, so they are ended first. Nothing is left visible that is still on disk:
 /// when the store cannot be wiped, memory keeps what it had and the reason is returned.
 /// </summary>
-public sealed class WipeService
+public sealed class WipeService : IWipeAll
 {
     private readonly IStoreWipe _store;
     private readonly ClipLibrary _library;
@@ -55,9 +55,7 @@ public sealed class WipeService
         _log = log;
     }
 
-    /// <summary>Deletes everything.</summary>
-    /// <param name="cancellationToken">Cancels the wait.</param>
-    /// <returns>Success, or why the store could not be wiped.</returns>
+    /// <inheritdoc/>
     public async Task<Result> WipeAllAsync(CancellationToken cancellationToken)
     {
         // These hold copies of clips whatever happens next, so they go even when the disk cannot be wiped.

@@ -10,7 +10,6 @@ namespace ClipBench.Presentation.Preferences;
 /// </summary>
 public abstract class SettingsSectionViewModel : ObservableObject, IDisposable
 {
-    private readonly IUiDispatcher _dispatcher;
     private int _disposed;
 
     /// <summary>Starts following the settings.</summary>
@@ -21,7 +20,7 @@ public abstract class SettingsSectionViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(dispatcher);
         Settings = settings;
-        _dispatcher = dispatcher;
+        Dispatcher = dispatcher;
         settings.Changed += OnSettingsChanged;
     }
 
@@ -31,6 +30,9 @@ public abstract class SettingsSectionViewModel : ObservableObject, IDisposable
         get;
         protected set => SetProperty(ref field, value);
     }
+
+    /// <summary>Moves updates to the UI thread.</summary>
+    protected IUiDispatcher Dispatcher { get; }
 
     /// <summary>The settings service.</summary>
     protected SettingsService Settings { get; }
@@ -80,7 +82,7 @@ public abstract class SettingsSectionViewModel : ObservableObject, IDisposable
     {
         if (Volatile.Read(ref _disposed) == 0)
         {
-            _dispatcher.Post(Refresh);
+            Dispatcher.Post(Refresh);
         }
     }
 }
