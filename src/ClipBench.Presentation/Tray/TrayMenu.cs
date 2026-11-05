@@ -23,11 +23,8 @@ public static class TrayMenu
     /// <summary>The id of the item that cancels collecting.</summary>
     public const int CancelCollectId = 6;
 
-    /// <summary>The id of the item that switches putting the clipboard back after a paste.</summary>
-    public const int RestoreId = 7;
-
-    /// <summary>The id of the item that opens the snippet editor.</summary>
-    public const int SnippetsId = 8;
+    /// <summary>The id of the item that opens the Settings window. The id 7 was the clipboard-restore tick, now in Settings.</summary>
+    public const int SettingsId = 8;
 
     /// <summary>Builds the tool tip and the menu.</summary>
     /// <param name="tray">The tray view model.</param>
@@ -47,8 +44,7 @@ public static class TrayMenu
             menu.Add(new TrayMenuItem(CancelCollectId, "Cancel collecting"));
         }
 
-        menu.Add(new TrayMenuItem(RestoreId, "Restore clipboard after paste", IsChecked: tray.RestoreClipboard));
-        menu.Add(new TrayMenuItem(SnippetsId, "Snippets…"));
+        menu.Add(new TrayMenuItem(SettingsId, "Settings…"));
         menu.Add(new TrayMenuItem(PauseId, tray.PauseLabel));
         menu.Add(new TrayMenuItem(ExitId, "Exit"));
         return new TrayModel(tray.ToolTip, [.. menu], tray.IsPaused);
@@ -80,11 +76,8 @@ public static class TrayMenu
             case CancelCollectId:
                 tray.CancelCollectCommand.Execute(null);
                 break;
-            case RestoreId:
-                tray.ToggleRestoreCommand.Execute(null);
-                break;
-            case SnippetsId:
-                tray.EditSnippetsCommand.Execute(null);
+            case SettingsId:
+                tray.OpenSettingsCommand.Execute(null);
                 break;
             default:
                 break;

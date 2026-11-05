@@ -18,6 +18,7 @@ using ClipBench.Presentation.Boards;
 using ClipBench.Presentation.Collect;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
+using ClipBench.Presentation.Preferences;
 using ClipBench.Presentation.Queue;
 using ClipBench.Presentation.Snippets;
 using ClipBench.Presentation.Transforms;
@@ -55,7 +56,7 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
     private readonly StartupOptions _options;
-    private SnippetsWindow? _snippetsWindow;
+    private SettingsWindow? _settingsWindow;
     private bool _disposed;
 
     private AppRoot(
@@ -206,7 +207,7 @@ internal sealed class AppRoot : IAsyncDisposable
 
             hud = CreateQueueWindow(services, platform, options);
             var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
-            popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSnippetEditor();
+            popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSettings(SettingsSection.Snippets);
             await root.ShowTrayAsync(cancellationToken);
 
             // A shortcut on the command line is a developer's override; otherwise the user's saved shortcut is used.
@@ -284,27 +285,28 @@ internal sealed class AppRoot : IAsyncDisposable
         _popup.ShowAt(bounds);
     }
 
-    /// <summary>Shows the snippet editor, making the window the first time.</summary>
-    public void OpenSnippetEditor()
+    /// <summary>Shows the Settings window with a section open, making the window the first time.</summary>
+    /// <param name="section">The section to open.</param>
+    public void OpenSettings(SettingsSection section = SettingsSection.General)
     {
         if (_disposed)
         {
             return;
         }
 
-        if (_snippetsWindow is null)
+        if (_settingsWindow is null)
         {
-            _snippetsWindow = new SnippetsWindow(_services.GetRequiredService<SnippetEditorViewModel>());
+            _settingsWindow = new SettingsWindow(_services.GetRequiredService<SettingsViewModel>());
 
-            // It shows what the user wrote in their snippets, so it is kept out of screen captures like the popup.
+            // It shows the user's snippets and excluded programs, so it is kept out of screen captures like the popup.
             if (HideFromCapture(_options, _services))
             {
-                var handle = WinRT.Interop.WindowNative.GetWindowHandle(_snippetsWindow);
+                var handle = WinRT.Interop.WindowNative.GetWindowHandle(_settingsWindow);
                 _ = _platform.WindowEffects.ExcludeFromCapture(new Core.Pasting.WindowHandle(handle));
             }
         }
 
-        _snippetsWindow.ShowEditor();
+        _settingsWindow.ShowSection(section);
     }
 
     /// <summary>Stops everything in the order that keeps data safe: no new clips, then the history, then Windows.</summary>
@@ -324,7 +326,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _popupViewModel.Close();
         _popup.Close();
         _hud.Close();
-        _snippetsWindow?.Shutdown();
+        _settingsWindow?.Shutdown();
         await _services.GetRequiredService<ExpirySweeper>().StopAsync();
         await DisposeAllAsync(_services, _storage, _platform);
     }
@@ -355,6 +357,19 @@ internal sealed class AppRoot : IAsyncDisposable
         }
 
         return hud;
+    }
+
+    // The version the build was stamped with, without the source revision that follows a plus sign.
+    private static string ProgramVersion()
+    {
+        var stamped = typeof(AppRoot).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), inherit: false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Select(attribute => attribute.InformationalVersion)
+            .FirstOrDefault();
+        var version = stamped is { Length: > 0 } ? stamped : typeof(AppRoot).Assembly.GetName().Version?.ToString(3);
+        var plus = version?.IndexOf('+', StringComparison.Ordinal) ?? -1;
+        return plus > 0 ? version![..plus] : version ?? "development build";
     }
 
     // The command-line switch is a developer's override; otherwise the user's setting decides.
@@ -404,6 +419,17 @@ internal sealed class AppRoot : IAsyncDisposable
         _ = services.AddSingleton<SettingsApplier>();
         _ = services.AddSingleton<HotkeyBindings>();
         _ = services.AddSingleton<WipeService>();
+        _ = services.AddSingleton<IWipeAll>(provider => provider.GetRequiredService<WipeService>());
+        _ = services.AddSingleton(provider => new GeneralSettingsViewModel(
+            provider.GetRequiredService<SettingsService>(),
+            provider.GetService<StartWithWindowsService>(),
+            provider.GetRequiredService<IUiDispatcher>()));
+        _ = services.AddSingleton<HotkeysSettingsViewModel>();
+        _ = services.AddSingleton<HistorySettingsViewModel>();
+        _ = services.AddSingleton<PrivacySettingsViewModel>();
+        _ = services.AddSingleton<PasteSettingsViewModel>();
+        _ = services.AddSingleton(new AboutViewModel(ProgramVersion()));
+        _ = services.AddSingleton<SettingsViewModel>();
         _ = services.AddSingleton<ICaptureControl>(provider => provider.GetRequiredService<CaptureService>());
         _ = services.AddSingleton<IPasteFlow, PasteFlow>();
         _ = services.AddSingleton<QueueRunner>();
@@ -467,7 +493,7 @@ internal sealed class AppRoot : IAsyncDisposable
         _tray.OpenRequested += (_, _) => _dispatcher.Post(() => TogglePopup(fromTray: true));
         _tray.MenuItemChosen += (_, e) => _dispatcher.Post(() => TrayMenu.Execute(_trayViewModel, e.Id));
         _trayViewModel.OpenRequested += (_, _) => TogglePopup(fromTray: true);
-        _trayViewModel.EditSnippetsRequested += (_, _) => OpenSnippetEditor();
+        _trayViewModel.SettingsRequested += (_, _) => OpenSettings();
         _trayViewModel.ExitRequested += (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty);
 
         // Pausing, collecting and a queue change the tool tip and the wording of their items, so the tool tip changes exactly
@@ -477,7 +503,7 @@ internal sealed class AppRoot : IAsyncDisposable
         {
             // Changes come from the UI thread, the queue and the capture thread. The menu is built and sent from the UI
             // thread, one change after another, so an older menu can never arrive after a newer one.
-            if (e.PropertyName is nameof(TrayViewModel.ToolTip) or nameof(TrayViewModel.RestoreClipboard))
+            if (e.PropertyName is nameof(TrayViewModel.ToolTip))
             {
                 _dispatcher.Post(() =>
                 {

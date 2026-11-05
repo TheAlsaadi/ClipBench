@@ -47,7 +47,10 @@ public sealed class AppUnderTest : IAsyncLifetime
     {
         await SeedHistoryAsync();
 
-        var start = new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
+        // The first-run question opens the Settings window by itself; these tests are about the popup, so it counts as answered.
+        await File.WriteAllTextAsync(Path.Combine(_folder, "settings.json"), "{ \"version\": 1, \"firstRunCompleted\": true }", Ct);
+
+        var start =new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
         _process = Process.Start(start) ?? throw new InvalidOperationException("The app did not start.");
         _automation = new UIA3Automation();
         _application = FlaUI.Core.Application.Attach(_process);
