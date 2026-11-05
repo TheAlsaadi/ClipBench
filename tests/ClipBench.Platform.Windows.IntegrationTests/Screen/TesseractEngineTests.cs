@@ -76,6 +76,14 @@ public class TesseractEngineTests
     }
 
     [Fact]
+    public void Whatever_goes_wrong_while_starting_gives_no_engine_and_no_exception()
+    {
+        // The wrapper may throw a plain exception when a native file will not load (ARM64, no Visual C++ runtime): the engine is an extra, so none of them may escape.
+        TesseractEngine.TryCreate(ModelFolder, _ => throw new FormatException("boom")).ShouldBeNull();
+        TesseractEngine.TryCreate(ModelFolder, _ => throw new InvalidCastException("boom")).ShouldBeNull();
+    }
+
+    [Fact]
     public void The_engine_is_a_latin_engine()
     {
         Engine().ShouldBeAssignableTo<ILatinWordRecognizer>();

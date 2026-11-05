@@ -33,8 +33,15 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
     /// <summary>Starts the engine on the model in a folder.</summary>
     /// <param name="dataFolder">The folder that holds <c>eng.traineddata</c>.</param>
     /// <returns>The engine, or null where it cannot start: no model, a model that is not one, no ARM64 build, or no Visual C++ runtime.</returns>
-    internal static TesseractEngine? TryCreate(string dataFolder)
+    internal static TesseractEngine? TryCreate(string dataFolder) => TryCreate(dataFolder, folder => new Engine(folder, Language, EngineMode.LstmOnly));
+
+    /// <summary>Starts the engine with the given way of starting it (for tests).</summary>
+    /// <param name="dataFolder">The folder that holds <c>eng.traineddata</c>.</param>
+    /// <param name="start">Makes the native engine for the folder.</param>
+    /// <returns>The engine, or null where it cannot start.</returns>
+    internal static TesseractEngine? TryCreate(string dataFolder, Func<string, Engine> start)
     {
+        ArgumentNullException.ThrowIfNull(start);
         ArgumentException.ThrowIfNullOrWhiteSpace(dataFolder);
         if (!File.Exists(Path.Combine(dataFolder, Language + ".traineddata")))
         {
@@ -43,10 +50,11 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
 
         try
         {
-            return new TesseractEngine(new Engine(dataFolder, Language, EngineMode.LstmOnly));
+            return new TesseractEngine(start(dataFolder));
         }
-        catch (Exception exception) when (exception is TesseractException or DllNotFoundException or BadImageFormatException
-            or EntryPointNotFoundException or InvalidOperationException or ArgumentException or IOException or SEHException)
+#pragma warning disable CA1031 // Any failure to start means no engine: the wrapper throws plain exceptions for native files that will not load.
+        catch (Exception)
+#pragma warning restore CA1031
         {
             // The engine is an extra. Windows' own engines still read, so a failure to start is not an error for the user.
             return null;
