@@ -94,12 +94,12 @@ public static class ColorDetector
     // Whole numbers from 0 to 255, or a percentage from 0 to 100.
     private static byte? ReadChannel(string part)
     {
-        if (part.EndsWith('%'))
+        if (ReadPercent(part) is { } percent)
         {
-            return ReadDecimal(part[..^1]) is { } percent and >= 0 and <= 100 ? ToByte(percent * 255m / 100m) : null;
+            return ToByte(percent * 255m / 100m);
         }
 
-        return part.All(char.IsAsciiDigit) && part.Length <= 3 && int.Parse(part, CultureInfo.InvariantCulture) is var value and <= 255
+        return !part.EndsWith('%') && part.All(char.IsAsciiDigit) && part.Length <= 3 && int.Parse(part, CultureInfo.InvariantCulture) is var value and <= 255
             ? (byte)value
             : null;
     }
@@ -115,7 +115,7 @@ public static class ColorDetector
         var part = parts[3];
         if (part.EndsWith('%'))
         {
-            return ReadDecimal(part[..^1]) is { } percent and >= 0 and <= 100 ? ToByte(percent * 255m / 100m) : null;
+            return ReadPercent(part) is { } percent ? ToByte(percent * 255m / 100m) : null;
         }
 
         return ReadDecimal(part) is { } fraction and >= 0 and <= 1 ? ToByte(fraction * 255m) : null;

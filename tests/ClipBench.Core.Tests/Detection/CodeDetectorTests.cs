@@ -52,6 +52,8 @@ public class CodeDetectorTests
     [InlineData("[just a note]")]
     [InlineData("<3 you")]
     [InlineData("a < b and c > d")]
+    [InlineData("SELECT YOUR SEAT FROM THE LIST")]
+    [InlineData("sudo make me a sandwich")]
     public void Ordinary_text_is_not_code(string text)
     {
         CodeDetector.Guess(text).ShouldBeNull();
@@ -72,6 +74,16 @@ public class CodeDetectorTests
         var deep = string.Concat(Enumerable.Repeat("[", 500)) + string.Concat(Enumerable.Repeat("]", 500));
 
         CodeDetector.Guess(deep).ShouldNotBe("JSON");
+    }
+
+    [Fact]
+    public void Warming_up_builds_the_patterns_ahead_of_time_without_changing_any_answer()
+    {
+        CodeDetector.Warm();
+        CodeDetector.Warm();
+
+        CodeDetector.Guess("def f(x):\n    return x\n").ShouldBe("Python");
+        CodeDetector.Guess("just words").ShouldBeNull();
     }
 
     [Fact]

@@ -194,6 +194,9 @@ internal sealed class AppRoot : IAsyncDisposable
             // Secrets that expired while the app was closed go now, and later ones as their time comes.
             services.GetRequiredService<ExpirySweeper>().Start();
 
+            // The patterns that tell a clip's kind take a moment to build; they are built now so the first popup does not wait.
+            _ = Task.Run(Core.Detection.CodeDetector.Warm, CancellationToken.None);
+
             // The capture service reports its own failure to the log; the app is still useful without it, for pasting what is saved.
             _ = await services.GetRequiredService<CaptureService>().StartAsync(cancellationToken);
 

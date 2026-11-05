@@ -29,6 +29,18 @@ public static class CodeDetector
     private static readonly Lazy<Regex> _htmlTag = new(() => Create(@"</?(div|span|p|a|body|head|html|ul|ol|li|table|tr|td|th|img|br|h[1-6]|script|style|button|input|form|section|nav|header|footer|label|select|option)\b"));
     private static readonly Lazy<Regex> _lineEnding = new(() => Create(@"[;{}]\s*$"));
 
+    /// <summary>
+    /// Builds the patterns now. They take a few milliseconds each to set up, so the app calls this on a background thread at start-up
+    /// and the first popup that lists clips does not wait for them. Safe to call more than once and from any thread.
+    /// </summary>
+    public static void Warm()
+    {
+        _ = _languages.Value;
+        _ = _tag.Value;
+        _ = _htmlTag.Value;
+        _ = _lineEnding.Value;
+    }
+
     /// <summary>Guesses what language the text is written in.</summary>
     /// <param name="text">The text.</param>
     /// <returns>The language (such as "C#", "Python", "SQL", "JSON", "HTML"), or null when the text does not look like code.</returns>

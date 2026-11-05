@@ -25,6 +25,7 @@ public sealed unsafe class SelectionOverlay : IRegionPicker
     private const uint WmLeftButtonDown = 0x0201;
     private const uint WmLeftButtonUp = 0x0202;
     private const uint WmRightButtonDown = 0x0204;
+    private const uint WmCaptureChanged = 0x0215;
     private const uint WmCancel = PInvoke.WM_APP + 2;
     private const int VirtualKeyEscape = 0x1B;
     private const int BorderUnits = 2;
@@ -76,7 +77,17 @@ public sealed unsafe class SelectionOverlay : IRegionPicker
             IsBackground = true,
             Name = "ClipBench selection overlay",
         };
-        thread.Start();
+        try
+        {
+            thread.Start();
+        }
+        catch (Exception exception) when (exception is OutOfMemoryException or ThreadStartException)
+        {
+            // No thread, no overlay: the flag must not stay set, or no later selection could start.
+            Volatile.Write(ref _active, 0);
+            return Task.FromResult(Result.Failure<PixelRect>(new ResultError(ErrorCode.ScreenCaptureFailed, "Windows would not show the selection on the screen.")));
+        }
+
         return finished.Task;
     }
 
@@ -138,8 +149,14 @@ public sealed unsafe class SelectionOverlay : IRegionPicker
 
                 // The window under the pointer takes the keyboard, so Esc works at once.
                 var cursor = PInvoke.GetCursorPos(out var point) ? new PixelPoint(point.X, point.Y) : default;
-                var first = _windows.FirstOrDefault(window => Contains(window.Monitor.Bounds, cursor)) ?? _windows[0];
-                _ = PInvoke.SetForegroundWindow(first.Handle);
+                var under = RegionMath.MonitorAt(_monitors, cursor);
+                var first = _windows.FirstOrDefault(window => under is { } monitor && window.Monitor == monitor) ?? _windows[0];
+
+                // When Windows refuses to hand the keyboard over (it protects the program in front), the stronger call is made, so Esc works.
+                if (!PInvoke.SetForegroundWindow(first.Handle))
+                {
+                    PInvoke.SwitchToThisWindow(first.Handle, true);
+                }
 
                 using var registration = cancellationToken.Register(() =>
                 {
@@ -173,9 +190,6 @@ public sealed unsafe class SelectionOverlay : IRegionPicker
                 }
             }
         }
-
-        private static bool Contains(PixelRect rectangle, PixelPoint point) =>
-            point.X >= rectangle.X && point.X < rectangle.Right && point.Y >= rectangle.Y && point.Y < rectangle.Bottom;
 
         private static Result<PixelRect> Cancelled() =>
             Result.Failure<PixelRect>(new ResultError(ErrorCode.SelectionCancelled, "The selection was cancelled."));
@@ -215,6 +229,8 @@ public sealed unsafe class SelectionOverlay : IRegionPicker
                     case WmLeftButtonUp when _dragging is { } active:
                         Finish(RegionMath.FromDrag(_start, Cursor(), active.Monitor.Bounds));
                         return new LRESULT(0);
+                    case WmCaptureChanged when _dragging is not null:
+                    // Something took the mouse in the middle of a drag (Alt+Tab, another window): no button-up will come, so the selection ends.
                     case WmRightButtonDown:
                     case WmCancel:
                     case PInvoke.WM_CLOSE:
@@ -317,6 +333,16 @@ public sealed unsafe class SelectionOverlay : IRegionPicker
             var bitmap = PInvoke.CreateDIBSection(memory, &header, DIB_USAGE.DIB_RGB_COLORS, &bits, HANDLE.Null, 0);
             if (memory.IsNull || bitmap.IsNull || bits is null)
             {
+                if (!bitmap.IsNull)
+                {
+                    _ = PInvoke.DeleteObject(bitmap);
+                }
+
+                if (!memory.IsNull)
+                {
+                    _ = PInvoke.DeleteDC(memory);
+                }
+
                 _ = PInvoke.DestroyWindow(handle);
                 return null;
             }
