@@ -51,7 +51,7 @@ public sealed class TrayViewModelTests : IDisposable
         var tray = Create();
 
         tray.IsPaused.ShouldBeFalse();
-        tray.PauseLabel.ShouldBe("Pause capturing");
+        tray.PauseLabel.ShouldBe("Turn on incognito");
         tray.ToolTip.ShouldBe("ClipBench · capturing");
     }
 
@@ -64,8 +64,8 @@ public sealed class TrayViewModelTests : IDisposable
         var tray = Create();
 
         tray.IsPaused.ShouldBeTrue();
-        tray.PauseLabel.ShouldBe("Resume capturing");
-        tray.ToolTip.ShouldBe("ClipBench · paused");
+        tray.PauseLabel.ShouldBe("Turn off incognito");
+        tray.ToolTip.ShouldBe("ClipBench · incognito");
         _capture.Calls.ShouldBeEmpty();
     }
 
@@ -78,8 +78,8 @@ public sealed class TrayViewModelTests : IDisposable
 
         _capture.IsPaused.ShouldBeTrue();
         tray.IsPaused.ShouldBeTrue();
-        tray.PauseLabel.ShouldBe("Resume capturing");
-        tray.ToolTip.ShouldBe("ClipBench · paused");
+        tray.PauseLabel.ShouldBe("Turn off incognito");
+        tray.ToolTip.ShouldBe("ClipBench · incognito");
         changed.ShouldContain(nameof(TrayViewModel.PauseLabel));
         changed.ShouldContain(nameof(TrayViewModel.ToolTip));
     }
@@ -94,7 +94,7 @@ public sealed class TrayViewModelTests : IDisposable
 
         _capture.Calls.ShouldBe([true, false]);
         tray.IsPaused.ShouldBeFalse();
-        tray.PauseLabel.ShouldBe("Pause capturing");
+        tray.PauseLabel.ShouldBe("Turn on incognito");
     }
 
     [Fact]

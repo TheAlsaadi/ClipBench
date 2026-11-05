@@ -49,6 +49,14 @@ internal sealed unsafe class Win32TrayApi : ITrayApi
     }
 
     /// <inheritdoc/>
+    public bool ChangeIcon(nint window, uint iconId, nint icon)
+    {
+        var data = Data(window, iconId, NOTIFY_ICON_DATA_FLAGS.NIF_ICON);
+        data.hIcon = new HICON(icon);
+        return PInvoke.Shell_NotifyIcon(NOTIFY_ICON_MESSAGE.NIM_MODIFY, in data);
+    }
+
+    /// <inheritdoc/>
     public bool Modify(nint window, uint iconId, string toolTip)
     {
         var data = Data(window, iconId, NOTIFY_ICON_DATA_FLAGS.NIF_TIP | NOTIFY_ICON_DATA_FLAGS.NIF_SHOWTIP);

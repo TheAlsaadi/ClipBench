@@ -127,7 +127,9 @@ internal sealed class AppRoot : IAsyncDisposable
         var dispatcher = new DispatcherQueueDispatcher(queue);
 
         // The tray icon is also how the app tells the user things, so it comes before the services that need to.
-        var trayCreated = WindowsPlatform.CreateTray(Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico"));
+        var trayCreated = WindowsPlatform.CreateTray(
+            Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico"),
+            Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench-incognito.ico"));
         var tray = trayCreated.IsSuccess ? trayCreated.Value : null;
         if (trayCreated.IsFailure)
         {

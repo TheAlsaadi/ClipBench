@@ -42,9 +42,22 @@ public sealed class TrayMenuTests : IDisposable
             (5, "Start collecting", false),
             (7, "Restore clipboard after paste", false),
             (8, "Snippets\u2026", false),
-            (2, "Pause capturing", false),
+            (2, "Turn on incognito", false),
             (3, "Exit", false),
         ]);
+    }
+
+    [Fact]
+    public void The_icon_shows_its_second_picture_only_while_incognito_is_on()
+    {
+        var tray = Create();
+        TrayMenu.Build(tray).UseAlternateIcon.ShouldBeFalse();
+
+        tray.TogglePauseCommand.Execute(null);
+        TrayMenu.Build(tray).UseAlternateIcon.ShouldBeTrue();
+
+        tray.TogglePauseCommand.Execute(null);
+        TrayMenu.Build(tray).UseAlternateIcon.ShouldBeFalse();
     }
 
     [Fact]
@@ -55,8 +68,8 @@ public sealed class TrayMenuTests : IDisposable
 
         var model = TrayMenu.Build(tray);
 
-        model.ToolTip.ShouldBe("ClipBench \u00B7 paused");
-        model.Menu.Single(item => item.Id == TrayMenu.PauseId).Text.ShouldBe("Resume capturing");
+        model.ToolTip.ShouldBe("ClipBench \u00B7 incognito");
+        model.Menu.Single(item => item.Id == TrayMenu.PauseId).Text.ShouldBe("Turn off incognito");
     }
 
     [Fact]
@@ -112,7 +125,7 @@ public sealed class TrayMenuTests : IDisposable
             (TrayMenu.CollectId, "Start collecting"),
             (TrayMenu.RestoreId, "Restore clipboard after paste"),
             (TrayMenu.SnippetsId, "Snippets\u2026"),
-            (TrayMenu.PauseId, "Pause capturing"),
+            (TrayMenu.PauseId, "Turn on incognito"),
             (TrayMenu.ExitId, "Exit"),
         ]);
     }
@@ -158,7 +171,7 @@ public sealed class TrayMenuTests : IDisposable
             (TrayMenu.CancelCollectId, "Cancel collecting"),
             (TrayMenu.RestoreId, "Restore clipboard after paste"),
             (TrayMenu.SnippetsId, "Snippets\u2026"),
-            (TrayMenu.PauseId, "Pause capturing"),
+            (TrayMenu.PauseId, "Turn on incognito"),
             (TrayMenu.ExitId, "Exit"),
         ]);
     }

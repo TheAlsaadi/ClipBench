@@ -139,8 +139,9 @@ public sealed class WindowsPlatform : IDisposable
     /// top-level windows hear that the taskbar was created again, and it removes itself when disposed.
     /// </summary>
     /// <param name="iconPath">The .ico file that holds the picture.</param>
+    /// <param name="alternateIconPath">The .ico file of the second picture, shown while incognito is on, or null for none.</param>
     /// <returns>The icon, not yet shown, or <see cref="ErrorCode.PlatformFailure"/> when Windows would not create its window.</returns>
-    public static Result<ITrayIcon> CreateTray(string iconPath)
+    public static Result<ITrayIcon> CreateTray(string iconPath, string? alternateIconPath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(iconPath);
 
@@ -151,7 +152,7 @@ public sealed class WindowsPlatform : IDisposable
         }
 
         var window = created.Value;
-        return Result.Success<ITrayIcon>(new TrayIcon(window, window, window.Handle, new Win32TrayApi(), new Win32TrayMenu(), iconPath, window));
+        return Result.Success<ITrayIcon>(new TrayIcon(window, window, window.Handle, new Win32TrayApi(), new Win32TrayMenu(), iconPath, window, alternateIconPath));
     }
 
     /// <summary>Stops every service and destroys the background window.</summary>

@@ -26,6 +26,10 @@ internal interface ITrayApi
     /// <returns>False when Windows refused.</returns>
     bool UseVersion4(nint window, uint iconId);
 
+    /// <summary>Changes the picture of the icon.</summary>
+    /// <returns>False when Windows refused.</returns>
+    bool ChangeIcon(nint window, uint iconId, nint icon);
+
     /// <summary>Changes the tool tip of the icon.</summary>
     /// <returns>False when Windows refused.</returns>
     bool Modify(nint window, uint iconId, string toolTip);

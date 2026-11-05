@@ -8,7 +8,7 @@ public static class TrayMenu
     /// <summary>The id of the item that opens the popup.</summary>
     public const int OpenId = 1;
 
-    /// <summary>The id of the item that pauses or resumes capturing.</summary>
+    /// <summary>The id of the item that turns incognito on or off.</summary>
     public const int PauseId = 2;
 
     /// <summary>The id of the item that quits.</summary>
@@ -51,7 +51,7 @@ public static class TrayMenu
         menu.Add(new TrayMenuItem(SnippetsId, "Snippets…"));
         menu.Add(new TrayMenuItem(PauseId, tray.PauseLabel));
         menu.Add(new TrayMenuItem(ExitId, "Exit"));
-        return new TrayModel(tray.ToolTip, [.. menu]);
+        return new TrayModel(tray.ToolTip, [.. menu], tray.IsPaused);
     }
 
     /// <summary>Runs the command behind a menu item. An id that is not one of ours does nothing.</summary>

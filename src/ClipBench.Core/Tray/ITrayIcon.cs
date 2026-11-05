@@ -21,7 +21,8 @@ public sealed record TrayMenuItem(int Id, string Text, bool IsDefault = false, b
 /// <summary>What the tray icon shows.</summary>
 /// <param name="ToolTip">The text when the pointer rests on the icon. Windows keeps only the first 127 characters.</param>
 /// <param name="Menu">The menu, top to bottom.</param>
-public sealed record TrayModel(string ToolTip, ImmutableArray<TrayMenuItem> Menu);
+/// <param name="UseAlternateIcon">True to show the icon's second picture, which marks a state such as incognito. Ignored when there is none.</param>
+public sealed record TrayModel(string ToolTip, ImmutableArray<TrayMenuItem> Menu, bool UseAlternateIcon = false);
 
 /// <summary>Tells which menu item was chosen.</summary>
 /// <param name="id">The id of the item.</param>

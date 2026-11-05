@@ -48,7 +48,7 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the user chose Snippets in the menu.</summary>
     public event EventHandler? EditSnippetsRequested;
 
-    /// <summary>True while capture is paused.</summary>
+    /// <summary>True while incognito is on and nothing is captured.</summary>
     [ObservableProperty]
     public partial bool IsPaused { get; set; }
 
@@ -64,12 +64,12 @@ public sealed partial class TrayViewModel : ObservableObject, IDisposable
     /// <summary>True while a paste queue runs.</summary>
     public bool IsQueueRunning => _queue.Progress.IsRunning;
 
-    /// <summary>The label of the pause item: what choosing it does.</summary>
-    public string PauseLabel => IsPaused ? "Resume capturing" : "Pause capturing";
+    /// <summary>The label of the incognito item: what choosing it does.</summary>
+    public string PauseLabel => IsPaused ? "Turn off incognito" : "Turn on incognito";
 
     /// <summary>The text shown when the pointer rests on the icon.</summary>
     public string ToolTip =>
-        (IsPaused ? "ClipBench · paused" : "ClipBench · capturing")
+        (IsPaused ? "ClipBench · incognito" : "ClipBench · capturing")
         + (IsCollecting ? $" · collecting {_collect.Collect.Count}" : string.Empty)
         + (IsQueueRunning ? " · paste queue running" : string.Empty);
 
