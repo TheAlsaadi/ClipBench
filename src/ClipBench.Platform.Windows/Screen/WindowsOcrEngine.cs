@@ -28,6 +28,13 @@ public sealed class WindowsOcrEngine : ITextRecognizer
     /// <summary>The tag of the language this engine reads, such as <c>en-US</c>.</summary>
     internal string LanguageTag => _engine.RecognizerLanguage.LanguageTag;
 
+    // Windows lists the words of a line left to right as drawn, which is backwards for Arabic and Hebrew.
+    // Lines with no such letters are returned exactly as Windows gives them.
+    private static string LineText(OcrLine line) =>
+        LineOrder.ContainsRightToLeft(line.Text)
+            ? LineOrder.ToLogical([.. line.Words.OrderBy(word => word.BoundingRect.X).Select(word => word.Text)])
+            : line.Text;
+
     /// <inheritdoc/>
     public async Task<Result<string>> RecognizeAsync(ScreenImage image, CancellationToken cancellationToken)
     {
@@ -49,7 +56,7 @@ public sealed class WindowsOcrEngine : ITextRecognizer
                 image.Height,
                 BitmapAlphaMode.Ignore);
             var result = await _engine.RecognizeAsync(bitmap).AsTask(cancellationToken).ConfigureAwait(false);
-            return Result.Success(string.Join("\r\n", result.Lines.Select(line => line.Text)));
+            return Result.Success(string.Join("\r\n", result.Lines.Select(LineText)));
         }
         catch (Exception exception) when (exception is not (OperationCanceledException or OutOfMemoryException))
         {

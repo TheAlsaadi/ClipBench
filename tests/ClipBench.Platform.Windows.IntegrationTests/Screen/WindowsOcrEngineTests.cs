@@ -13,7 +13,7 @@ public class WindowsOcrEngineTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     // Black text on white, drawn with GDI+ the way Windows draws interface text (ClearType), as a picture in memory.
-    private static ScreenImage Render(string text, int pixelSize = 48, string family = "Arial", int width = 900, int height = 0)
+    private static ScreenImage Render(string text, int pixelSize = 48, string family = "Arial", int width = 900, int height = 0, bool rightToLeft = false)
     {
         height = height > 0 ? height : Math.Max(40, pixelSize * 3);
         using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
@@ -22,7 +22,16 @@ public class WindowsOcrEngineTests
             graphics.Clear(Color.White);
             graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             using var font = new Font(family, pixelSize, FontStyle.Regular, GraphicsUnit.Pixel);
-            graphics.DrawString(text, font, Brushes.Black, new PointF(pixelSize / 2f, pixelSize));
+            if (rightToLeft)
+            {
+                // A right-to-left paragraph: the first word of the sentence is at the right edge.
+                using var format = new StringFormat(StringFormatFlags.DirectionRightToLeft);
+                graphics.DrawString(text, font, Brushes.Black, new RectangleF(pixelSize / 2f, pixelSize, width - pixelSize, height - pixelSize), format);
+            }
+            else
+            {
+                graphics.DrawString(text, font, Brushes.Black, new PointF(pixelSize / 2f, pixelSize));
+            }
         }
 
         var data = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
@@ -227,6 +236,54 @@ public class WindowsOcrEngineTests
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
         result.Value.Count(c => c is >= (char)0x600 and <= (char)0x6FF).ShouldBeGreaterThanOrEqualTo(10);
         result.Value.ShouldContain("2026");
+    }
+
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData(16)]
+    [InlineData(20)]
+    [InlineData(32)]
+    public async Task Arabic_words_come_back_in_reading_order_not_in_the_order_they_are_drawn_left_to_right(int pixelSize)
+    {
+        RequireLanguage("ar-SA");
+        var mohammed = Letters(0x645, 0x62D, 0x645, 0x62F);
+        var alsaadi = Letters(0x627, 0x644, 0x635, 0x627, 0x639, 0x62F, 0x64A);
+        using var image = Render(mohammed + " " + alsaadi, pixelSize, "Segoe UI", 400);
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["ar-SA"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.Trim().ShouldBe(mohammed + " " + alsaadi);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task English_inside_an_Arabic_sentence_stays_where_it_was_written()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+        var sentence = Letters(0x645, 0x631, 0x62D, 0x628, 0x627) + " " + Letters(0x628, 0x643, 0x645) + " " + Letters(0x641, 0x64A) + " ClipBench 2026";
+        using var image = Render(sentence, 28, "Segoe UI", 600, rightToLeft: true);
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["ar-SA", "en-US"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.Trim().ShouldBe(sentence);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task An_Arabic_name_inside_an_English_sentence_is_read_in_order_and_the_English_stays_put()
+    {
+        RequireLanguage("en-US");
+        RequireLanguage("ar-SA");
+        var sentence = "Hello there " + Letters(0x645, 0x62D, 0x645, 0x62F) + " " + Letters(0x627, 0x644, 0x635, 0x627, 0x639, 0x62F, 0x64A) + " my friend";
+        using var image = Render(sentence, 28, "Segoe UI", 700);
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["en-US", "ar-SA"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.Trim().ShouldBe(sentence);
     }
 
     [Fact]
