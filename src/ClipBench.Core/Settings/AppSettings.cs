@@ -108,6 +108,15 @@ public sealed record AppSettings
         _ => Pasting.Separator.NewLine,
     };
 
+    /// <summary>The history limits these settings ask for.</summary>
+    /// <returns>The limits, with every number moved into its range first.</returns>
+    public History.HistoryOptions ToHistoryOptions() => new()
+    {
+        MaxCount = HistoryMaxCountRange.Clamp(HistoryMaxCount),
+        MaxAge = TimeSpan.FromDays(HistoryMaxAgeDaysRange.Clamp(HistoryMaxAgeDays)),
+        MaxTotalBytes = HistoryMaxMegabytesRange.Clamp(HistoryMaxMegabytes) * 1024L * 1024L,
+    };
+
     /// <summary>Replaces what cannot be used, so the settings can be trusted as they are.</summary>
     /// <returns>The settings, with an unknown choice or an unreadable custom separator reset and every number moved into its range.</returns>
     public AppSettings Normalize()

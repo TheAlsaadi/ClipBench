@@ -17,7 +17,7 @@ namespace ClipBench.Core.History;
 /// </remarks>
 public sealed class ClipHistory
 {
-    private readonly HistoryOptions _options;
+    private HistoryOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly Lock _gate = new();
     private ImmutableArray<Clip> _clips = [];
@@ -31,6 +31,17 @@ public sealed class ClipHistory
         ArgumentNullException.ThrowIfNull(timeProvider);
         _options = options;
         _timeProvider = timeProvider;
+    }
+
+    /// <summary>Changes the limits. They apply when a clip is next added and when <see cref="Trim"/> is called.</summary>
+    /// <param name="options">The new limits.</param>
+    public void SetOptions(HistoryOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        lock (_gate)
+        {
+            _options = options;
+        }
     }
 
     /// <summary>A snapshot of the clips, newest first. It does not change when the history does.</summary>

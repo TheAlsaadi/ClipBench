@@ -1,3 +1,4 @@
+using ClipBench.Core.History;
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Settings;
 using ClipBench.Core.Tests.Support;
@@ -205,6 +206,32 @@ public class AppSettingsTests
     public void A_range_that_ends_before_it_starts_is_a_bug()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => new SettingRange(9, 5));
+    }
+
+    [Fact]
+    public void The_history_limits_are_the_chosen_count_age_and_size()
+    {
+        var options = (AppSettings.Default with { HistoryMaxCount = 250, HistoryMaxAgeDays = 7, HistoryMaxMegabytes = 64 }).ToHistoryOptions();
+
+        options.MaxCount.ShouldBe(250);
+        options.MaxAge.ShouldBe(TimeSpan.FromDays(7));
+        options.MaxTotalBytes.ShouldBe(64L * 1024 * 1024);
+    }
+
+    [Fact]
+    public void The_default_history_limits_are_the_ones_the_history_starts_with()
+    {
+        AppSettings.Default.ToHistoryOptions().ShouldBe(new HistoryOptions());
+    }
+
+    [Fact]
+    public void Settings_that_were_never_normalized_still_give_usable_history_limits()
+    {
+        var options = (AppSettings.Default with { HistoryMaxCount = -1, HistoryMaxAgeDays = 0, HistoryMaxMegabytes = int.MaxValue }).ToHistoryOptions();
+
+        options.MaxCount.ShouldBe(10);
+        options.MaxAge.ShouldBe(TimeSpan.FromDays(1));
+        options.MaxTotalBytes.ShouldBe(2048L * 1024 * 1024);
     }
 
     private static int Normalized(string name, int value)

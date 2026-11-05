@@ -121,6 +121,35 @@ public sealed class ClipLibrary : IDisposable
         }
     }
 
+    /// <summary>Changes the history limits and removes at once the clips that no longer fit.</summary>
+    /// <param name="options">The new limits.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>Success, or why the removed clips could not be deleted from the store. A failure still leaves them out of the library.</returns>
+    public async Task<Result> ApplyLimitsAsync(HistoryOptions options, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        await _changes.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _history.SetOptions(options);
+            var evicted = _history.Trim();
+            if (evicted.IsEmpty)
+            {
+                return Result.Success();
+            }
+
+            ForgetSensitivity(evicted);
+            var deleted = await _store.DeleteAsync([.. evicted.Select(clip => clip.Id)], cancellationToken).ConfigureAwait(false);
+            RaiseChanged();
+            return deleted;
+        }
+        finally
+        {
+            _ = _changes.Release();
+        }
+    }
+
     /// <summary>Pins or unpins a clip.</summary>
     /// <param name="id">The clip id.</param>
     /// <param name="pinned">True to pin.</param>
