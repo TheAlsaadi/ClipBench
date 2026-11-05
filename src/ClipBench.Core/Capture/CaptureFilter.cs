@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using ClipBench.Core.Clips;
+using ClipBench.Core.Privacy;
 
 namespace ClipBench.Core.Capture;
 
@@ -9,8 +10,6 @@ namespace ClipBench.Core.Capture;
 /// </summary>
 public sealed record CaptureFilter
 {
-    private const string ExecutableSuffix = ".exe";
-
     /// <summary>True when nothing is captured.</summary>
     public bool Incognito { get; init; }
 
@@ -74,7 +73,7 @@ public sealed record CaptureFilter
 
     private bool IsExcluded(string? process)
     {
-        var name = NameOf(process);
+        var name = ProcessName.Normalize(process);
         if (name.Length == 0 || ExcludedProcesses.IsDefaultOrEmpty)
         {
             return false;
@@ -82,30 +81,12 @@ public sealed record CaptureFilter
 
         foreach (var excluded in ExcludedProcesses)
         {
-            if (string.Equals(name, NameOf(excluded), StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(name, ProcessName.Normalize(excluded), StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
         }
 
         return false;
-    }
-
-    // "C:\Program Files\KeePass\KeePass.exe", "KeePass.exe" and "keepass" all name the same program.
-    private static string NameOf(string? process)
-    {
-        if (string.IsNullOrWhiteSpace(process))
-        {
-            return string.Empty;
-        }
-
-        var name = process.Trim();
-        var lastSeparator = name.LastIndexOfAny(['\\', '/']);
-        if (lastSeparator >= 0)
-        {
-            name = name[(lastSeparator + 1)..].Trim();
-        }
-
-        return name.EndsWith(ExecutableSuffix, StringComparison.OrdinalIgnoreCase) ? name[..^ExecutableSuffix.Length] : name;
     }
 }
