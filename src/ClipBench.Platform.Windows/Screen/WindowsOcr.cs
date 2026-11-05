@@ -17,11 +17,11 @@ public static class WindowsOcr
         + "choose a language, then Language options, and add its Text recognition feature. Then try again.";
 
     // Tesseract is made once and kept: starting it takes about 70 ms. It is null where it cannot start (ARM64, no model, no runtime), and then the Windows engines read alone.
-    private static readonly Lazy<TesseractEngine?> SharedLatinEngine = new(() => TesseractEngine.TryCreate(Path.Combine(AppContext.BaseDirectory, "tessdata")));
+    private static readonly Lazy<TesseractEngine?> _sharedLatinEngine = new(() => TesseractEngine.TryCreate(Path.Combine(AppContext.BaseDirectory, "tessdata")));
 
     /// <summary>Creates the recognizer for the languages in the user's Windows profile, in the order the user ranked them, with Tesseract for Latin text where it can start.</summary>
     /// <returns>The recognizer.</returns>
-    public static ITextRecognizer CreateRecognizer() => CreateRecognizer(() => [.. GlobalizationPreferences.Languages], () => SharedLatinEngine.Value);
+    public static ITextRecognizer CreateRecognizer() => CreateRecognizer(() => [.. GlobalizationPreferences.Languages], () => _sharedLatinEngine.Value);
 
     /// <summary>Creates a recognizer for the given language tags, with the Windows engines alone (for tests).</summary>
     /// <param name="languageTags">The tags, asked for every time because the user can add a language while ClipBench runs.</param>

@@ -97,12 +97,39 @@ On 2026-11-05 the owner, asked to choose, left the choice to the assistant ("cho
 
 1. **Network client:** accepted and stated plainly in `docs/security/PRIVACY.md` and `docs/security/THREAT_MODEL.md`. ClipBench never gives the engine a URL. A test reads text with the engine while it watches the process's connections.
 2. **ARM64:** the Tesseract engine ships for x64 only. Where it cannot start (ARM64, a missing model or runtime) ClipBench reads with the Windows engines alone, as before, and nothing fails.
-3. **Visual C++ runtime:** shipped with the app (app-local) in the installer and the zip when Phase 10 builds them. Until then `docs/RELEASING` style notes live in this record.
+3. **Visual C++ runtime:** shipped with the app (app-local) in the installer and the zip when Phase 10 builds them. Until then the "For Phase 10" list at the end of this record holds it.
 4. **Prose regression of the Arabic engine:** not fixed separately. On x64 Tesseract replaces the Windows English reading, which removes it. On ARM64 it stays and is recorded as a known limit.
-5. **Choosing between readings:** the Tesseract reading is used for everything that is not Arabic or Hebrew, unless a Windows engine read at least two more non-ASCII letters (an accented, Cyrillic or Asian alphabet the English model cannot read). Arabic and Hebrew words always come from the Windows engine for that script. The model is `eng` only; other Latin languages with accents are read by their Windows engine through the same rule.
+5. **Choosing between readings** (`ReadingMerge`, tested in Core): the Tesseract reading is used for everything that is not Arabic or Hebrew, unless a Windows reading has at least two more letters the English model cannot read: letters of another alphabet or Latin letters with an accent (not the o-slash, see below). Arabic and Hebrew words come from the Windows engine for that script, except where Tesseract read the same place with confidence 30 or more (the Arabic engine makes up two Arabic letters for tiny Latin text such as `x > 0`). A symbols-only Tesseract word with confidence under 60 gives way to a symbols-only word a Windows engine read in the same place (the English model reads a chevron icon as `>>`). The model is `eng` only.
 6. **The model file** is committed under `third_party/tessdata/` with its SHA-256, and a test fails if the file changes.
 
 This is still the owner's to overrule: reverting is one package reference, one factory method and the model file.
+
+### Measured on the shipped pipeline (2026-11-05)
+
+The same pictures, run through the code in the repository (Tesseract, the Windows English and Arabic engines, and the merge above), against the thresholds:
+
+| Measure | Threshold | Windows only | Shipped pipeline |
+|---|---|---|---|
+| Code-like text, mean similarity | at least 0.85 | 0.835 | **0.955** |
+| `>` kept in 252 cases | at least 90% | 65% | **92%** |
+| Code pictures read empty | at most 5 of 120 | 0 | **0** |
+| Terminal screenshot, characters right | at least 90% | 43.9% | **96.7%** |
+| Prose, mean similarity | at least 0.95 | 0.922 | **0.994** |
+| 1000 x 100 px selection, median | at most 1 s | 71 ms | **133 ms** (Tesseract and two Windows engines) |
+
+The owner's File Explorer breadcrumb comes out as `> محمد الصاعدي > Minecraft-mod-porting >`, exactly.
+
+The first run of the merge failed two of these (`>` kept 89.7%, terminal 43.9%) and found why. A "more non-ASCII letters wins" rule counted the `ø` the Arabic engine makes of a slashed zero and gave the terminal back to the engine that misread it; and the Arabic engine's made-up Arabic letters replaced `x > 0`. Both are now fixed by the rules in decision 5, each with a unit test. One of 252 chevron cases still loses text (`if (a > b) {` in one font came back as `if(a`).
+
+### Facts found while building it
+
+- The two native libraries bundle image decoders (libjpeg-turbo, zlib 1.2.11, libpng, libtiff, giflib, an LZMA library) and a network client. ClipBench never calls them: it gives Tesseract raw pixels only. They are listed in `THIRD_PARTY_NOTICES.md`; zlib 1.2.11 is old and only matters if a compressed stream ever reaches it, which no code path allows.
+- The package copies `x86` files and `tesseract.exe` into the output; the Windows project removes both, and a test checks the output.
+- On ARM64 the x64 files would still be copied by a build for that platform and cannot load. The engine then returns "not started" and Windows reads alone. Phase 10 must leave them out of the ARM64 installer.
+
+### For Phase 10 (installer and zip)
+
+Ship the three Visual C++ runtime DLLs app-local for x64; leave out `x86`, `tesseract.exe` and (on ARM64) the x64 Tesseract files; ship the Apache-2.0 text beside `THIRD_PARTY_NOTICES.md`.
 
 ## If accepted
 

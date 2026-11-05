@@ -235,6 +235,9 @@ Every privacy setting has an item here. Open the Settings window from the tray m
 - [ ] Settings → Shortcuts → **Copy text from the screen**: set `Ctrl+Alt+T`, and it works at once without a restart; **Reset** brings back Win+Alt+O. Giving it the popup's shortcut is refused.
 - [ ] Remove the recognition language of your Windows (Settings, Time and language, Language and region, your language, Language options, remove **Text recognition**) and try again: the message names where to add it back. Add it back.
 - [ ] No file with a picture of the screen appears anywhere in `%LOCALAPPDATA%\ClipBench` or `%TEMP%` after copying text this way.
+- [ ] Tesseract: select a line of code (`if (a > b) {`), a command prompt line (`C:\Users\you> dir`) and a line from the terminal screenshot that failed before: the symbols (`>`, `\`, `[`, `=>`) are right. A slashed zero may come out as `@` or `0`; that is a font shape, not a bug.
+- [ ] The File Explorer breadcrumb with an Arabic folder name comes out as `> name > folder >` with the name in reading order and no stray symbol.
+- [ ] In the install folder of an x64 build: `x64\tesseract55.dll`, `x64\leptonica-1.85.0.dll` and `tessdata\eng.traineddata` exist; there is no `x86` folder and no `tesseract.exe`.
 - [ ] Small interface text (menus, a spreadsheet, a code editor at 100% zoom, 10 to 13 pixels) is read: select a few lines of it and paste. A capital I against a lowercase l, or an O against a 0, may still be mixed up in some fonts; that is what the recognizer cannot tell apart.
 - [ ] Select an Arabic name written "first name, family name" and paste: the first name comes first. Then a line of Arabic with a number, and an English sentence with an Arabic name inside it: each keeps its order.
 - [ ] In File Explorer (English), select the address bar breadcrumb of a folder under a path with an Arabic name: the separators come out as `>`, never `(` or `)`, and the segments stay in the order drawn.

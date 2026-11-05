@@ -18,7 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reading, so Arabic next to English works, and Arabic and Hebrew lines come back in reading order, not in the order they are drawn.
   Each word is taken from the engine that reads it best, so an Arabic name in an English window keeps its `>` separators
   instead of getting `(`, and a line is read right to left only when its Arabic letters are at least twice the others.
-  Windows still drops fragments that are mostly symbols (`x > 0` may come back empty).
+  Code, paths and symbols (`x > 0`, a command prompt, a terminal) are read by Tesseract, an open-source recognizer that
+  ships with ClipBench on x64 (ADR 0019, `THIRD_PARTY_NOTICES.md`); Windows still reads Arabic and Hebrew, and reads alone where
+  Tesseract cannot start (ARM64). Measured on drawn code: similarity 0.835 to 0.955, `>` kept 65% to 92%, a terminal screenshot
+  43.9% to 96.7% of characters right. Tesseract's library contains an unused network client; ClipBench never gives it a
+  web address and a test watches the process for connections.
   If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
   Settings.
 - The popup says what a clip is: a **color** (with a swatch) in hex, `rgb()` or `hsl()`; a **link**; an **email**

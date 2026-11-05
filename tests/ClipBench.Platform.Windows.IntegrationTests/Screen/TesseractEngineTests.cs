@@ -13,13 +13,13 @@ public class TesseractEngineTests
     // The English model that ships with the app, from tessdata_fast (ADR 0019). A different file is a different engine.
     private const string ModelSha256 = "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2";
 
-    private static readonly Lazy<TesseractEngine?> SharedEngine = new(() => TesseractEngine.TryCreate(ModelFolder));
+    private static readonly Lazy<TesseractEngine?> _sharedEngine = new(() => TesseractEngine.TryCreate(ModelFolder));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static string ModelFolder => Path.Combine(AppContext.BaseDirectory, "tessdata");
 
-    private static TesseractEngine Engine() => SharedEngine.Value ?? throw new InvalidOperationException("The Tesseract engine did not start from " + ModelFolder);
+    private static TesseractEngine Engine() => _sharedEngine.Value ?? throw new InvalidOperationException("The Tesseract engine did not start from " + ModelFolder);
 
     // What the app does: a margin and an enlargement first (ImageScaler), then every engine reads the same enlarged picture.
     private static async Task<string> TextOf(ScreenImage picture)
