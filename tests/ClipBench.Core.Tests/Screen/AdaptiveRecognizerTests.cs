@@ -64,25 +64,36 @@ public class AdaptiveRecognizerTests
     // --- enlarging ---
 
     [Fact]
-    public async Task The_picture_is_enlarged_twofold_before_it_is_read()
+    public async Task The_picture_gets_a_margin_and_is_enlarged_threefold_before_it_is_read()
     {
         var engine = Says("text");
         using var image = Image(300, 40);
 
         await Create(engine).RecognizeAsync(image, Ct);
 
-        engine.Saw.ShouldBe([(600, 80)]);
+        engine.Saw.ShouldBe([((300 + 16) * 3, (40 + 16) * 3)]);
     }
 
     [Fact]
-    public async Task A_picture_too_large_to_enlarge_is_read_as_it_is()
+    public async Task A_picture_too_large_to_enlarge_is_read_with_its_margin_only()
     {
         var engine = Says("text");
         using var image = Image(4000, 1000);
 
         await Create(engine).RecognizeAsync(image, Ct);
 
-        engine.Saw.ShouldBe([(4000, 1000)]);
+        engine.Saw.ShouldBe([(4016, 1016)]);
+    }
+
+    [Fact]
+    public async Task A_picture_so_wide_that_a_margin_would_pass_the_limit_is_read_as_it_is()
+    {
+        var engine = Says("text");
+        using var image = Image(ImageScaler.MaxSide - 1, 4);
+
+        await Create(engine).RecognizeAsync(image, Ct);
+
+        engine.Saw.ShouldBe([(ImageScaler.MaxSide - 1, 4)]);
     }
 
     [Fact]

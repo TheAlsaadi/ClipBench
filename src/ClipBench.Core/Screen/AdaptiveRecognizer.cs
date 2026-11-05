@@ -3,7 +3,7 @@ using ClipBench.Core.Results;
 namespace ClipBench.Core.Screen;
 
 /// <summary>
-/// Reads a picture of text well on a real desktop: it enlarges small text (<see cref="ImageScaler"/>) and reads the picture
+/// Reads a picture of text well on a real desktop: it gives the picture a margin and enlarges it (<see cref="ImageScaler"/>) and reads the picture
 /// with the engine of every language the user has set up, keeping the reading with the most letters. One engine
 /// reads one language only: Arabic text through an English engine comes out as a few digits, and English
 /// through an Arabic engine as noise, so the languages are tried and compared rather than guessed. Every enlarged copy is
@@ -41,11 +41,10 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
             return Result.Failure<string>(new ResultError(ErrorCode.OcrLanguageMissing, _noLanguageMessage));
         }
 
-        var factor = ImageScaler.ChooseFactor(image.Width, image.Height);
-        var scaled = factor > 1 ? ImageScaler.Scale(image, factor) : null;
+        var prepared = ImageScaler.Prepare(image);
         try
         {
-            var picture = scaled ?? image;
+            var picture = prepared ?? image;
             var texts = new List<string>(engines.Count);
             ResultError? firstFailure = null;
 
@@ -73,7 +72,7 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
         }
         finally
         {
-            scaled?.Dispose();
+            prepared?.Dispose();
         }
     }
 }

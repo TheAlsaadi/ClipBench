@@ -1,10 +1,12 @@
 namespace ClipBench.Core.Screen;
 
 /// <summary>
-/// Enlarges a picture of text before it is read. Windows' recognizer returns little or nothing for text set at
-/// 13 pixels or less, which is how most screen text is drawn; a smooth twofold enlargement makes the same letters
-/// readable (measured in the ADR 0018 addendum: 78% of characters right at the original size, 91% enlarged twofold, and
-/// no empty readings). Pure and deterministic: bilinear, with the centers of the pixels lined up.
+/// Prepares a picture of text to be read. Windows' recognizer returns little or nothing for text set at 13 pixels or
+/// less, which is how most screen text is drawn, and for text that touches the edge of the picture, which is how a
+/// dragged rectangle is cut. So the picture gets a margin in its own background color and is enlarged threefold, or
+/// twofold when that is too large (measured in the ADR 0018 addendum: tightly cropped code was read empty in every
+/// case at its own size and 0.72 right when padded and enlarged threefold). Pure and deterministic: bilinear, with the
+/// centers of the pixels lined up.
 /// </summary>
 public static class ImageScaler
 {
@@ -17,18 +19,92 @@ public static class ImageScaler
     /// <summary>The largest factor <see cref="Scale"/> accepts.</summary>
     public const int MaxFactor = 8;
 
-    private const int PreferredFactor = 2;
+    /// <summary>The width, in pixels of the original picture, of the margin <see cref="Prepare"/> adds on every side.</summary>
+    public const int Margin = 8;
 
-    /// <summary>How much to enlarge a picture: twofold when the result stays within the limits, otherwise not at all.</summary>
+    private const int PreferredFactor = 3;
+    private const int FallbackFactor = 2;
+
+    /// <summary>How much to enlarge a picture: threefold when the result stays within the limits, else twofold, else not at all.</summary>
     /// <param name="width">The width in pixels. Greater than zero.</param>
     /// <param name="height">The height in pixels. Greater than zero.</param>
-    /// <returns>2 or 1.</returns>
+    /// <returns>3, 2 or 1.</returns>
     public static int ChooseFactor(int width, int height)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(width, 0);
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(height, 0);
 
-        return Fits(width, height, PreferredFactor) ? PreferredFactor : 1;
+        if (Fits(width, height, PreferredFactor))
+        {
+            return PreferredFactor;
+        }
+
+        return Fits(width, height, FallbackFactor) ? FallbackFactor : 1;
+    }
+
+    /// <summary>Gives a picture a margin and enlarges it, ready for the recognizer.</summary>
+    /// <param name="source">The picture.</param>
+    /// <returns>
+    /// A new image, which the caller must dispose, or <see langword="null"/> when even the margin would pass
+    /// <see cref="MaxSide"/> and the picture is to be read as it is. The original is not touched; the in-between copy is zeroed.
+    /// </returns>
+    public static ScreenImage? Prepare(ScreenImage source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ObjectDisposedException.ThrowIf(source.IsDisposed, source);
+
+        if ((long)source.Width + (2 * Margin) > MaxSide || (long)source.Height + (2 * Margin) > MaxSide)
+        {
+            return null;
+        }
+
+        var padded = Pad(source, Margin);
+        var factor = ChooseFactor(padded.Width, padded.Height);
+        if (factor == 1)
+        {
+            return padded;
+        }
+
+        try
+        {
+            return Scale(padded, factor);
+        }
+        finally
+        {
+            padded.Dispose();
+        }
+    }
+
+    /// <summary>Adds a margin around a picture, in the color most of its edge has, so text that reaches the edge no longer touches it.</summary>
+    /// <param name="source">The picture.</param>
+    /// <param name="margin">The width of the margin in pixels. Greater than zero.</param>
+    /// <returns>A new image, which the caller must dispose.</returns>
+    public static ScreenImage Pad(ScreenImage source, int margin)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ObjectDisposedException.ThrowIf(source.IsDisposed, source);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(margin, 0);
+
+        var width = checked(source.Width + (2 * margin));
+        var height = checked(source.Height + (2 * margin));
+        var output = new byte[checked(width * height * 4)];
+        var (blue, green, red) = EdgeColor(source);
+
+        for (var i = 0; i < output.Length; i += 4)
+        {
+            output[i] = blue;
+            output[i + 1] = green;
+            output[i + 2] = red;
+            output[i + 3] = 255;
+        }
+
+        var rowBytes = source.Width * 4;
+        for (var y = 0; y < source.Height; y++)
+        {
+            Buffer.BlockCopy(source.Pixels, y * rowBytes, output, (((y + margin) * width) + margin) * 4, rowBytes);
+        }
+
+        return new ScreenImage(width, height, output);
     }
 
     /// <summary>Makes an enlarged copy. The original is not touched; the copy is zeroed when it is let go of.</summary>
@@ -67,6 +143,61 @@ public static class ImageScaler
         }
 
         return new ScreenImage(width, height, output);
+    }
+
+    // The middle value of each channel over the edge pixels: a few pixels of a letter on the edge do not change it.
+    private static (byte Blue, byte Green, byte Red) EdgeColor(ScreenImage source)
+    {
+        var blue = new int[256];
+        var green = new int[256];
+        var red = new int[256];
+        var pixels = source.Pixels;
+        var count = 0;
+
+        void Add(int x, int y)
+        {
+            var i = ((y * source.Width) + x) * 4;
+            blue[pixels[i]]++;
+            green[pixels[i + 1]]++;
+            red[pixels[i + 2]]++;
+            count++;
+        }
+
+        for (var x = 0; x < source.Width; x++)
+        {
+            Add(x, 0);
+            if (source.Height > 1)
+            {
+                Add(x, source.Height - 1);
+            }
+        }
+
+        for (var y = 1; y < source.Height - 1; y++)
+        {
+            Add(0, y);
+            if (source.Width > 1)
+            {
+                Add(source.Width - 1, y);
+            }
+        }
+
+        return (Median(blue, count), Median(green, count), Median(red, count));
+    }
+
+    private static byte Median(int[] histogram, int count)
+    {
+        var target = (count + 1) / 2;
+        var seen = 0;
+        for (var value = 0; value < histogram.Length; value++)
+        {
+            seen += histogram[value];
+            if (seen >= target)
+            {
+                return (byte)value;
+            }
+        }
+
+        return 0;
     }
 
     private static bool Fits(int width, int height, int factor)

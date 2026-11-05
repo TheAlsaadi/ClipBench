@@ -28,35 +28,43 @@ public class ImageScalerTests
 
     [Theory]
     [InlineData(300, 40)]
+    [InlineData(1000, 1000)]
+    [InlineData(1333, 1000)]
+    [InlineData(3333, 10)]
+    public void A_picture_whose_threefold_enlargement_fits_is_enlarged_threefold(int width, int height)
+    {
+        ImageScaler.ChooseFactor(width, height).ShouldBe(3);
+    }
+
+    [Theory]
+    [InlineData(1334, 1000)]
     [InlineData(1920, 1080)]
     [InlineData(2000, 1500)]
-    public void A_picture_that_fits_is_enlarged_twofold(int width, int height)
+    [InlineData(3000, 1000)]
+    [InlineData(3334, 10)]
+    public void A_picture_too_large_for_threefold_but_not_twofold_is_enlarged_twofold(int width, int height)
     {
         ImageScaler.ChooseFactor(width, height).ShouldBe(2);
     }
 
-    [Fact]
-    public void The_largest_picture_that_is_enlarged_is_the_one_whose_result_holds_twelve_million_pixels()
-    {
-        ImageScaler.ChooseFactor(3000, 1000).ShouldBe(2);
-        ImageScaler.ChooseFactor(3000, 1001).ShouldBe(1);
-        ImageScaler.MaxOutputPixels.ShouldBe(12_000_000);
-    }
-
     [Theory]
+    [InlineData(3000, 1001)]
     [InlineData(3840, 2160)]
     [InlineData(6000, 3000)]
+    [InlineData(5001, 10)]
+    [InlineData(10, 5001)]
     public void A_picture_too_large_to_enlarge_is_read_as_it_is(int width, int height)
     {
         ImageScaler.ChooseFactor(width, height).ShouldBe(1);
     }
 
     [Fact]
-    public void A_picture_whose_enlargement_would_be_longer_than_the_recognizer_reads_is_left_alone()
+    public void The_limits_are_twelve_million_pixels_and_ten_thousand_on_a_side()
     {
-        ImageScaler.ChooseFactor(5001, 10).ShouldBe(1);
+        ImageScaler.MaxOutputPixels.ShouldBe(12_000_000);
+        ImageScaler.MaxSide.ShouldBe(10_000);
         ImageScaler.ChooseFactor(5000, 10).ShouldBe(2);
-        ImageScaler.ChooseFactor(10, 5001).ShouldBe(1);
+        ImageScaler.ChooseFactor(3333, 10).ShouldBe(3);
     }
 
     [Theory]
@@ -207,5 +215,155 @@ public class ImageScalerTests
         using var source = Solid(4000, 4000, 0, 0, 0);
 
         Should.Throw<ArgumentOutOfRangeException>(() => ImageScaler.Scale(source, 8));
+    }
+
+    // --- the margin ---
+
+    private static ScreenImage Frame(int width, int height, (byte B, byte G, byte R) edge, (byte B, byte G, byte R) inside)
+    {
+        var pixels = new byte[width * height * 4];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var onEdge = x == 0 || y == 0 || x == width - 1 || y == height - 1;
+                var color = onEdge ? edge : inside;
+                var i = ((y * width) + x) * 4;
+                pixels[i] = color.B;
+                pixels[i + 1] = color.G;
+                pixels[i + 2] = color.R;
+                pixels[i + 3] = 255;
+            }
+        }
+
+        return new ScreenImage(width, height, pixels);
+    }
+
+    [Fact]
+    public void A_margin_in_the_color_of_the_edge_is_added_on_every_side_and_the_picture_sits_in_the_middle()
+    {
+        using var source = Frame(5, 4, (200, 100, 50), (1, 2, 3));
+
+        using var padded = ImageScaler.Pad(source, 3);
+
+        padded.Width.ShouldBe(11);
+        padded.Height.ShouldBe(10);
+        At(padded, 0, 0).ShouldBe(((byte)200, (byte)100, (byte)50, (byte)255));
+        At(padded, 10, 9).ShouldBe(((byte)200, (byte)100, (byte)50, (byte)255));
+        At(padded, 5, 1).ShouldBe(((byte)200, (byte)100, (byte)50, (byte)255));
+        At(padded, 3, 3).ShouldBe(((byte)200, (byte)100, (byte)50, (byte)255)); // the source's own edge pixel
+        At(padded, 4, 4).ShouldBe(((byte)1, (byte)2, (byte)3, (byte)255));
+        At(padded, 6, 5).ShouldBe(((byte)1, (byte)2, (byte)3, (byte)255));
+        source.Pixels.Length.ShouldBe(5 * 4 * 4);
+    }
+
+    [Fact]
+    public void Text_touching_a_few_edge_pixels_does_not_change_the_margin_color()
+    {
+        // A dark terminal background with two light pixels of a letter on the top edge.
+        var pixels = new byte[20 * 6 * 4];
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = 12;
+            pixels[i + 1] = 12;
+            pixels[i + 2] = 12;
+            pixels[i + 3] = 255;
+        }
+
+        for (var x = 4; x < 6; x++)
+        {
+            pixels[x * 4] = 230;
+            pixels[(x * 4) + 1] = 230;
+            pixels[(x * 4) + 2] = 230;
+        }
+
+        using var source = new ScreenImage(20, 6, pixels);
+
+        using var padded = ImageScaler.Pad(source, 4);
+
+        At(padded, 0, 0).ShouldBe(((byte)12, (byte)12, (byte)12, (byte)255));
+        At(padded, 9, 1).ShouldBe(((byte)12, (byte)12, (byte)12, (byte)255));
+    }
+
+    [Fact]
+    public void The_margin_is_zeroed_with_the_picture_and_the_original_is_not_changed()
+    {
+        using var source = Frame(3, 3, (9, 9, 9), (200, 200, 200));
+        var before = source.Pixels.ToArray();
+        var padded = ImageScaler.Pad(source, 2);
+        var buffer = padded.Pixels;
+
+        padded.Dispose();
+
+        buffer.ShouldAllBe(value => value == 0);
+        source.Pixels.ShouldBe(before);
+    }
+
+    [Fact]
+    public void A_margin_that_is_not_positive_or_a_missing_or_released_picture_is_a_bug()
+    {
+        using var source = Solid(2, 2, 0, 0, 0);
+        Should.Throw<ArgumentOutOfRangeException>(() => ImageScaler.Pad(source, 0));
+        Should.Throw<ArgumentNullException>(() => ImageScaler.Pad(null!, 2));
+
+        var released = Solid(2, 2, 0, 0, 0);
+        released.Dispose();
+        Should.Throw<ObjectDisposedException>(() => ImageScaler.Pad(released, 2));
+    }
+
+    // --- preparing a picture to be read ---
+
+    [Fact]
+    public void A_picture_is_given_a_margin_and_enlarged_threefold_in_one_step()
+    {
+        using var source = Frame(300, 40, (255, 255, 255), (0, 0, 0));
+
+        using var prepared = ImageScaler.Prepare(source)!;
+
+        prepared.Width.ShouldBe((300 + (2 * ImageScaler.Margin)) * 3);
+        prepared.Height.ShouldBe((40 + (2 * ImageScaler.Margin)) * 3);
+        At(prepared, 0, 0).ShouldBe(((byte)255, (byte)255, (byte)255, (byte)255));
+        source.IsDisposed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_picture_too_large_to_enlarge_still_gets_its_margin()
+    {
+        using var source = Solid(3840, 2160, 255, 255, 255);
+
+        using var prepared = ImageScaler.Prepare(source)!;
+
+        prepared.Width.ShouldBe(3840 + (2 * ImageScaler.Margin));
+        prepared.Height.ShouldBe(2160 + (2 * ImageScaler.Margin));
+    }
+
+    [Fact]
+    public void A_picture_so_wide_that_a_margin_would_pass_the_limit_is_left_as_it_is()
+    {
+        using var source = Solid(ImageScaler.MaxSide - 1, 4, 0, 0, 0);
+
+        ImageScaler.Prepare(source).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Preparing_zeroes_the_picture_with_the_margin_that_is_replaced_by_the_enlargement()
+    {
+        // Nothing can observe the in-between picture directly; the result holds the only copy and is zeroed with the others.
+        using var source = Solid(10, 10, 5, 5, 5);
+        var prepared = ImageScaler.Prepare(source)!;
+        var buffer = prepared.Pixels;
+
+        prepared.Dispose();
+
+        buffer.ShouldAllBe(value => value == 0);
+    }
+
+    [Fact]
+    public void A_missing_or_released_picture_cannot_be_prepared()
+    {
+        Should.Throw<ArgumentNullException>(() => ImageScaler.Prepare(null!));
+        var released = Solid(2, 2, 0, 0, 0);
+        released.Dispose();
+        Should.Throw<ObjectDisposedException>(() => ImageScaler.Prepare(released));
     }
 }

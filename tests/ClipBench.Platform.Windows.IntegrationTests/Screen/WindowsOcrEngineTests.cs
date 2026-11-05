@@ -38,6 +38,38 @@ public class WindowsOcrEngineTests
         }
     }
 
+    // The way a dragged rectangle is cut: 2 pixels around the text, in the colors given.
+    private static ScreenImage RenderTight(string text, int pixelSize, string family, Color foreground, Color background)
+    {
+        using var font = new Font(family, pixelSize, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var probe = new Bitmap(10, 10);
+        using var measuring = Graphics.FromImage(probe);
+        var size = measuring.MeasureString(text, font, 4000, StringFormat.GenericTypographic);
+        var width = (int)size.Width + 4;
+        var height = (int)size.Height + 4;
+
+        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            graphics.Clear(background);
+            graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            using var brush = new SolidBrush(foreground);
+            graphics.DrawString(text, font, brush, 2, 2, StringFormat.GenericTypographic);
+        }
+
+        var data = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+        try
+        {
+            var pixels = new byte[width * height * 4];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, pixels, 0, pixels.Length);
+            return new ScreenImage(width, height, pixels);
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
+    }
+
     private static OcrEngine? Engine(string tag) => OcrEngine.TryCreateFromLanguage(new Language(tag));
 
     private static void RequireLanguage(string tag)
@@ -158,6 +190,27 @@ public class WindowsOcrEngineTests
         result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
         result.Value.ShouldContain("Invoice", Case.Insensitive);
         result.Value.ShouldContain("ACME");
+    }
+
+    [Theory]
+    [Trait("Category", "Integration")]
+    [InlineData(11, "Consolas", false)]
+    [InlineData(13, "Consolas", false)]
+    [InlineData(13, "Consolas", true)]
+    [InlineData(16, "Segoe UI", true)]
+    public async Task Code_cut_tightly_around_the_text_is_read_which_the_recognizer_alone_returns_nothing_for(int pixelSize, string family, bool lightOnDark)
+    {
+        RequireLanguage("en-US");
+        var foreground = lightOnDark ? Color.FromArgb(204, 204, 204) : Color.Black;
+        var background = lightOnDark ? Color.FromArgb(12, 12, 12) : Color.White;
+        using var image = RenderTight("if (count > max) { return items[i]; }", pixelSize, family, foreground, background);
+
+        var result = await WindowsOcr.CreateRecognizer(() => ["en-US"]).RecognizeAsync(image, Ct);
+
+        result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Message : null);
+        result.Value.ShouldContain("count");
+        result.Value.ShouldContain("return");
+        result.Value.ShouldContain("items");
     }
 
     [Fact]
