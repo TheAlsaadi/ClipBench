@@ -28,7 +28,8 @@ public sealed class ExclusionList : IEquatable<ExclusionList>
         "NordPass",
         "Enpass",
         "RoboForm",
-        "Keeper",
+        "RoboTaskBarIcon",
+        "KeeperPasswordManager",
         "Proton Pass",
         "CredentialUIBroker",
     ];

@@ -16,7 +16,8 @@ public class ExclusionListTests
     [InlineData("NordPass.exe")]
     [InlineData("Enpass.exe")]
     [InlineData("RoboForm.exe")]
-    [InlineData("Keeper.exe")]
+    [InlineData("RoboTaskBarIcon.exe")]
+    [InlineData("KeeperPasswordManager.exe")]
     [InlineData("Proton Pass.exe")]
     [InlineData("CredentialUIBroker.exe")]
     public void The_default_list_has_the_password_managers_and_the_Windows_credential_prompt(string executable)
