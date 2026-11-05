@@ -80,6 +80,12 @@ public enum ActivityEvent
     /// <summary>The saved settings could not be read; the defaults are in use and the file was left alone.</summary>
     SettingsUnreadable,
 
+    /// <summary>Text was copied from the screen, with its size in characters as the count and in bytes.</summary>
+    ScreenTextCopied,
+
+    /// <summary>Copying text from the screen did not work; only the error code is recorded.</summary>
+    ScreenTextFailed,
+
     /// <summary>The user wiped everything: every clip, board and snippet was deleted.</summary>
     HistoryWiped,
 
