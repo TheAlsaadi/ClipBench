@@ -10,7 +10,7 @@ namespace ClipBench.Core.Screen;
 /// </summary>
 public static class ImageScaler
 {
-    /// <summary>The most pixels an enlarged picture may hold (a 3000 × 1000 area enlarged twofold). Bigger ones are read as they are.</summary>
+    /// <summary>The most pixels an enlarged picture may hold (a 2000 x 1500 area enlarged twofold, or 1333 x 1000 threefold). Bigger ones are read as they are.</summary>
     public const int MaxOutputPixels = 12_000_000;
 
     /// <summary>The longest side an enlarged picture may have. The recognizer of Windows reads up to 10 000.</summary>
