@@ -97,6 +97,7 @@ public sealed class ClipHistory
                     CapturedAt = clip.CapturedAt,
                     SourceApp = clip.SourceApp,
                     IsPinned = existing.IsPinned || clip.IsPinned,
+                    ExpiresAt = existing.IsPinned || clip.IsPinned ? null : clip.ExpiresAt,
                 };
                 clips.RemoveAt(existingIndex);
             }
@@ -142,7 +143,7 @@ public sealed class ClipHistory
             }
 
             var updated = board is { } target
-                ? current with { IsPinned = true, OnBoard = target, BoardPosition = NextPositionOn(target, id) }
+                ? current with { IsPinned = true, ExpiresAt = null, OnBoard = target, BoardPosition = NextPositionOn(target, id) }
                 : current with { OnBoard = null, BoardPosition = 0 };
             _clips = _clips.SetItem(index, updated);
             return Result.Success(updated);
@@ -270,6 +271,23 @@ public sealed class ClipHistory
         }
     }
 
+    /// <summary>Removes the clips whose expiry has arrived, pinned or not.</summary>
+    /// <returns>The clips that were removed, newest first.</returns>
+    public ImmutableArray<Clip> RemoveExpired()
+    {
+        lock (_gate)
+        {
+            var now = _timeProvider.GetUtcNow();
+            var removed = _clips.Where(clip => clip.ExpiresAt is { } expiresAt && expiresAt <= now).ToImmutableArray();
+            if (!removed.IsEmpty)
+            {
+                _clips = [.. _clips.Where(clip => clip.ExpiresAt is not { } expiresAt || expiresAt > now)];
+            }
+
+            return removed;
+        }
+    }
+
     private Result<Clip> SetPinned(ClipId id, bool pinned)
     {
         lock (_gate)
@@ -282,7 +300,7 @@ public sealed class ClipHistory
 
             // A board holds pinned clips only, so a clip that is let go of leaves its board.
             var updated = pinned
-                ? _clips[index] with { IsPinned = true }
+                ? _clips[index] with { IsPinned = true, ExpiresAt = null }
                 : _clips[index] with { IsPinned = false, OnBoard = null, BoardPosition = 0 };
             _clips = _clips.SetItem(index, updated);
             return Result.Success(updated);
