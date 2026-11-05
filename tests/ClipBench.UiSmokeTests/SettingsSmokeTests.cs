@@ -21,7 +21,7 @@ public sealed class SettingsSmokeTests(AppUnderTest app) : IClassFixture<AppUnde
     [InlineData("History", "HistoryPanel", "MaxCountBox")]
     [InlineData("Privacy", "PrivacyPanel", "IncognitoSwitch")]
     [InlineData("Paste", "PastePanel", "RestoreClipboardSwitch")]
-    [InlineData("Snippets", "SnippetsPanel", "SnippetNames")]
+    [InlineData("Snippets", "SnippetNames", "NewSnippetButton")]
     [InlineData("About", "AboutPanel", "AboutVersion")]
     public void Every_section_opens_and_shows_its_controls(string section, string panel, string control)
     {
@@ -79,7 +79,7 @@ public sealed class SettingsSmokeTests(AppUnderTest app) : IClassFixture<AppUnde
         Find(settings, "NewProgramBox")!.AsTextBox().Enter("a*b");
         Find(settings, "AddProgramButton")!.Patterns.Invoke.Pattern.Invoke();
 
-        AppUnderTest.WaitFor(() => !string.IsNullOrWhiteSpace(Find(settings, "PrivacyError")?.Name), 10_000).ShouldBeTrue("no reason was shown");
+        AppUnderTest.WaitFor(() => !string.IsNullOrWhiteSpace(TextOf(settings, "PrivacyError")), 10_000).ShouldBeTrue("no reason was shown");
         CloseSettings(settings);
     }
 
@@ -110,7 +110,7 @@ public sealed class SettingsSmokeTests(AppUnderTest app) : IClassFixture<AppUnde
         AppUnderTest.WaitFor(() => Find(settings, "WipeConfirmButton") is not null, 10_000).ShouldBeTrue("the question did not show");
         Find(settings, "WipeCancelButton")!.Patterns.Invoke.Pattern.Invoke();
         AppUnderTest.WaitFor(() => Find(settings, "WipeConfirmButton") is null, 10_000).ShouldBeTrue("the question did not go away");
-        Find(settings, "WipeStatus")!.Name.ShouldBeNullOrEmpty();
+        TextOf(settings, "WipeStatus").ShouldBeNullOrEmpty();
         CloseSettings(settings);
         var popup = app.OpenPopup();
         AppUnderTest.WaitFor(() => AppUnderTest.Rows(popup).Length > 0, 10_000).ShouldBeTrue("the clips were gone after the wipe was cancelled");
@@ -123,8 +123,8 @@ public sealed class SettingsSmokeTests(AppUnderTest app) : IClassFixture<AppUnde
         Find(settings, "WipeButton")!.Patterns.Invoke.Pattern.Invoke();
         AppUnderTest.WaitFor(() => Find(settings, "WipeConfirmButton") is not null, 10_000).ShouldBeTrue("the question did not show");
         Find(settings, "WipeConfirmButton")!.Patterns.Invoke.Pattern.Invoke();
-        AppUnderTest.WaitFor(() => Find(settings, "WipeStatus")?.Name?.Contains("Everything was deleted", StringComparison.Ordinal) == true, 15_000)
-            .ShouldBeTrue($"the wipe did not report success: \"{Find(settings, "WipeStatus")?.Name}\"");
+        AppUnderTest.WaitFor(() => TextOf(settings, "WipeStatus")?.Contains("Everything was deleted", StringComparison.Ordinal) == true, 15_000)
+            .ShouldBeTrue($"the wipe did not report success: \"{TextOf(settings, "WipeStatus")}\"");
         CloseSettings(settings);
 
         popup = app.OpenPopup();
@@ -148,6 +148,10 @@ public sealed class SettingsSmokeTests(AppUnderTest app) : IClassFixture<AppUnde
         settings.Close();
         AppUnderTest.WaitFor(() => app.FindWindow("ClipBench settings") is null, 10_000).ShouldBeTrue("the settings window did not hide");
     }
+
+    // An empty text block has no name at all, so the property is read without insisting on it.
+    private static string? TextOf(Window window, string automationId) =>
+        Find(window, automationId)?.Properties.Name.ValueOrDefault;
 
     private static AutomationElement? Find(Window window, string automationId) =>
         window.FindFirstDescendant(cf => cf.ByAutomationId(automationId));
