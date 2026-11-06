@@ -136,6 +136,10 @@ The owner's run of the rebuilt app showed one more thing, a space after a dot in
 
 Still wrong on those pictures: a closing `)` alone on a line read as `d` (the engine's confidence for it is 29), `###` read as `tt` before `Response` (confidence 4, the comment colour is dim), `],` read as `1,`, and the slashed zero of Consolas as `@` or `8` in blue text.
 
+### The larger English model was tried and not adopted (2026-11-06)
+
+The model ClipBench ships is the small, fast one (`tessdata_fast`, 4.1 MB). The larger one (`tessdata_best`, 15.4 MB, Apache-2.0, SHA-256 8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba) was measured in the trial project only, on the same drawn pictures and the owner's real ones, with the same pipeline. Drawn code: similarity 0.957 against 0.968, `>` kept 94% against 96%, prose 0.994 against 0.995, a reading of 1000 by 100 pixels 198 ms against 123 ms; the terminal screenshot was better, 98.8% against 96.3%. On the owner's pictures it fixed some mistakes (a lone `)` that the small model read as `d`, the `0` of `[80`, and a list bullet read as `*` instead of `e`) and made others (`CausallLM`, `##%Response`, `#*inputs`, the closing quote and comma of a line read as `®`, `},` as `)`, `v0.2.0` as `v@.2.8`). It is not clearly better, it is slower and bigger, so the shipped model stays. Reading with both and choosing word by word is possible, at about twice the time and 15 MB more; it is not done.
+
 ### Facts found while building it
 
 - The two native libraries bundle image decoders (libjpeg-turbo, zlib 1.2.11, libpng, libtiff, giflib, an LZMA library) and a network client. ClipBench never calls them: it gives Tesseract raw pixels only. They are listed in `THIRD_PARTY_NOTICES.md`; zlib 1.2.11 is old and only matters if a compressed stream ever reaches it, which no code path allows.
