@@ -329,6 +329,20 @@ public class TesseractEngineTests
     }
 
     [Fact]
+    public async Task The_recognizer_the_app_really_uses_starts_tesseract_from_the_install_folder_and_keeps_the_chevron()
+    {
+        // The public factory, with the profile languages and the engine it makes itself from the folder beside the program.
+        var recognizer = WindowsOcr.CreateRecognizer();
+        using var picture = WindowsOcrEngineTests.RenderTight("if (count > max) { return items[i]; }", 14, "Consolas", Color.White, Color.Black);
+
+        var result = await recognizer.RecognizeAsync(picture, Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldContain(">");
+        result.Value.ShouldContain("return");
+    }
+
+    [Fact]
     public async Task The_app_recognizer_works_when_windows_has_no_language_at_all()
     {
         var recognizer = WindowsOcr.CreateRecognizer(() => ["zz-ZZ"], () => Engine());
