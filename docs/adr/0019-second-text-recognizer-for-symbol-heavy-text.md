@@ -140,6 +140,16 @@ Still wrong on those pictures: a closing `)` alone on a line read as `d` (the en
 
 The model ClipBench ships is the small, fast one (`tessdata_fast`, 4.1 MB). The larger one (`tessdata_best`, 15.4 MB, Apache-2.0, SHA-256 8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba) was measured in the trial project only, on the same drawn pictures and the owner's real ones, with the same pipeline. Drawn code: similarity 0.957 against 0.968, `>` kept 94% against 96%, prose 0.994 against 0.995, a reading of 1000 by 100 pixels 198 ms against 123 ms; the terminal screenshot was better, 98.8% against 96.3%. On the owner's pictures it fixed some mistakes (a lone `)` that the small model read as `d`, the `0` of `[80`, and a list bullet read as `*` instead of `e`) and made others (`CausallLM`, `##%Response`, `#*inputs`, the closing quote and comma of a line read as `®`, `},` as `)`, `v0.2.0` as `v@.2.8`). It is not clearly better, it is slower and bigger, so the shipped model stays. Reading with both and choosing word by word is possible, at about twice the time and 15 MB more; it is not done.
 
+### Other options tried and not adopted (2026-11-06)
+
+All three were measured in the trial project only, on the same drawn pictures and the owner's real ones. Nothing was added to ClipBench.
+
+- **Reading with both Tesseract models and choosing the better line by confidence** (word by word where the words line up): drawn code 0.971 against 0.968, a terminal screenshot 98.8% against 96.3%, the owner's Python picture 99.8% against 99.3%, the JSON picture unchanged at 99.0% (both models misread the same characters), but `>` kept 94% against 96%. It would add 15 MB and about 75 ms to each selection, for a small and mixed gain.
+- **Sharper enlargement** (bicubic in place of bilinear): slightly worse on drawn code (0.963) and `>` (94%) because of ringing around thin strokes.
+- **PP-OCRv5 through ONNX Runtime** (the `RapidOcrNet` 4.2.0 package, Apache-2.0, maintained by one person, with the models inside the 26 MB package; it would bring `Microsoft.ML.OnnxRuntime`, `SkiaSharp` and `Clipper2` with their native files): drawn code 0.856 (Tesseract 0.968), prose 0.978, `>` 93%, a terminal screenshot 98.3%, the Python picture 98.2%, the JSON picture 94.9%, about 390 ms for a 1000 by 100 pixel selection (Tesseract 123 ms). It read `[80` right, but it drops lines made of one symbol (`)`, `},`), reads the zero of code as `θ`, and gave a line out of order. Several new native dependencies and three times the time for a worse result on code.
+
+A vision-language model was not tried: hundreds of megabytes, seconds per selection, and it can write text that is not on the screen, which is the wrong failure for copying code.
+
 ### Facts found while building it
 
 - The two native libraries bundle image decoders (libjpeg-turbo, zlib 1.2.11, libpng, libtiff, giflib, an LZMA library) and a network client. ClipBench never calls them: it gives Tesseract raw pixels only. They are listed in `THIRD_PARTY_NOTICES.md`; zlib 1.2.11 is old and only matters if a compressed stream ever reaches it, which no code path allows.
