@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ships with ClipBench on x64 (ADR 0019, `THIRD_PARTY_NOTICES.md`); Windows still reads Arabic and Hebrew, and reads alone where
   Tesseract cannot start (ARM64). Tesseract reads its own twofold copy of the picture and quotes come back straight. Measured on drawn code: similarity 0.835 to 0.970, `>` kept 65% to 95%, a terminal screenshot
   43.9% to 96.3% of characters right. Tesseract's library contains an unused network client; ClipBench never gives it a
-  web address and a test watches the process for connections.
+  web address and a test watches the process for connections. Lines keep their indentation (from where each line starts),
+  and coloured text on a dark theme is read as strongly as white text.
   If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
   Settings.
 - The popup says what a clip is: a **color** (with a swatch) in hex, `rgb()` or `hsl()`; a **link**; an **email**

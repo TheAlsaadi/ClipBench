@@ -118,7 +118,11 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
     }
 
     // Raw pixels into a Leptonica picture: no file or image-format decoder is involved. Light text on a dark ground is inverted on the way,
-    // which reads better, and the original is untouched.
+    // which reads better, and the original is untouched. The picture is made grey here, not by the engine, because the usual grey-scale
+    // conversion counts blue for a tenth and so loses the blue and green of syntax colours on a dark theme (a "0" came back as "@" and
+    // "True" as "lruc"). Half the strongest channel (the brightest on a dark ground, the darkest on a light one) and half the usual brightness
+    // keeps colour text as strong as white text without thickening thin strokes; the strongest channel alone filled in the slash of a zero.
+    // A grey pixel is unchanged by this.
     private static unsafe TessImage ToPix(ScreenImage image, bool invert)
     {
         var pix = TessImage.Create(image.Width, image.Height, 32);
@@ -134,9 +138,11 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
                 var blue = pixels[i];
                 var green = pixels[i + 1];
                 var red = pixels[i + 2];
-                words[(y * wordsPerLine) + x] = invert
-                    ? TesseractOCR.Pix.Data.EncodeAsRGBA((byte)(255 - red), (byte)(255 - green), (byte)(255 - blue), 255)
-                    : TesseractOCR.Pix.Data.EncodeAsRGBA(red, green, blue, 255);
+                var strongest = invert ? Math.Max(red, Math.Max(green, blue)) : Math.Min(red, Math.Min(green, blue));
+                var brightness = ((299 * red) + (587 * green) + (114 * blue)) / 1000;
+                var mixed = (strongest + brightness) / 2;
+                var grey = (byte)(invert ? 255 - mixed : mixed);
+                words[(y * wordsPerLine) + x] = TesseractOCR.Pix.Data.EncodeAsRGBA(grey, grey, grey, 255);
             }
         }
 

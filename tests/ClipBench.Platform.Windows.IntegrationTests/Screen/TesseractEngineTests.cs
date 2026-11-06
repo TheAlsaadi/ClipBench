@@ -145,6 +145,28 @@ public class TesseractEngineTests
         }
     }
 
+    [Theory]
+    [InlineData(30, 170, 90)]
+    [InlineData(255, 90, 30)]
+    [InlineData(60, 200, 60)]
+    public async Task Coloured_text_on_a_dark_background_is_read_even_where_its_brightness_is_low(int red, int green, int blue)
+    {
+        // Syntax colours: the number blue of a code theme is far brighter to the eye than to a grey-scale conversion, which counts blue for about a tenth.
+        using var picture = WindowsOcrEngineTests.RenderTight("ports = [80, 2222, 3003, 3033, 28081]  # True", 14, "Consolas", Color.FromArgb(red, green, blue), Color.FromArgb(13, 17, 23));
+
+        var prepared = ImageScaler.Prepare(picture);
+        try
+        {
+            var result = await Engine().ReadAsync(prepared!, Ct);
+
+            ReadingMerge.ToText(result.Value).ShouldContain("[80, 2222, 3003, 3033, 28081]");
+        }
+        finally
+        {
+            prepared?.Dispose();
+        }
+    }
+
     [Fact]
     public async Task A_word_comes_back_with_a_place_inside_the_picture()
     {
