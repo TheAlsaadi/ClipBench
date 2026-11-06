@@ -11,10 +11,17 @@ public class AdaptiveRecognizerTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     // A Latin-script engine such as Tesseract: its reading is preferred for everything that is not Arabic or Hebrew.
-    private sealed class LatinEngine(IReadOnlyList<RecognizedLine> lines) : ILatinWordRecognizer
+    private sealed class LatinEngine(IReadOnlyList<RecognizedLine> lines, int preferredScale = 0) : ILatinWordRecognizer
     {
-        public Task<Result<IReadOnlyList<RecognizedLine>>> ReadAsync(ScreenImage image, CancellationToken cancellationToken) =>
-            Task.FromResult(Result.Success(lines));
+        public int PreferredScale => preferredScale;
+
+        public ScreenImage? Saw { get; private set; }
+
+        public Task<Result<IReadOnlyList<RecognizedLine>>> ReadAsync(ScreenImage image, CancellationToken cancellationToken)
+        {
+            Saw = image;
+            return Task.FromResult(Result.Success(lines));
+        }
     }
 
     private sealed class FakeEngine(Func<ScreenImage, Result<IReadOnlyList<RecognizedLine>>> answer) : IWordRecognizer
@@ -320,5 +327,72 @@ public class AdaptiveRecognizerTests
         var result = await Create(Says("12"), Says("hello")).RecognizeAsync(image, Ct);
 
         result.Value.ShouldBe("hello");
+    }
+
+    // --- a Latin engine that wants its own enlargement ---
+
+    [Fact]
+    public async Task A_latin_engine_that_prefers_twofold_gets_a_twofold_picture_while_the_others_get_threefold()
+    {
+        ScreenImage? shared = null;
+        var windows = new FakeEngine(image =>
+        {
+            shared = image;
+            return Result.Success("text");
+        });
+        var latin = new LatinEngine([], preferredScale: 2);
+        using var image = Image(100, 20);
+
+        await Create(windows, latin).RecognizeAsync(image, Ct);
+
+        // 100 x 20 plus a margin of 8 on every side is 116 x 36, enlarged threefold for Windows and twofold for the Latin engine.
+        shared.ShouldNotBeNull();
+        (shared.Width, shared.Height).ShouldBe((348, 108));
+        latin.Saw.ShouldNotBeNull();
+        (latin.Saw.Width, latin.Saw.Height).ShouldBe((232, 72));
+        latin.Saw.IsDisposed.ShouldBeTrue("the extra enlarged copy is zeroed like the first");
+    }
+
+    [Fact]
+    public async Task A_latin_engine_with_the_same_enlargement_as_the_others_gets_the_same_picture()
+    {
+        ScreenImage? shared = null;
+        var windows = new FakeEngine(image =>
+        {
+            shared = image;
+            return Result.Success("text");
+        });
+        var latin = new LatinEngine([], preferredScale: 3);
+        using var image = Image(100, 20);
+
+        await Create(windows, latin).RecognizeAsync(image, Ct);
+
+        latin.Saw.ShouldBeSameAs(shared);
+    }
+
+    [Fact]
+    public async Task The_words_of_a_latin_engine_read_at_twofold_are_put_in_the_places_of_the_threefold_picture()
+    {
+        // The Arabic engine read a word at x 60 of the threefold picture; the Latin engine read the same place at x 40 of the twofold one.
+        // Moved to the threefold picture they are the same place, so the Latin engine's sure word wins and the Arabic letters made up there do not.
+        var arabic = string.Concat((char)0x0644, (char)0x0627);
+        var windows = Reads(new RecognizedLine(arabic, [new RecognizedWord(arabic, 60, 15, 30, 12)]));
+        var latin = new LatinEngine([new RecognizedLine("x", [new RecognizedWord("x", 40, 10, 20, 8, 90)])], preferredScale: 2);
+        using var image = Image(100, 20);
+
+        var result = await Create(windows, latin).RecognizeAsync(image, Ct);
+
+        result.Value.ShouldBe("x");
+    }
+
+    [Fact]
+    public async Task A_picture_too_large_to_enlarge_is_read_as_it_is_by_a_latin_engine_that_prefers_an_enlargement()
+    {
+        var latin = new LatinEngine([], preferredScale: 2);
+        using var image = Image(9_995, 1);
+
+        await Create(latin).RecognizeAsync(image, Ct);
+
+        latin.Saw.ShouldBeSameAs(image);
     }
 }

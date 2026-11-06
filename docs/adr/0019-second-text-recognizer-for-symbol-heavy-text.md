@@ -99,7 +99,7 @@ On 2026-11-05 the owner, asked to choose, left the choice to the assistant ("cho
 2. **ARM64:** the Tesseract engine ships for x64 only. Where it cannot start (ARM64, a missing model or runtime) ClipBench reads with the Windows engines alone, as before, and nothing fails.
 3. **Visual C++ runtime:** shipped with the app (app-local) in the installer and the zip when Phase 10 builds them. Until then the "For Phase 10" list at the end of this record holds it.
 4. **Prose regression of the Arabic engine:** not fixed separately. On x64 Tesseract replaces the Windows English reading, which removes it. On ARM64 it stays and is recorded as a known limit.
-5. **Choosing between readings** (`ReadingMerge`, tested in Core): the Tesseract reading is used for everything that is not Arabic or Hebrew, unless a Windows reading has at least two more letters the English model cannot read: letters of another alphabet or Latin letters with an accent (not the o-slash, see below). Arabic and Hebrew words come from the Windows engine for that script, except where Tesseract read the same place with confidence 30 or more (the Arabic engine makes up two Arabic letters for tiny Latin text such as `x > 0`). A symbols-only Tesseract word with confidence under 60 gives way to a symbols-only word a Windows engine read in the same place (the English model reads a chevron icon as `>>`). The model is `eng` only.
+5. **Choosing between readings** (`ReadingMerge`, tested in Core): the Tesseract reading is used for everything that is not Arabic or Hebrew, unless a Windows reading has at least two more letters the English model cannot read: letters of another alphabet or Latin letters with an accent (not the o-slash, see below). Arabic and Hebrew words come from the Windows engine for that script, except where Tesseract read the same place with confidence 30 or more (the Arabic engine makes up two Arabic letters for tiny Latin text such as `x > 0`). A symbols-only Tesseract word with confidence under 60 gives way to a symbols-only word a Windows engine read in the same place (the English model reads a chevron icon as `>>`). The model is `eng` only. Tesseract reads its own twofold copy of the picture (`PreferredScale`), not the threefold one the Windows engines read, and its word places are moved to the shared picture; it writes typographic quotes where code has straight ones, so quotes are always put back as straight ones.
 6. **The model file** is committed under `third_party/tessdata/` with its SHA-256, and a test fails if the file changes.
 
 This is still the owner's to overrule: reverting is one package reference, one factory method and the model file.
@@ -110,16 +110,20 @@ The same pictures, run through the code in the repository (Tesseract, the Window
 
 | Measure | Threshold | Windows only | Shipped pipeline |
 |---|---|---|---|
-| Code-like text, mean similarity | at least 0.85 | 0.835 | **0.955** |
-| `>` kept in 252 cases | at least 90% | 65% | **92%** |
+| Code-like text, mean similarity | at least 0.85 | 0.835 | **0.970** |
+| `>` kept in 252 cases | at least 90% | 65% | **95%** |
 | Code pictures read empty | at most 5 of 120 | 0 | **0** |
-| Terminal screenshot, characters right | at least 90% | 43.9% | **96.7%** |
+| Terminal screenshot, characters right | at least 90% | 43.9% | **96.3%** |
 | Prose, mean similarity | at least 0.95 | 0.922 | **0.994** |
-| 1000 x 100 px selection, median | at most 1 s | 71 ms | **133 ms** (Tesseract and two Windows engines) |
+| 1000 x 100 px selection, median | at most 1 s | 71 ms | **119 ms** (Tesseract and two Windows engines) |
 
 The owner's File Explorer breadcrumb comes out as `> محمد الصاعدي > Minecraft-mod-porting >`, exactly.
 
 The first run of the merge failed two of these (`>` kept 89.7%, terminal 43.9%) and found why. A "more non-ASCII letters wins" rule counted the `ø` the Arabic engine makes of a slashed zero and gave the terminal back to the engine that misread it; and the Arabic engine's made-up Arabic letters replaced `x > 0`. Both are now fixed by the rules in decision 5, each with a unit test. One of 252 chevron cases still loses text (`if (a > b) {` in one font came back as `if(a`).
+
+### From the owner's second round of real screenshots (2026-11-06)
+
+A chat window (prose with inline code, light on dark) and a dark JSON block with dashed rounded borders were read with threefold enlargement and gave: lost underscores (`MANUAL_QA`, `A_paste_reaches_a_real_window`), curly quotes in place of straight ones, `[80` as `(88`, `],` as `1 F`, a bullet as `e`, `v0.2.0` as `v@.2.@`. Tesseract alone at twofold, on the same pictures, kept every underscore, and on drawn pictures twofold was as good or better than threefold (code 0.960 against 0.958, `>` 95% against 93%, prose 0.994 for both; the terminal and the breadcrumb were unchanged). So Tesseract now reads its own twofold copy, and curly quotes are straightened (tests for both). After that change the underscores and quotes are right on those two pictures. What remains is the font and the box: a list bullet read as `e`, the slashed zero of a monospace font read as `@`, the dashed borders of the JSON boxes read as stray `'`, `}` and `;` at line ends, and a few bracket confusions at 11 pixels (`[` as `(`). These are limits of the recognizer on that artwork, not of the pipeline.
 
 ### Facts found while building it
 

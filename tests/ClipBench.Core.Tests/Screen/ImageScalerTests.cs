@@ -366,4 +366,28 @@ public class ImageScalerTests
         released.Dispose();
         Should.Throw<ObjectDisposedException>(() => ImageScaler.Prepare(released));
     }
+
+    [Fact]
+    public void A_cap_on_the_factor_gives_a_smaller_enlargement_and_the_factor_can_be_told_from_the_result()
+    {
+        using var source = new ScreenImage(100, 20, new byte[100 * 20 * 4]);
+
+        using var twofold = ImageScaler.Prepare(source, 2)!;
+        using var threefold = ImageScaler.Prepare(source)!;
+
+        (twofold.Width, twofold.Height).ShouldBe((232, 72));
+        ImageScaler.FactorOf(source, twofold).ShouldBe(2);
+        ImageScaler.FactorOf(source, threefold).ShouldBe(3);
+        ImageScaler.FactorOf(source, null).ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_cap_outside_one_to_the_largest_factor_is_a_bug_and_a_missing_picture_too()
+    {
+        using var source = new ScreenImage(10, 10, new byte[400]);
+
+        Should.Throw<ArgumentOutOfRangeException>(() => ImageScaler.Prepare(source, 0));
+        Should.Throw<ArgumentOutOfRangeException>(() => ImageScaler.Prepare(source, ImageScaler.MaxFactor + 1));
+        Should.Throw<ArgumentNullException>(() => ImageScaler.FactorOf(null!, null));
+    }
 }

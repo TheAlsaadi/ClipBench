@@ -19,7 +19,7 @@ public static class ImageScaler
     /// <summary>The largest factor <see cref="Scale"/> accepts.</summary>
     public const int MaxFactor = 8;
 
-    /// <summary>The width, in pixels of the original picture, of the margin <see cref="Prepare"/> adds on every side.</summary>
+    /// <summary>The width, in pixels of the original picture, of the margin <see cref="Prepare(ScreenImage)"/> adds on every side.</summary>
     public const int Margin = 8;
 
     private const int PreferredFactor = 3;
@@ -48,9 +48,17 @@ public static class ImageScaler
     /// A new image, which the caller must dispose, or <see langword="null"/> when even the margin would pass
     /// <see cref="MaxSide"/> and the picture is to be read as it is. The original is not touched; the in-between copy is zeroed.
     /// </returns>
-    public static ScreenImage? Prepare(ScreenImage source)
+    public static ScreenImage? Prepare(ScreenImage source) => Prepare(source, MaxFactor);
+
+    /// <summary>Gives a picture a margin and enlarges it, by at most the given factor.</summary>
+    /// <param name="source">The picture.</param>
+    /// <param name="maxFactor">The largest enlargement wanted, from 1 to <see cref="MaxFactor"/>.</param>
+    /// <returns>A new image, which the caller must dispose, or null when the picture is to be read as it is.</returns>
+    public static ScreenImage? Prepare(ScreenImage source, int maxFactor)
     {
         ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxFactor, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxFactor, MaxFactor);
         ObjectDisposedException.ThrowIf(source.IsDisposed, source);
 
         if ((long)source.Width + (2 * Margin) > MaxSide || (long)source.Height + (2 * Margin) > MaxSide)
@@ -59,7 +67,7 @@ public static class ImageScaler
         }
 
         var padded = Pad(source, Margin);
-        var factor = ChooseFactor(padded.Width, padded.Height);
+        var factor = Math.Min(ChooseFactor(padded.Width, padded.Height), maxFactor);
         if (factor == 1)
         {
             return padded;
@@ -73,6 +81,16 @@ public static class ImageScaler
         {
             padded.Dispose();
         }
+    }
+
+    /// <summary>The enlargement that was applied to get a prepared picture from its source.</summary>
+    /// <param name="source">The original picture.</param>
+    /// <param name="prepared">What <see cref="Prepare(ScreenImage)"/> returned, or null when the original is read as it is.</param>
+    /// <returns>The factor: 1 when nothing was enlarged.</returns>
+    public static int FactorOf(ScreenImage source, ScreenImage? prepared)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return prepared is null ? 1 : prepared.Width / (source.Width + (2 * Margin));
     }
 
     /// <summary>Adds a margin around a picture, in the color most of its edge has, so text that reaches the edge no longer touches it.</summary>

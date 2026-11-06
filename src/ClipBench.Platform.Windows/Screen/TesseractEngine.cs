@@ -30,6 +30,12 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
 
     private TesseractEngine(Engine engine) => _engine = engine;
 
+    /// <summary>
+    /// Twofold. Measured on the same pictures it is as good as threefold or better (code 0.960 against 0.958, <c>&gt;</c> kept 95% against 93%), it
+    /// reads the thin strokes of underscores in real screenshots that threefold loses, and it has about half the pixels to read.
+    /// </summary>
+    public int PreferredScale => 2;
+
     /// <summary>Starts the engine on the model in a folder.</summary>
     /// <param name="dataFolder">The folder that holds <c>eng.traineddata</c>.</param>
     /// <returns>The engine, or null where it cannot start: no model, a model that is not one, no ARM64 build, or no Visual C++ runtime.</returns>
@@ -166,6 +172,11 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
         }
     }
 
+    // The English model writes typographic quotes where code, JSON and paths have straight ones (a third of the quotes in the measured pictures),
+    // so a quote is always put back as a straight one. Text typeset with curly quotes loses them; the words stay right.
+    private static string? Straight(string? text) =>
+        text?.Replace((char)0x201C, '"').Replace((char)0x201D, '"').Replace((char)0x2018, (char)0x27).Replace((char)0x2019, (char)0x27);
+
     private static List<RecognizedLine> Lines(Page page)
     {
         var lines = new List<RecognizedLine>();
@@ -178,7 +189,7 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
                     var words = new List<RecognizedWord>();
                     foreach (var word in line.Words)
                     {
-                        var text = word.Text?.Trim();
+                        var text = Straight(word.Text?.Trim());
                         if (string.IsNullOrEmpty(text) || word.BoundingBox is not { } box)
                         {
                             continue;

@@ -31,7 +31,14 @@ public interface IWordRecognizer
 /// A recognizer that reads Latin letters, digits and symbols (code, paths, prose) better than the engines of Windows, but only that
 /// script. Its reading is preferred for everything that is not Arabic or Hebrew (<see cref="ReadingMerge.Choose(IReadOnlyList{IReadOnlyList{RecognizedLine}}, int)"/>).
 /// </summary>
-public interface ILatinWordRecognizer : IWordRecognizer;
+public interface ILatinWordRecognizer : IWordRecognizer
+{
+    /// <summary>
+    /// The enlargement this engine reads best (1 to <see cref="ImageScaler.MaxFactor"/>), or 0 to read the picture the other engines read.
+    /// Where it differs, the reading is made on its own enlarged copy and its word places are moved to the shared picture.
+    /// </summary>
+    int PreferredScale => 0;
+}
 
 /// <summary>
 /// Combines readings of one picture made with the engines of different languages. An engine reads the script of its

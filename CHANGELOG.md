@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of getting `(`, and a line is read right to left only when its Arabic letters are at least twice the others.
   Code, paths and symbols (`x > 0`, a command prompt, a terminal) are read by Tesseract, an open-source recognizer that
   ships with ClipBench on x64 (ADR 0019, `THIRD_PARTY_NOTICES.md`); Windows still reads Arabic and Hebrew, and reads alone where
-  Tesseract cannot start (ARM64). Measured on drawn code: similarity 0.835 to 0.955, `>` kept 65% to 92%, a terminal screenshot
-  43.9% to 96.7% of characters right. Tesseract's library contains an unused network client; ClipBench never gives it a
+  Tesseract cannot start (ARM64). Tesseract reads its own twofold copy of the picture and quotes come back straight. Measured on drawn code: similarity 0.835 to 0.970, `>` kept 65% to 95%, a terminal screenshot
+  43.9% to 96.3% of characters right. Tesseract's library contains an unused network client; ClipBench never gives it a
   web address and a test watches the process for connections.
   If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
   Settings.

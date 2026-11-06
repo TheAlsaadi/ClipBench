@@ -84,6 +84,12 @@ public class TesseractEngineTests
     }
 
     [Fact]
+    public void The_engine_asks_for_a_twofold_enlargement_because_it_reads_thin_strokes_such_as_underscores_better_there()
+    {
+        Engine().PreferredScale.ShouldBe(2);
+    }
+
+    [Fact]
     public void The_engine_is_a_latin_engine()
     {
         Engine().ShouldBeAssignableTo<ILatinWordRecognizer>();
@@ -166,6 +172,31 @@ public class TesseractEngineTests
         words.ShouldNotBeEmpty();
         words.ShouldAllBe(word => word.Confidence != null && word.Confidence >= 0 && word.Confidence <= 100);
         words.ShouldAllBe(word => word.Confidence >= 50, "clean text at a normal size is read with confidence");
+    }
+
+    [Fact]
+    public async Task Straight_quotes_in_code_do_not_come_back_as_curly_ones()
+    {
+        // The English model writes a typographic quote at the start of a word. Code, JSON and paths use straight ones.
+        var recognizer = WindowsOcr.CreateRecognizer(() => ["zz-ZZ"], () => Engine());
+        var curly = new List<string>();
+        foreach (var family in new[] { "Consolas", "Segoe UI", "Arial" })
+        {
+            foreach (var size in new[] { 11, 12, 13, 14, 16 })
+            {
+                foreach (var (foreground, background) in new[] { (Color.Black, Color.White), (Color.FromArgb(220, 220, 220), Color.FromArgb(24, 24, 28)) })
+                {
+                    using var picture = WindowsOcrEngineTests.RenderTight("\"image\": \"ghcr.io/github/dev_image:latest\"", size, family, foreground, background);
+                    var text = (await recognizer.RecognizeAsync(picture, Ct)).Value;
+                    if (text.Any(c => c is (char)0x201C or (char)0x201D or (char)0x2018 or (char)0x2019))
+                    {
+                        curly.Add($"{family} {size}px: {text}");
+                    }
+                }
+            }
+        }
+
+        curly.ShouldBeEmpty();
     }
 
     [Fact]

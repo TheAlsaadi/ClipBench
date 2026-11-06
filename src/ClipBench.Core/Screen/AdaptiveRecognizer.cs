@@ -44,6 +44,7 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
         }
 
         var prepared = ImageScaler.Prepare(image);
+        ScreenImage? latinCopy = null;
         try
         {
             var picture = prepared ?? image;
@@ -54,7 +55,30 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
             foreach (var engine in engines)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var result = await engine.ReadAsync(picture, cancellationToken).ConfigureAwait(false);
+
+                // A Latin engine may read best at its own enlargement. It reads a copy made for it, and its word places are moved to the
+                // shared picture so the readings can be compared place by place.
+                var seen = picture;
+                var toShared = 1.0;
+                if (engine is ILatinWordRecognizer { PreferredScale: > 0 and var scale })
+                {
+                    var own = ImageScaler.Prepare(image, scale);
+                    var ownFactor = ImageScaler.FactorOf(image, own);
+                    var sharedFactor = ImageScaler.FactorOf(image, prepared);
+                    if (own is not null && ownFactor != sharedFactor)
+                    {
+                        latinCopy?.Dispose();
+                        latinCopy = own;
+                        seen = own;
+                        toShared = (double)sharedFactor / ownFactor;
+                    }
+                    else
+                    {
+                        own?.Dispose();
+                    }
+                }
+
+                var result = await engine.ReadAsync(seen, cancellationToken).ConfigureAwait(false);
                 if (result.IsSuccess)
                 {
                     if (latinIndex < 0 && engine is ILatinWordRecognizer)
@@ -62,7 +86,7 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
                         latinIndex = readings.Count;
                     }
 
-                    readings.Add(result.Value);
+                    readings.Add(toShared == 1.0 ? result.Value : Rescale(result.Value, toShared));
                 }
                 else
                 {
@@ -81,8 +105,16 @@ public sealed class AdaptiveRecognizer : ITextRecognizer
         finally
         {
             prepared?.Dispose();
+            latinCopy?.Dispose();
         }
     }
+
+    private static List<RecognizedLine> Rescale(IReadOnlyList<RecognizedLine> lines, double by) =>
+        [
+            .. lines.Select(line => new RecognizedLine(
+                line.Text,
+                [.. line.Words.Select(word => word with { X = word.X * by, Y = word.Y * by, Width = word.Width * by, Height = word.Height * by })])),
+        ];
 }
 
 /// <summary>Chooses between readings of the same picture made in different languages.</summary>
