@@ -132,7 +132,15 @@ public sealed class OcrSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTest
                     Dock = DockStyle.Fill,
                     TextAlign = ContentAlignment.MiddleCenter,
                 });
-                _form.Shown += (_, _) => _shown.Set();
+                _form.Shown += (_, _) =>
+                {
+                    // Windows can drop the top-most style of a window that is shown without being activated, even though the form still reports
+                    // TopMost (seen on every test after the first in a run). Without it the window of the program in front covers this one, and the
+                    // drag reads that program's text instead. Setting it again once the window is on screen puts the style back.
+                    _form.TopMost = false;
+                    _form.TopMost = true;
+                    _shown.Set();
+                };
                 Application.Run(_form);
             })
             { IsBackground = true, Name = "Screen text window" };
@@ -144,9 +152,20 @@ public sealed class OcrSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTest
             var window = new ScreenTextWindow(text, bounds);
             window._thread.Start();
             window._shown.Wait(TimeSpan.FromSeconds(15)).ShouldBeTrue("the test window did not show");
+            AppUnderTest.WaitFor(() => window.IsTopMost, 5_000).ShouldBeTrue("the test window is not top-most, so another window could cover it and the drag would read that window");
             Thread.Sleep(500);   // the desktop compositor needs a moment to put the new window on screen
             return window;
         }
+
+        /// <summary>True while Windows really holds the window above every ordinary window, which the form's own TopMost property does not prove.</summary>
+        private bool IsTopMost => (bool)_form!.Invoke(() => (GetWindowLong(_form.Handle, ExtendedStyleIndex) & TopMostStyle) != 0);
+
+        private const int ExtendedStyleIndex = -20;
+        private const int TopMostStyle = 0x8;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+        [System.Runtime.InteropServices.DefaultDllImportSearchPaths(System.Runtime.InteropServices.DllImportSearchPath.System32)]
+        private static extern int GetWindowLong(nint window, int index);
 
         public void Dispose()
         {
