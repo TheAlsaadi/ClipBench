@@ -101,6 +101,39 @@ public class ReadingMergeTests
         text.Split("\r\n")[1].ShouldBe(new string(' ', 40) + "right");
     }
 
+    // --- words the engine split where there is no space (monospaced text only) ---
+
+    [Fact]
+    public void In_monospaced_text_two_words_with_no_room_for_a_space_between_them_are_joined()
+    {
+        // Ten pixels a letter. "AutoModel." and "from_pretrained(" are 4 pixels apart, less than a letter, so the engine only guessed at a space;
+        // "x" and "=" are a letter apart, which is a space.
+        var lines = Reading(
+            Line(M("AutoModel.", 0, 0), M("from_pretrained(", 104, 0)),
+            Line(M("tokenizer", 0, 20), M("=", 100, 20), M("model", 120, 20)));
+
+        ReadingMerge.ToText(lines).ShouldBe("AutoModel.from_pretrained(\r\ntokenizer = model");
+    }
+
+    [Fact]
+    public void In_text_whose_letters_differ_in_width_a_narrow_gap_is_still_a_space()
+    {
+        // Proportional text: an "i" is a third of an "M", so a narrow gap between words is a real space.
+        var lines = Reading(
+            Line(new RecognizedWord("illi", 0, 0, 20, 10), new RecognizedWord("MMMM", 24, 0, 60, 10)),
+            Line(new RecognizedWord("word", 0, 20, 40, 10), new RecognizedWord("lili", 44, 20, 22, 10)));
+
+        ReadingMerge.ToText(lines).ShouldBe("illi MMMM\r\nword lili");
+    }
+
+    [Fact]
+    public void A_line_whose_text_is_not_its_words_joined_keeps_its_own_text()
+    {
+        var line = new RecognizedLine("AutoModel.  from_pretrained(", [M("AutoModel.", 0, 0), M("from_pretrained(", 104, 0)]);
+
+        ReadingMerge.ToText(Reading(line, Line(M("tokenizer", 0, 20)), Line(M("another", 0, 40)))).ShouldStartWith("AutoModel.  from_pretrained(");
+    }
+
     // --- choosing among readings in different languages ---
 
     [Fact]

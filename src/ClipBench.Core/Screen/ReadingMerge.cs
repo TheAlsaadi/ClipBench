@@ -67,6 +67,15 @@ public static class ReadingMerge
     // same place. The English model reads a chevron icon as ">>" with about 42; clean symbols in code are read with 70 and more.
     private const double SureOfSymbols = 60;
 
+    // A font is taken to be monospaced when the width of a letter, over the words of three letters or more, varies by less than this share
+    // (0.03 in the pictures measured, 0.15 and more for proportional text), judged on at least this many words.
+    private const double MonospacedSpread = 0.08;
+    private const int MinWordsToJudgeFont = 3;
+
+    // In a monospaced font two words closer than this many letters have no space between them (a real space is a letter wide; the narrow dot
+    // that separated "Model." from "from_pretrained(" left 0.74 of a letter, the narrowest real space measured 1.1).
+    private const double JoinBelowLetters = 0.9;
+
     // The most spaces put before a line, so a word placed wrongly cannot make a line of thousands of spaces.
     private const int MaxIndent = 40;
 
@@ -79,23 +88,38 @@ public static class ReadingMerge
     public static string ToText(IReadOnlyList<RecognizedLine> lines)
     {
         ArgumentNullException.ThrowIfNull(lines);
-        var indents = Indents(lines);
-        return string.Join("\r\n", lines.Select((line, i) => new string(' ', indents[i]) + LineText(line)));
+        var letter = LetterWidth(lines);
+        var indents = Indents(lines, letter);
+        var joinBelow = letter is { Monospaced: true } ? letter.Value.Width * JoinBelowLetters : 0;
+        return string.Join("\r\n", lines.Select((line, i) => new string(' ', indents[i]) + LineText(line, joinBelow)));
+    }
+
+    // The width of a letter in a reading (the median over its words) and whether the letters all have the same width, as in the fonts code is shown in.
+    private static (double Width, bool Monospaced)? LetterWidth(IReadOnlyList<RecognizedLine> lines)
+    {
+        var widths = lines.SelectMany(line => line.Words).Where(word => word.Text.Length >= 3 && word.Width > 0).Select(word => word.Width / word.Text.Length).Order().ToList();
+        if (widths.Count == 0)
+        {
+            return null;
+        }
+
+        var mean = widths.Average();
+        var spread = Math.Sqrt(widths.Sum(width => (width - mean) * (width - mean)) / widths.Count) / mean;
+        return (widths[widths.Count / 2], widths.Count >= MinWordsToJudgeFont && spread < MonospacedSpread);
     }
 
     // How many spaces each line starts with, from where its first word is. Indentation is part of code (Python, YAML, JSON) and is lost
     // when every line is flush left. The width of a letter is the typical width of a word's letters, so it is exact for the monospaced
     // fonts code is shown in and close enough for others, where a gap of under half a letter counts as no indent.
-    private static int[] Indents(IReadOnlyList<RecognizedLine> lines)
+    private static int[] Indents(IReadOnlyList<RecognizedLine> lines, (double Width, bool Monospaced)? measured)
     {
         var indents = new int[lines.Count];
-        var widths = lines.SelectMany(line => line.Words).Where(word => word.Text.Length >= 3 && word.Width > 0).Select(word => word.Width / word.Text.Length).Order().ToList();
-        if (widths.Count == 0)
+        if (measured is not { } size)
         {
             return indents;
         }
 
-        var letter = widths[widths.Count / 2];
+        var letter = size.Width;
         var lefts = lines.Select(line => line.Words.Count == 0 || LineOrder.ContainsRightToLeft(line.Text) ? double.NaN : line.Words.Min(word => word.X)).ToList();
         var known = lefts.Where(left => !double.IsNaN(left)).Order().ToList();
         if (known.Count < 2)
@@ -282,10 +306,29 @@ public static class ReadingMerge
         return smaller > 0 && (width * height) / smaller >= OverlapShare;
     }
 
-    private static string LineText(RecognizedLine line) =>
-        LineOrder.ContainsRightToLeft(line.Text)
-            ? LineOrder.ToLogical([.. line.Words.OrderBy(word => word.X).Select(word => word.Text)])
-            : line.Text;
+    private static string LineText(RecognizedLine line, double joinBelow)
+    {
+        if (LineOrder.ContainsRightToLeft(line.Text))
+        {
+            return LineOrder.ToLogical([.. line.Words.OrderBy(word => word.X).Select(word => word.Text)]);
+        }
+
+        // The engine puts a space between two words it sees apart, and in code it sees "Model." and "from_pretrained(" apart because a dot is
+        // narrow. In a monospaced font a real space is a whole letter wide, so less than that between two words is no space.
+        if (joinBelow <= 0 || line.Words.Count < 2 || line.Text != string.Join(' ', line.Words.Select(word => word.Text)))
+        {
+            return line.Text;
+        }
+
+        var text = new StringBuilder(line.Words[0].Text);
+        for (var i = 1; i < line.Words.Count; i++)
+        {
+            var gap = line.Words[i].X - (line.Words[i - 1].X + line.Words[i - 1].Width);
+            _ = gap < joinBelow ? text.Append(line.Words[i].Text) : text.Append(' ').Append(line.Words[i].Text);
+        }
+
+        return text.ToString();
+    }
 
     private static string Joined(IReadOnlyList<RecognizedLine> lines) => string.Join("\n", lines.Select(line => line.Text));
 }
