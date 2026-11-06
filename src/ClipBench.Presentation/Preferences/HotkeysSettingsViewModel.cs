@@ -31,6 +31,9 @@ public sealed partial class HotkeysSettingsViewModel : SettingsSectionViewModel
     /// <summary>The shortcut that starts and finishes collecting.</summary>
     public string CollectHotkey => Current.CollectHotkey.ToString();
 
+    /// <summary>The shortcut that copies text from the screen.</summary>
+    public string CaptureTextHotkey => Current.CaptureTextHotkey.ToString();
+
     /// <summary>Gives an action a new shortcut.</summary>
     /// <param name="action">The action.</param>
     /// <param name="typed">The shortcut as typed, such as <c>Ctrl+Alt+K</c>.</param>
@@ -59,7 +62,12 @@ public sealed partial class HotkeysSettingsViewModel : SettingsSectionViewModel
         }
 
         return await ChangeAsync(
-            settings => action == HotkeyAction.OpenPopup ? settings with { PopupHotkey = hotkey } : settings with { CollectHotkey = hotkey },
+            settings => action switch
+            {
+                HotkeyAction.OpenPopup => settings with { PopupHotkey = hotkey },
+                HotkeyAction.ToggleCollect => settings with { CollectHotkey = hotkey },
+                _ => settings with { CaptureTextHotkey = hotkey },
+            },
             cancellationToken);
     }
 
@@ -70,4 +78,8 @@ public sealed partial class HotkeysSettingsViewModel : SettingsSectionViewModel
     [RelayCommand]
     private async Task ResetCollectAsync(CancellationToken cancellationToken) =>
         _ = await SetAsync(HotkeyAction.ToggleCollect, Hotkey.DefaultCollect.ToString(), cancellationToken);
+
+    [RelayCommand]
+    private async Task ResetCaptureTextAsync(CancellationToken cancellationToken) =>
+        _ = await SetAsync(HotkeyAction.CaptureText, Hotkey.DefaultCaptureText.ToString(), cancellationToken);
 }

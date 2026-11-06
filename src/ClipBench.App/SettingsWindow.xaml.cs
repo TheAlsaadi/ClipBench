@@ -335,6 +335,9 @@ public sealed partial class SettingsWindow : Window
     private async void CollectHotkeyBox_PreviewKeyDown(object sender, KeyRoutedEventArgs e) =>
         await CaptureAsync(HotkeyAction.ToggleCollect, e);
 
+    private async void CaptureTextHotkeyBox_PreviewKeyDown(object sender, KeyRoutedEventArgs e) =>
+        await CaptureAsync(HotkeyAction.CaptureText, e);
+
     // Turns the keys pressed in a shortcut box into the text a person would type, and lets the view model judge it.
     private async Task CaptureAsync(HotkeyAction action, KeyRoutedEventArgs e)
     {

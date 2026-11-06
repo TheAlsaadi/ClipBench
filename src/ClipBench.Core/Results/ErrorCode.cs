@@ -137,4 +137,28 @@ public enum ErrorCode
 
     /// <summary>The exclusion list already holds as many programs as it can.</summary>
     TooManyExcludedPrograms,
+
+    /// <summary>The region chosen on the screen is too small to hold text, or lies outside the monitor.</summary>
+    RegionTooSmall,
+
+    /// <summary>The region chosen on the screen is larger than the text recognizer can read.</summary>
+    RegionTooLarge,
+
+    /// <summary>The user cancelled choosing a region of the screen.</summary>
+    SelectionCancelled,
+
+    /// <summary>Windows would not let the pixels of the chosen region be read.</summary>
+    ScreenCaptureFailed,
+
+    /// <summary>Windows has no text-recognition language installed for the user's languages.</summary>
+    OcrLanguageMissing,
+
+    /// <summary>Windows could not read the text in the picture.</summary>
+    OcrFailed,
+
+    /// <summary>The chosen region holds no text that could be read.</summary>
+    NoTextFound,
+
+    /// <summary>Text is already being copied from the screen.</summary>
+    ScreenTextBusy,
 }

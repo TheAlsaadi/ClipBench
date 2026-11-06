@@ -73,6 +73,15 @@ public sealed class WindowsPlatform : IDisposable
     /// <summary>Hides windows from screen capture and rounds their corners.</summary>
     public IWindowEffects WindowEffects { get; } = new Win32WindowEffects();
 
+    /// <summary>Where the monitors are.</summary>
+    public IMonitorLayout Monitors { get; } = new MonitorLayout(new Win32ScreenApi());
+
+    /// <summary>Reads the pixels of a region of the screen into memory.</summary>
+    public IScreenCapturer ScreenCapturer { get; } = new GdiScreenCapturer();
+
+    /// <summary>Reads text in pictures with the text recognition of Windows.</summary>
+    public ITextRecognizer TextRecognizer { get; } = WindowsOcr.CreateRecognizer();
+
     /// <summary>Creates the platform: the background window and everything that runs on it.</summary>
     /// <param name="timeProvider">The clock for every wait.</param>
     /// <returns>The platform, or <see cref="ErrorCode.PlatformFailure"/> when Windows would not create the background window.</returns>

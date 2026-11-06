@@ -18,6 +18,25 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- A second text recognizer for code, paths and symbols (ADR 0019). x64 only: the package has no ARM64 build. -->
+    <PackageReference Include="TesseractOCR" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The English model, pinned by its SHA-256 in tests/ClipBench.Platform.Windows.IntegrationTests (ADR 0019). -->
+    <Content Include="../../third_party/tessdata/eng.traineddata" Link="tessdata\eng.traineddata" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The package copies native files for x86 as well, and its own tesseract.exe is never started. Neither is shipped. -->
+  <Target Name="DropUnusedTesseractFiles" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_UnusedTesseract Include="@(None)" Condition="$([System.String]::new('%(None.Link)').StartsWith('x86'))" />
+      <_UnusedTesseract Include="@(None)" Condition="$([System.String]::new('%(None.Filename)%(None.Extension)').Equals('tesseract.exe'))" />
+      <None Remove="@(_UnusedTesseract)" />
+    </ItemGroup>
+  </Target>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="ClipBench.Platform.Windows.IntegrationTests" />
   </ItemGroup>
 

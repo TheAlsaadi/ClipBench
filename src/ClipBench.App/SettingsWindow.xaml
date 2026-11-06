@@ -142,6 +142,27 @@
                             Content="Reset" />
                     </Grid>
 
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox
+                            x:Name="CaptureTextHotkeyBox"
+                            AutomationProperties.AutomationId="CaptureTextHotkeyBox"
+                            AutomationProperties.Name="Copy text from the screen"
+                            Header="Copy text from the screen"
+                            IsReadOnly="True"
+                            PreviewKeyDown="CaptureTextHotkeyBox_PreviewKeyDown"
+                            Text="{x:Bind ViewModel.Hotkeys.CaptureTextHotkey, Mode=OneWay}" />
+                        <Button
+                            Grid.Column="1"
+                            VerticalAlignment="Bottom"
+                            AutomationProperties.AutomationId="ResetCaptureTextHotkey"
+                            Command="{x:Bind ViewModel.Hotkeys.ResetCaptureTextCommand}"
+                            Content="Reset" />
+                    </Grid>
+
                     <TextBlock
                         AutomationProperties.AutomationId="HotkeysError"
                         Foreground="{ThemeResource SystemFillColorCriticalBrush}"

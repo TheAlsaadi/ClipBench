@@ -24,6 +24,46 @@ public class ClipLibraryTests
     private static string[] Texts(ClipLibrary library) =>
         [.. library.Clips.Select(clip => ((TextContent)clip.Content).Text)];
 
+    // --- what a clip is ---
+
+    [Fact]
+    public void A_clips_text_is_looked_at_once_and_the_answer_is_kept()
+    {
+        using var library = Create();
+        var clip = TestClips.Text("#1E90FF");
+
+        var first = library.GetDetection(clip);
+        var second = library.GetDetection(clip);
+
+        first.Kind.ShouldBe(ClipBench.Core.Detection.DetectedKind.Color);
+        second.ShouldBeSameAs(first);
+    }
+
+    [Fact]
+    public void Pictures_and_file_lists_have_no_detection_and_missing_clips_are_a_bug()
+    {
+        using var library = Create();
+
+        library.GetDetection(TestClips.Image(1)).Kind.ShouldBe(ClipBench.Core.Detection.DetectedKind.None);
+        library.GetDetection(TestClips.Files(null, "C:\\www.example.com")).Kind.ShouldBe(ClipBench.Core.Detection.DetectedKind.None);
+        Should.Throw<ArgumentNullException>(() => library.GetDetection(null!));
+    }
+
+    [Fact]
+    public async Task What_was_learned_about_a_clip_is_forgotten_when_the_clip_goes()
+    {
+        using var library = Create(maxCount: 10);
+        var first = (await library.AddAsync(TestClips.Text("https://example.com/one"), Ct)).Value.Clip;
+        var learned = library.GetDetection(first);
+        for (var i = 0; i < 12; i++)
+        {
+            await library.AddAsync(TestClips.Text("filler " + i), Ct);
+        }
+
+        library.Clips.ShouldNotContain(first);
+        library.GetDetection(first).ShouldNotBeSameAs(learned);
+    }
+
     // --- changing the limits ---
 
     [Fact]

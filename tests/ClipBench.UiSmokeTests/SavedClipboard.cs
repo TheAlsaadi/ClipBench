@@ -38,6 +38,21 @@ internal sealed class SavedClipboard
         return copy;
     }));
 
+    /// <summary>The text on the clipboard now, or an empty string when there is none or it cannot be read.</summary>
+    /// <returns>The text.</returns>
+    public static string CurrentText() => OnStaThread(() =>
+    {
+        try
+        {
+            return Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty;
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.ExternalException or InvalidOperationException)
+        {
+            // Another program has the clipboard open at this moment; the caller asks again.
+            return string.Empty;
+        }
+    });
+
     public void Restore() => OnStaThread(() =>
     {
         if (_saved is null)

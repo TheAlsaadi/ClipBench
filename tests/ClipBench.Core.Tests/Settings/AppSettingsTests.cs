@@ -231,10 +231,56 @@ public class AppSettingsTests
     }
 
     [Fact]
+    public void The_default_shortcut_for_copying_text_from_the_screen_is_its_own()
+    {
+        AppSettings.Default.CaptureTextHotkey.ShouldBe(Hotkey.DefaultCaptureText);
+        Hotkey.DefaultCaptureText.ToString().ShouldBe("Win+Alt+O");
+        new[] { Hotkey.Default, Hotkey.DefaultCollect, Hotkey.DefaultCaptureText }.Distinct().Count().ShouldBe(3);
+    }
+
+    [Fact]
+    public void Normalizing_keeps_a_usable_shortcut_for_copying_text()
+    {
+        var settings = AppSettings.Default with { CaptureTextHotkey = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Shift, 'T') };
+
+        settings.Normalize().ShouldBe(settings);
+    }
+
+    [Fact]
+    public void Normalizing_replaces_an_unusable_shortcut_for_copying_text_with_its_default()
+    {
+        var settings = AppSettings.Default with { CaptureTextHotkey = new Hotkey(HotkeyModifiers.None, 'T') };
+
+        settings.Normalize().CaptureTextHotkey.ShouldBe(Hotkey.DefaultCaptureText);
+    }
+
+    [Fact]
+    public void Copying_text_cannot_share_a_shortcut_with_the_popup_or_collecting()
+    {
+        var shared = new Hotkey(HotkeyModifiers.Control | HotkeyModifiers.Alt, 'K');
+
+        (AppSettings.Default with { PopupHotkey = shared, CaptureTextHotkey = shared }).Normalize().CaptureTextHotkey.ShouldBe(Hotkey.DefaultCaptureText);
+        (AppSettings.Default with { CollectHotkey = shared, CaptureTextHotkey = shared }).Normalize().CaptureTextHotkey.ShouldBe(Hotkey.DefaultCaptureText);
+    }
+
+    [Fact]
+    public void When_the_defaults_themselves_are_swapped_between_actions_every_shortcut_goes_back_to_its_own()
+    {
+        var settings = AppSettings.Default with { PopupHotkey = Hotkey.DefaultCaptureText, CaptureTextHotkey = Hotkey.DefaultCaptureText };
+
+        var normalized = settings.Normalize();
+
+        normalized.PopupHotkey.ShouldBe(Hotkey.Default);
+        normalized.CollectHotkey.ShouldBe(Hotkey.DefaultCollect);
+        normalized.CaptureTextHotkey.ShouldBe(Hotkey.DefaultCaptureText);
+    }
+
+    [Fact]
     public void A_missing_shortcut_is_a_bug()
     {
         Should.Throw<ArgumentNullException>(() => AppSettings.Default with { PopupHotkey = null! });
         Should.Throw<ArgumentNullException>(() => AppSettings.Default with { CollectHotkey = null! });
+        Should.Throw<ArgumentNullException>(() => AppSettings.Default with { CaptureTextHotkey = null! });
     }
 
     [Fact]

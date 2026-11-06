@@ -80,6 +80,29 @@ MonitorFromPoint
 GetMonitorInfo
 GetDpiForMonitor
 
+// Reading the pixels of a region the user chose (never a window of another program, never the whole screen), and listing the monitors
+EnumDisplayMonitors
+GetDC
+ReleaseDC
+CreateCompatibleDC
+CreateCompatibleBitmap
+SelectObject
+BitBlt
+GetDIBits
+DeleteObject
+DeleteDC
+
+// The selection overlay: a dimmed layered window per monitor that follows the mouse while the user drags
+UpdateLayeredWindow
+SetCapture
+ReleaseCapture
+LoadCursor
+SetCursor
+DestroyWindow
+CreateDIBSection
+IDC_CROSS
+HWND_TOPMOST
+
 // Window effects: hidden from screenshots and screen sharing, rounded corners
 SetWindowDisplayAffinity
 GetWindowDisplayAffinity

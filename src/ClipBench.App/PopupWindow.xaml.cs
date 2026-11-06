@@ -76,6 +76,7 @@ public sealed partial class PopupWindow : Window
         DragHandle.PointerCaptureLost += DragHandle_DragEnded;
         Frame.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Frame_PointerPressed), handledEventsToo: true);
         ViewModel.CloseRequested += (_, _) => AppWindow.Hide();
+        ViewModel.OpenLinkRequested += OnOpenLinkRequested;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
         ViewModel.Transforms.PropertyChanged += OnTransformsPropertyChanged;
         ViewModel.Sidebar.PropertyChanged += OnSidebarPropertyChanged;
@@ -232,6 +233,16 @@ public sealed partial class PopupWindow : Window
         {
             TakeForeground();
             _ = SearchBox.Focus(FocusState.Programmatic);
+        }
+    }
+
+    // The user chose "Open the link". The address is one the detector read as a web address; the user's own browser opens it
+    // and ClipBench itself makes no connection. Anything that is not http or https is refused here as well.
+    private void OnOpenLinkRequested(object? sender, ClipBench.Presentation.Preferences.OpenAddressEventArgs e)
+    {
+        if (Uri.TryCreate(e.Url, UriKind.Absolute, out var address) && (address.Scheme == Uri.UriSchemeHttps || address.Scheme == Uri.UriSchemeHttp))
+        {
+            _ = Launcher.LaunchUriAsync(address);
         }
     }
 

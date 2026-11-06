@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ClipBench.Core.Screen;
 
 namespace ClipBench.Platform.Windows.Screen;
@@ -27,4 +28,8 @@ internal interface IScreenApi
     /// <param name="point">The point.</param>
     /// <returns>The monitor, or null when Windows would not say.</returns>
     MonitorInfo? GetMonitor(PixelPoint point);
+
+    /// <summary>Every monitor that is part of the desktop: its whole rectangle (not its work area) and its scale.</summary>
+    /// <returns>The monitors, or none when Windows would not say.</returns>
+    ImmutableArray<MonitorBounds> GetMonitors();
 }

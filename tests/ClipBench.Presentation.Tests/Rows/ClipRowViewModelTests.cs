@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using ClipBench.Core.Clips;
+using ClipBench.Core.Detection;
 using ClipBench.Core.Privacy;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Tests.Support;
@@ -12,12 +13,92 @@ public class ClipRowViewModelTests
 
     private static ClipRowViewModel Row(Clip clip, SensitiveKind sensitivity = SensitiveKind.None) => new(clip, sensitivity, _now);
 
+    private static ClipRowViewModel RowWith(string text, SensitiveKind sensitivity = SensitiveKind.None) =>
+        new(TestClips.Text(text), sensitivity, _now, ContentDetector.Detect(text));
+
     private static string[] ChangedProperties(ClipRowViewModel row, Action act)
     {
         List<string> names = [];
         row.PropertyChanged += (_, args) => names.Add(args.PropertyName!);
         act();
         return [.. names];
+    }
+
+    // --- what the clip is ---
+
+    [Fact]
+    public void An_ordinary_row_shows_no_detection()
+    {
+        var row = Row(TestClips.Text("just words"));
+
+        row.HasDetection.ShouldBeFalse();
+        row.DetectionLabel.ShouldBeEmpty();
+        row.HasSwatch.ShouldBeFalse();
+        row.LinkAddress.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_color_row_shows_a_swatch_of_the_color_and_names_it_in_hex()
+    {
+        var row = RowWith("#1E90FF");
+
+        row.HasDetection.ShouldBeTrue();
+        row.DetectionLabel.ShouldBe("Color #1E90FF");
+        row.HasSwatch.ShouldBeTrue();
+        ((int)row.SwatchRed, (int)row.SwatchGreen, (int)row.SwatchBlue, (int)row.SwatchAlpha).ShouldBe((0x1E, 0x90, 0xFF, 0xFF));
+    }
+
+    [Fact]
+    public void A_color_with_alpha_says_so_in_its_name()
+    {
+        RowWith("rgba(255, 0, 0, 0.5)").DetectionLabel.ShouldBe("Color #FF000080");
+    }
+
+    [Fact]
+    public void A_link_row_says_link_and_offers_the_address_to_open()
+    {
+        var row = RowWith("https://learn.microsoft.com/windows/");
+
+        row.DetectionLabel.ShouldBe("Link");
+        row.LinkAddress.ShouldBe("https://learn.microsoft.com/windows/");
+        row.HasSwatch.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("someone@example.com", "Email")]
+    [InlineData("+1 (555) 123-4567", "Phone")]
+    [InlineData("def f(x):\n    return x\n", "Code \u00B7 Python")]
+    [InlineData("SELECT id FROM users WHERE id = 1;", "Code \u00B7 SQL")]
+    public void Emails_phone_numbers_and_code_are_named(string text, string label)
+    {
+        RowWith(text).DetectionLabel.ShouldBe(label);
+    }
+
+    [Fact]
+    public void A_hidden_secret_shows_nothing_about_what_it_is_until_it_is_revealed()
+    {
+        // A text that is a link and also looks like a secret: nothing about it may show while it is hidden.
+        var row = RowWith("https://example.com/a", SensitiveKind.Token);
+
+        row.HasDetection.ShouldBeFalse();
+        row.DetectionLabel.ShouldBeEmpty();
+        row.LinkAddress.ShouldBeNull();
+
+        var changed = ChangedProperties(row, () => row.IsRevealed = true);
+
+        row.HasDetection.ShouldBeTrue();
+        row.LinkAddress.ShouldBe("https://example.com/a");
+        changed.ShouldContain(nameof(ClipRowViewModel.DetectionLabel));
+        changed.ShouldContain(nameof(ClipRowViewModel.LinkAddress));
+    }
+
+    [Fact]
+    public void A_screen_reader_hears_what_the_clip_is()
+    {
+        RowWith("https://example.com/a").AutomationName.ShouldContain("link");
+        RowWith("#FF0000").AutomationName.ShouldContain("color #FF0000");
+        RowWith("someone@example.com").AutomationName.ShouldContain("email");
+        RowWith("hello there").AutomationName.ShouldNotContain("link");
     }
 
     // --- text ---

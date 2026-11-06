@@ -26,6 +26,7 @@ public sealed class ClipLibrary : IDisposable
     private readonly ClipSearch _search = new();
     private readonly SemaphoreSlim _changes = new(1, 1);
     private readonly ConcurrentDictionary<ClipId, SensitiveKind> _sensitivity = new();
+    private readonly ConcurrentDictionary<ClipId, Detection.Detection> _detections = new();
     private readonly Lock _expiryGate = new();
     private TimeSpan? _sensitiveExpiry;
 
@@ -231,6 +232,7 @@ public sealed class ClipLibrary : IDisposable
 
             _ = _history.Clear(includePinned: true);
             _sensitivity.Clear();
+            _detections.Clear();
             RaiseChanged();
             return wiped;
         }
@@ -401,6 +403,7 @@ public sealed class ClipLibrary : IDisposable
             }
 
             _ = _sensitivity.TryRemove(id, out _);
+            _ = _detections.TryRemove(id, out _);
             var stored = await _store.DeleteAsync([id], cancellationToken).ConfigureAwait(false);
             RaiseChanged();
             return stored;
@@ -438,6 +441,15 @@ public sealed class ClipLibrary : IDisposable
             clip.Content);
     }
 
+    /// <summary>Tells what a clip's text is: a color, a link, an email address, a phone number or code. The text is read once per clip.</summary>
+    /// <param name="clip">The clip.</param>
+    /// <returns>What it is, or nothing in particular. Nothing is fetched or opened. Pictures and file lists have none.</returns>
+    public Detection.Detection GetDetection(Clip clip)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+        return _detections.GetOrAdd(clip.Id, static (_, content) => Detection.ContentDetector.Detect(content), clip.Content);
+    }
+
     /// <summary>Releases the lock that keeps changes in order. Call it once nothing changes the library any more.</summary>
     public void Dispose() => _changes.Dispose();
 
@@ -460,6 +472,7 @@ public sealed class ClipLibrary : IDisposable
         foreach (var clip in clips)
         {
             _ = _sensitivity.TryRemove(clip.Id, out _);
+            _ = _detections.TryRemove(clip.Id, out _);
         }
     }
 

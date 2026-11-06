@@ -10,6 +10,9 @@ public enum HotkeyAction
 
     /// <summary>Starts or finishes collecting.</summary>
     ToggleCollect,
+
+    /// <summary>Lets the user choose a part of the screen and copies the text in it.</summary>
+    CaptureText,
 }
 
 /// <summary>Tells which action's shortcut was pressed.</summary>

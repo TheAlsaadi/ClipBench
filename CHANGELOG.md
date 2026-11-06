@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Copy text from the screen (ADR 0018). **Win+Alt+O**, or **Copy text from the screen** in the tray menu, dims every
+  monitor; drag a rectangle over the text and let go. Only that rectangle is read, in memory, with the text recognition
+  of Windows, and the picture is cleared at once and never saved. The text goes on the clipboard and into the history
+  like any copy (a secret is hidden and expires; with incognito on it is not recorded). Esc or a right click cancels.
+  The picture gets a margin and is enlarged threefold before it is read (Windows returns nothing for text of 13 pixels or less,
+  or for text cut tightly at the edge, otherwise), every recognition language in your Windows profile is tried, keeping the best
+  reading, so Arabic next to English works, and Arabic and Hebrew lines come back in reading order, not in the order they are drawn.
+  Each word is taken from the engine that reads it best, so an Arabic name in an English window keeps its `>` separators
+  instead of getting `(`, and a line is read right to left only when its Arabic letters are at least twice the others.
+  Code, paths and symbols (`x > 0`, a command prompt, a terminal) are read by Tesseract, an open-source recognizer that
+  ships with ClipBench on x64 (ADR 0019, `THIRD_PARTY_NOTICES.md`); Windows still reads Arabic and Hebrew, and reads alone where
+  Tesseract cannot start (ARM64). Tesseract reads its own twofold copy of the picture and quotes come back straight. Measured on drawn code: similarity 0.835 to 0.970, `>` kept 65% to 95%, a terminal screenshot
+  43.9% to 96.3% of characters right. Tesseract's library contains an unused network client; ClipBench never gives it a
+  web address and a test watches the process for connections. Lines keep their indentation (from where each line starts),
+  and coloured text on a dark theme is read as strongly as white text. The zero of a code font is no longer read as `@`,
+  list bullets come out as `•`, and closing brackets in code are put right where the open ones show what they must be.
+  If Windows has no recognition language for yours, the message says where to add one. The shortcut can be changed in
+  Settings.
+- The popup says what a clip is: a **color** (with a swatch) in hex, `rgb()` or `hsl()`; a **link**; an **email**
+  address; a **phone** number; or **code** with a guess of its language. Only whole-text matches count and nothing is
+  fetched. A link is opened only from the right-click menu, only if it is `http` or `https`. A hidden secret shows
+  nothing about what it is.
 - Privacy center and settings (ADR 0017, `docs/security/PRIVACY.md`). A **Settings window** (tray menu **Settings…**,
   Ctrl+E in the popup, and by itself the first time ClipBench runs) with General, Shortcuts, History, Privacy, Paste,
   Snippets and About. The snippet editor moved into it.

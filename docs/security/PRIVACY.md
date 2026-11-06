@@ -33,6 +33,21 @@ Settings → History: at most 1,000 unpinned clips (10 to 10,000), for 30 days (
 
 Settings → Privacy → **Delete everything…**, then confirm. Every clip (pinned ones too), board and snippet is deleted, and the database file is rebuilt and its log emptied so the old values do not stay in the files. A collect session or paste queue in progress is ended. If the disk cannot be wiped, ClipBench says so and still shows what is still there. To remove the key and the database files as well, delete the ClipBench folder, or choose to start fresh when ClipBench offers it after a history it cannot read.
 
+## Copying text from the screen
+
+Press **Win+Alt+O** (or **Copy text from the screen** in the tray menu), drag a rectangle over the text, and let go. The text is read on your PC by the text recognition that is part of Windows together with Tesseract, an open-source recognizer that ships with ClipBench (x64 only), put on your clipboard and added to your history like any copy. **Esc** or a right click cancels.
+
+- Only the rectangle you drag is read, into memory. The picture is **never saved**, not even temporarily, and it is cleared from ClipBench's memory the moment the text has been read, and so is the enlarged copy, with a small margin, that ClipBench makes to read it better. (Windows' recognizer and Tesseract keep their own copies for a moment while they work, which ClipBench cannot clear.) Because only text is kept, there is no picture to pin.
+- The dimmed overlay and its border are never part of what is read, and are kept out of screenshots.
+- Text that looks like a secret is hidden and expires, like any copy. With **incognito** on, the text goes on your clipboard but is not added to your history, and the notice says so.
+- ClipBench tells you how many characters were copied, never which.
+- Tesseract reads code, paths and symbols that Windows drops; Windows still reads Arabic and Hebrew. Tesseract's library contains code that can fetch a picture from a web address. **ClipBench never gives it one**: it passes only pixels it holds in memory, and a test watches the program for any connection while Tesseract starts and reads. On a PC where Tesseract cannot start (ARM64, or a missing Visual C++ runtime) ClipBench reads with Windows alone.
+- It reads with every text-recognition language you have set up in your Windows profile (up to four, in your order) and keeps the best reading, so a second script such as Arabic works next to English. It needs at least one. If there is none, ClipBench says where to add one: Settings, Time and language, Language and region, Language options, Text recognition.
+
+## What the popup knows about a clip
+
+The popup can say what a clip is: a **color** (hex, `rgb()` or `hsl()`, with a small swatch), a **link**, an **email address**, a **phone number** or **code** (with a guess of the language). It only looks at the text of the clip, and only when the whole text is exactly that one thing. It never fetches or looks up anything. A link is only opened when you choose **Open the link in your browser** from the right-click menu, and then Windows opens your own browser; ClipBench makes no connection. A secret that is hidden shows nothing about what it is.
+
 ## Starting with Windows
 
 It is **off by default** and ClipBench asks once, the first time it runs. Turning it on adds one value named `ClipBench` to your own `Run` key in the registry (the path of the program, nothing else). It needs no administrator rights. Turning it off removes only that value.

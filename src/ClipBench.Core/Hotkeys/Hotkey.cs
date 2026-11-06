@@ -57,6 +57,9 @@ public sealed record Hotkey
     /// <summary>The shortcut that starts and finishes collecting until the user picks another: Win+Alt+C.</summary>
     public static Hotkey DefaultCollect { get; } = new(HotkeyModifiers.Windows | HotkeyModifiers.Alt, 'C');
 
+    /// <summary>The shortcut that copies text from the screen until the user picks another: Win+Alt+O.</summary>
+    public static Hotkey DefaultCaptureText { get; } = new(HotkeyModifiers.Windows | HotkeyModifiers.Alt, 'O');
+
     /// <summary>The names of the keys a shortcut can use, as they are shown and typed.</summary>
     public static IReadOnlyList<string> KeyNames { get; } = [.. _keys.Select(key => key.Name)];
 

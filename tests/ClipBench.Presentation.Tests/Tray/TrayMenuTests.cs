@@ -41,6 +41,7 @@ public sealed class TrayMenuTests : IDisposable
             (1, "Open ClipBench", true),
             (0, string.Empty, false),
             (5, "Start collecting", false),
+            (9, "Copy text from the screen", false),
             (8, "Settings\u2026", false),
             (2, "Turn on incognito", false),
             (3, "Exit", false),
@@ -123,10 +124,23 @@ public sealed class TrayMenuTests : IDisposable
             (0, string.Empty),
             (TrayMenu.StopQueueId, "Stop paste queue"),
             (TrayMenu.CollectId, "Start collecting"),
+            (TrayMenu.CaptureTextId, "Copy text from the screen"),
             (TrayMenu.SettingsId, "Settings\u2026"),
             (TrayMenu.PauseId, "Turn on incognito"),
             (TrayMenu.ExitId, "Exit"),
         ]);
+    }
+
+    [Fact]
+    public void Choosing_copy_text_from_the_screen_asks_for_it_once()
+    {
+        var tray = Create();
+        var asked = 0;
+        tray.CaptureTextRequested += (_, _) => asked++;
+
+        TrayMenu.Execute(tray, TrayMenu.CaptureTextId);
+
+        asked.ShouldBe(1);
     }
 
     [Fact]
@@ -168,6 +182,7 @@ public sealed class TrayMenuTests : IDisposable
             (0, string.Empty),
             (TrayMenu.CollectId, "Finish collecting (2)"),
             (TrayMenu.CancelCollectId, "Cancel collecting"),
+            (TrayMenu.CaptureTextId, "Copy text from the screen"),
             (TrayMenu.SettingsId, "Settings\u2026"),
             (TrayMenu.PauseId, "Turn on incognito"),
             (TrayMenu.ExitId, "Exit"),

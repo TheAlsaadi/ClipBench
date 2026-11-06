@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using ClipBench.Core.Screen;
 using Windows.Win32;
 using Windows.Win32.Foundation;
@@ -65,13 +66,32 @@ internal sealed unsafe class Win32ScreenApi : IScreenApi
         var work = info.rcWork;
         var area = new PixelRect(work.left, work.top, work.right - work.left, work.bottom - work.top);
 
-        // Effective dpi is what the monitor is set to. Without it the monitor is treated as normal scale.
-        var scale = 1.0;
-        if (PInvoke.GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _).Succeeded && dpiX > 0)
-        {
-            scale = dpiX / BaseDpi;
-        }
-
-        return new MonitorInfo(area, scale);
+        return new MonitorInfo(area, ScaleOf(monitor));
     }
+
+    /// <inheritdoc/>
+    public ImmutableArray<MonitorBounds> GetMonitors()
+    {
+        var found = ImmutableArray.CreateBuilder<MonitorBounds>();
+        var callback = new MONITORENUMPROC((HMONITOR monitor, HDC context, RECT* bounds, LPARAM data) =>
+        {
+            var info = new MONITORINFO { cbSize = (uint)sizeof(MONITORINFO) };
+            if (PInvoke.GetMonitorInfo(monitor, ref info))
+            {
+                var whole = info.rcMonitor;
+                if (whole.right > whole.left && whole.bottom > whole.top)
+                {
+                    found.Add(new MonitorBounds(new PixelRect(whole.left, whole.top, whole.right - whole.left, whole.bottom - whole.top), ScaleOf(monitor)));
+                }
+            }
+
+            return true;
+        });
+
+        return PInvoke.EnumDisplayMonitors(HDC.Null, (RECT?)null, callback, 0) ? found.ToImmutable() : [];
+    }
+
+    // Effective dpi is what the monitor is set to. Without it the monitor is treated as normal scale.
+    private static double ScaleOf(HMONITOR monitor) =>
+        PInvoke.GetDpiForMonitor(monitor, MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI, out var dpiX, out _).Succeeded && dpiX > 0 ? dpiX / BaseDpi : 1.0;
 }

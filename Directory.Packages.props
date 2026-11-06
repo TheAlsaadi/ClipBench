@@ -41,4 +41,8 @@
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
   </ItemGroup>
 
+  <ItemGroup Label="Second text recognizer (ADR 0019)">
+    <PackageVersion Include="TesseractOCR" Version="5.5.2" />
+  </ItemGroup>
+
 </Project>

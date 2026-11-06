@@ -218,6 +218,44 @@ Every privacy setting has an item here. Open the Settings window from the tray m
 - [ ] **About** shows the version, "MIT License", the sentence that ClipBench makes no network connections and the project's address; clicking it opens your browser.
 - [ ] `%LOCALAPPDATA%\ClipBench\settings.json` holds your choices and the program names, never any copied text. Replace it with nonsense and restart: the defaults are used and the bad file is kept as `settings.json.bad`.
 
+## Phase 8: copying text from the screen, and what a clip is
+
+### Copy text from the screen
+
+- [ ] Open a page or a document with some text. Press **Win+Alt+O**: every monitor dims, the text underneath is still easy to read, and the pointer is a cross. Drag a rectangle over a line of text and let go: the overlay goes, a notice says "Copied N characters from the screen.", and pasting anywhere gives that text.
+- [ ] Open the popup: the text is the newest clip, from "Screen text".
+- [ ] Press **Win+Alt+O** and press **Esc**: the overlay closes and nothing changes. Do it again and **right-click**: same.
+- [ ] Drag a very small rectangle, or just click: a notice says to choose a larger area, and nothing is copied.
+- [ ] Drag over an area with no text (a plain wall of color): a notice says "No text was found in that area." and the clipboard is unchanged.
+- [ ] With two monitors, at different display scales if you have them: the overlay covers each monitor edge to edge, the dim is the same on both, and a drag on the second monitor copies the text under it, not the text at the same place on the first. A drag that leaves a monitor stops at its edge. Try a monitor to the left of or above the main one.
+- [ ] The overlay and its border are not in a screenshot or screen share taken while it is open (use the Snipping Tool's delay, or a screen recorder), and the text you copied is not blurred or dimmed.
+- [ ] Turn **incognito** on, copy some text from the screen: the notice says it was not kept; it pastes, and it is not in the popup. Turn incognito off.
+- [ ] Copy a line that holds a long token (a test API key) from the screen: it shows as dots in the popup and expires after the secret time.
+- [ ] Press **Win+Alt+O** twice quickly: only one overlay appears.
+- [ ] Settings → Shortcuts → **Copy text from the screen**: set `Ctrl+Alt+T`, and it works at once without a restart; **Reset** brings back Win+Alt+O. Giving it the popup's shortcut is refused.
+- [ ] Remove the recognition language of your Windows (Settings, Time and language, Language and region, your language, Language options, remove **Text recognition**) and try again: the message names where to add it back. Add it back.
+- [ ] No file with a picture of the screen appears anywhere in `%LOCALAPPDATA%\ClipBench` or `%TEMP%` after copying text this way.
+- [ ] Tesseract: select a line of code (`if (a > b) {`), a command prompt line (`C:\Users\you> dir`) and a line from the terminal screenshot that failed before: the symbols (`>`, `\`, `[`, `=>`) are right. A slashed zero may come out as `@` or `0`; that is a font shape, not a bug.
+- [ ] The File Explorer breadcrumb with an Arabic folder name comes out as `> name > folder >` with the name in reading order and no stray symbol.
+- [ ] In the install folder of an x64 build: `x64\tesseract55.dll`, `x64\leptonica-1.85.0.dll` and `tessdata\eng.traineddata` exist; there is no `x86` folder and no `tesseract.exe`.
+- [ ] Small interface text (menus, a spreadsheet, a code editor at 100% zoom, 10 to 13 pixels) is read: select a few lines of it and paste. A capital I against a lowercase l, or an O against a 0, may still be mixed up in some fonts; that is what the recognizer cannot tell apart.
+- [ ] Select an Arabic name written "first name, family name" and paste: the first name comes first. Then a line of Arabic with a number, and an English sentence with an Arabic name inside it: each keeps its order.
+- [ ] In File Explorer (English), select the address bar breadcrumb of a folder under a path with an Arabic name: the separators come out as `>`, never `(` or `)`, and the segments stay in the order drawn.
+- [ ] Select a line of code or a terminal prompt tightly (no empty space around it) in a light and a dark theme: the words are read. Symbols such as `>` inside short or symbol-heavy pieces may be dropped by Windows; note which ones.
+- [ ] With English first and Arabic added in your Windows languages, a line of Arabic, a line of English and a mixed line are each read, without choosing a language.
+- [ ] Text in other languages that you have a pack for (Arabic, Chinese, Japanese) is read. Chinese and Japanese text comes out with spaces between characters; that is how Windows returns it.
+
+### What a clip is
+
+- [ ] Copy `#1E90FF`: the row shows a small blue square and "Color #1E90FF". Also try `rgb(30, 144, 255)`, `hsl(210, 100%, 56%)` and `#1E90FF80` (a half see-through blue).
+- [ ] Copy `https://learn.microsoft.com/windows/apps/winui/`: the row says "Link". Right-click it: **Open the link in your browser** is there and opens your browser. Nothing opens by itself, and the menu item is not there on an ordinary clip.
+- [ ] Copy `javascript:alert(1)`, `file:///C:/Windows/System32/cmd.exe` and `https://user:pass@example.com/`: none is a link.
+- [ ] Copy a sentence that contains a web address: it is not marked as a link.
+- [ ] Copy `someone@example.com` ("Email") and `+1 (555) 123-4567` ("Phone"). Copy `2026-11-05`, `192.168.1.1` and a plain 10-digit number: none is a phone number.
+- [ ] Copy a few lines of code (C#, Python, SQL, JavaScript, a shell command): the row says "Code" with the language. Copy a paragraph of ordinary prose: it says nothing.
+- [ ] Copy a link that has a long token in it so that it shows as dots: no label and no link menu item show until you reveal it with **Ctrl+R**.
+- [ ] With Narrator on, a link row is read as a link, a color row names the color.
+
 ## Tests that need a person
 
 These send real keys or use the real clipboard, so nobody may type while they run. The smoke tests also run batch, table, queue and collect paste; the collect test saves what is on your clipboard first and puts it back afterwards.

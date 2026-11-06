@@ -23,6 +23,9 @@ public static class TrayMenu
     /// <summary>The id of the item that cancels collecting.</summary>
     public const int CancelCollectId = 6;
 
+    /// <summary>The id of the item that lets the user choose a part of the screen and copies the text in it.</summary>
+    public const int CaptureTextId = 9;
+
     /// <summary>The id of the item that opens the Settings window. The id 7 was the clipboard-restore tick, now in Settings.</summary>
     public const int SettingsId = 8;
 
@@ -44,6 +47,7 @@ public static class TrayMenu
             menu.Add(new TrayMenuItem(CancelCollectId, "Cancel collecting"));
         }
 
+        menu.Add(new TrayMenuItem(CaptureTextId, "Copy text from the screen"));
         menu.Add(new TrayMenuItem(SettingsId, "Settings…"));
         menu.Add(new TrayMenuItem(PauseId, tray.PauseLabel));
         menu.Add(new TrayMenuItem(ExitId, "Exit"));
@@ -75,6 +79,9 @@ public static class TrayMenu
                 break;
             case CancelCollectId:
                 tray.CancelCollectCommand.Execute(null);
+                break;
+            case CaptureTextId:
+                tray.CaptureTextCommand.Execute(null);
                 break;
             case SettingsId:
                 tray.OpenSettingsCommand.Execute(null);

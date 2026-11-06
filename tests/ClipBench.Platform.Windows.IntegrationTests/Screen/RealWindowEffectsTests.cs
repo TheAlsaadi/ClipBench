@@ -158,8 +158,7 @@ public class RealWindowEffectsTests
 
         // Taking the focus on purpose, with the shortcut or a click in a text box, has to work: the style is lifted for it, and
         // comes back when the window is put behind another one again.
-        _effects.BringToFront(window).IsSuccess.ShouldBeTrue();
-        form.WaitUntilInFront(TimeSpan.FromSeconds(5)).ShouldBeTrue("the window was not brought to the front");
+        BringToFrontAndWait(form, window);
         form.HasNoActivateStyle.ShouldBeFalse();
         PutBehind(other, behind);
         form.HasNoActivateStyle.ShouldBeTrue();
@@ -174,9 +173,26 @@ public class RealWindowEffectsTests
     // Another window is put in front, which is how a window really gets put behind: Windows tells it so on its own.
     private void PutBehind(TestEditForm other, WindowHandle otherWindow)
     {
-        _effects.BringToFront(otherWindow).IsSuccess.ShouldBeTrue();
-        other.WaitUntilInFront(TimeSpan.FromSeconds(5)).ShouldBeTrue("the other window was not brought to the front");
+        BringToFrontAndWait(other, otherWindow);
         Thread.Sleep(200);
+    }
+
+    // Windows can ignore a request to switch to a window that comes a moment after another switch, even from the program that has the focus:
+    // the first request after the previous switch went unanswered in every full run of this namespace, and the second was answered at once, while
+    // the test passed on its own. So the request is repeated, which still fails the test if the window never comes to the front.
+    private void BringToFrontAndWait(TestEditForm form, WindowHandle window)
+    {
+        const int Attempts = 5;
+        for (var attempt = 1; attempt <= Attempts; attempt++)
+        {
+            _effects.BringToFront(window).IsSuccess.ShouldBeTrue();
+            if (form.WaitUntilInFront(TimeSpan.FromSeconds(1)))
+            {
+                return;
+            }
+        }
+
+        Assert.Fail($"the window was not brought to the front in {Attempts} attempts; in front is " + TestEditForm.ForegroundTitle());
     }
 
     [Fact]

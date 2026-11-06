@@ -31,6 +31,8 @@ public class ScreenLocatorTests
             MonitorAskedFor.Add(point);
             return Monitor;
         }
+
+        public System.Collections.Immutable.ImmutableArray<MonitorBounds> GetMonitors() => [];
     }
 
     private readonly FakeScreen _screen = new();
