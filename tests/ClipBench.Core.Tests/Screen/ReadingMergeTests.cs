@@ -44,6 +44,63 @@ public class ReadingMergeTests
         ReadingMerge.ToText(Reading()).ShouldBeEmpty();
     }
 
+    // --- indentation, from where each line starts ---
+
+    // A word of a monospaced font, 10 pixels a letter.
+    private static RecognizedWord M(string text, double x, double y) => new(text, x, y, text.Length * 10, 10);
+
+    [Fact]
+    public void A_line_that_starts_further_right_than_the_others_is_indented_by_the_letters_that_fit_in_the_gap()
+    {
+        var lines = Reading(Line(M("def", 0, 0), M("f():", 40, 0)), Line(M("return", 40, 20), M("1", 110, 20)), Line(M("pass", 0, 40)));
+
+        ReadingMerge.ToText(lines).ShouldBe("def f():\r\n    return 1\r\npass");
+    }
+
+    [Fact]
+    public void Each_level_of_nesting_adds_its_own_indent()
+    {
+        var lines = Reading(Line(M("if", 0, 0), M("x:", 30, 0)), Line(M("while", 20, 20), M("y:", 70, 20)), Line(M("stop", 40, 40)));
+
+        ReadingMerge.ToText(lines).ShouldBe("if x:\r\n  while y:\r\n    stop");
+    }
+
+    [Fact]
+    public void A_stray_mark_left_of_the_text_does_not_indent_every_other_line()
+    {
+        // A border or a bullet read as a lone mark starts one line further left than the three lines that share a left edge.
+        var lines = Reading(Line(M("|", 0, 0), M("alpha", 25, 0)), Line(M("beta", 25, 20)), Line(M("gamma", 25, 40)), Line(M("delta", 25, 60)));
+
+        ReadingMerge.ToText(lines).ShouldBe("| alpha\r\nbeta\r\ngamma\r\ndelta");
+    }
+
+    [Fact]
+    public void A_ragged_left_edge_of_less_than_half_a_letter_is_not_an_indent()
+    {
+        var lines = Reading(Line(M("first", 0, 0)), Line(M("second", 4, 20)), Line(M("third", 0, 40)));
+
+        ReadingMerge.ToText(lines).ShouldBe("first\r\nsecond\r\nthird");
+    }
+
+    [Fact]
+    public void Lines_with_no_places_for_their_words_are_not_indented_and_a_right_to_left_line_is_left_alone()
+    {
+        var plain = new RecognizedLine("no places", []);
+        var arabic = new RecognizedLine(Mohammed, [M(Mohammed, 200, 20)]);
+
+        ReadingMerge.ToText(Reading(Line(M("start", 0, 0)), plain, arabic)).ShouldBe("start\r\nno places\r\n" + Mohammed);
+    }
+
+    [Fact]
+    public void An_indent_is_capped_so_a_wrong_place_cannot_make_a_huge_line()
+    {
+        var lines = Reading(Line(M("left", 0, 0)), Line(M("right", 5_000, 20)), Line(M("left", 0, 40)));
+
+        var text = ReadingMerge.ToText(lines);
+
+        text.Split("\r\n")[1].ShouldBe(new string(' ', 40) + "right");
+    }
+
     // --- choosing among readings in different languages ---
 
     [Fact]

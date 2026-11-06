@@ -67,6 +67,9 @@ public static class ReadingMerge
     // same place. The English model reads a chevron icon as ">>" with about 42; clean symbols in code are read with 70 and more.
     private const double SureOfSymbols = 60;
 
+    // The most spaces put before a line, so a word placed wrongly cannot make a line of thousands of spaces.
+    private const int MaxIndent = 40;
+
     // Two words that share at least this much of the smaller one's area are the same place read twice.
     private const double OverlapShare = 0.5;
 
@@ -76,7 +79,42 @@ public static class ReadingMerge
     public static string ToText(IReadOnlyList<RecognizedLine> lines)
     {
         ArgumentNullException.ThrowIfNull(lines);
-        return string.Join("\r\n", lines.Select(LineText));
+        var indents = Indents(lines);
+        return string.Join("\r\n", lines.Select((line, i) => new string(' ', indents[i]) + LineText(line)));
+    }
+
+    // How many spaces each line starts with, from where its first word is. Indentation is part of code (Python, YAML, JSON) and is lost
+    // when every line is flush left. The width of a letter is the typical width of a word's letters, so it is exact for the monospaced
+    // fonts code is shown in and close enough for others, where a gap of under half a letter counts as no indent.
+    private static int[] Indents(IReadOnlyList<RecognizedLine> lines)
+    {
+        var indents = new int[lines.Count];
+        var widths = lines.SelectMany(line => line.Words).Where(word => word.Text.Length >= 3 && word.Width > 0).Select(word => word.Width / word.Text.Length).Order().ToList();
+        if (widths.Count == 0)
+        {
+            return indents;
+        }
+
+        var letter = widths[widths.Count / 2];
+        var lefts = lines.Select(line => line.Words.Count == 0 || LineOrder.ContainsRightToLeft(line.Text) ? double.NaN : line.Words.Min(word => word.X)).ToList();
+        var known = lefts.Where(left => !double.IsNaN(left)).Order().ToList();
+        if (known.Count < 2)
+        {
+            return indents;
+        }
+
+        // The left edge of the text is the leftmost place that two lines share. A lone mark further left (a border, a bullet read as a letter)
+        // does not move it, and when no two lines share an edge it is simply the leftmost.
+        var margin = known.FirstOrDefault(left => known.Count(other => Math.Abs(other - left) < letter / 2) >= 2, known[0]);
+        for (var i = 0; i < indents.Length; i++)
+        {
+            if (!double.IsNaN(lefts[i]))
+            {
+                indents[i] = (int)Math.Clamp(Math.Round((lefts[i] - margin) / letter), 0, MaxIndent);
+            }
+        }
+
+        return indents;
     }
 
     /// <summary>Chooses the reading to use, combining a right-to-left reading with a reading in another script when there are both.</summary>
