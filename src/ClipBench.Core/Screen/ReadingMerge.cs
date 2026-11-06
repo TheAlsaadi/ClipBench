@@ -63,82 +63,23 @@ public static class ReadingMerge
     // and under 30 to 1% of the words it read right.
     private const double TrustedConfidence = 30;
 
-    // A word made only of symbols that the Latin engine read with less confidence than this is replaced by the symbols another engine read in the
-    // same place. The English model reads a chevron icon as ">>" with about 42; clean symbols in code are read with 70 and more.
+    // A word the Latin engine read with less confidence than this can be replaced by what another engine read in the same place (see Replaces).
+    // The English model reads a chevron icon as ">>" with about 42 and a blue "[80," as "(86," with 59; clean symbols in code are read with 70 and more.
     private const double SureOfSymbols = 60;
-
-    // A font is taken to be monospaced when the width of a letter, over the words of three letters or more, varies by less than this share
-    // (0.03 in the pictures measured, 0.15 and more for proportional text), judged on at least this many words.
-    private const double MonospacedSpread = 0.08;
-    private const int MinWordsToJudgeFont = 3;
-
-    // In a monospaced font two words closer than this many letters have no space between them (a real space is a letter wide; the narrow dot
-    // that separated "Model." from "from_pretrained(" left 0.74 of a letter, the narrowest real space measured 1.1).
-    private const double JoinBelowLetters = 0.9;
-
-    // The most spaces put before a line, so a word placed wrongly cannot make a line of thousands of spaces.
-    private const int MaxIndent = 40;
 
     // Two words that share at least this much of the smaller one's area are the same place read twice.
     private const double OverlapShare = 0.5;
 
-    /// <summary>The text of a reading: lines in order, right-to-left lines in reading order, joined with a line break.</summary>
+    /// <summary>
+    /// The text of a reading: lines in order and indented as far as their places show, right-to-left lines in reading order, joined with a line
+    /// break. A list bullet read as a letter and the zero of a code font read as "@" are put right.
+    /// </summary>
     /// <param name="lines">The reading.</param>
     /// <returns>The text.</returns>
     public static string ToText(IReadOnlyList<RecognizedLine> lines)
     {
         ArgumentNullException.ThrowIfNull(lines);
-        var letter = LetterWidth(lines);
-        var indents = Indents(lines, letter);
-        var joinBelow = letter is { Monospaced: true } ? letter.Value.Width * JoinBelowLetters : 0;
-        return string.Join("\r\n", lines.Select((line, i) => new string(' ', indents[i]) + LineText(line, joinBelow)));
-    }
-
-    // The width of a letter in a reading (the median over its words) and whether the letters all have the same width, as in the fonts code is shown in.
-    private static (double Width, bool Monospaced)? LetterWidth(IReadOnlyList<RecognizedLine> lines)
-    {
-        var widths = lines.SelectMany(line => line.Words).Where(word => word.Text.Length >= 3 && word.Width > 0).Select(word => word.Width / word.Text.Length).Order().ToList();
-        if (widths.Count == 0)
-        {
-            return null;
-        }
-
-        var mean = widths.Average();
-        var spread = Math.Sqrt(widths.Sum(width => (width - mean) * (width - mean)) / widths.Count) / mean;
-        return (widths[widths.Count / 2], widths.Count >= MinWordsToJudgeFont && spread < MonospacedSpread);
-    }
-
-    // How many spaces each line starts with, from where its first word is. Indentation is part of code (Python, YAML, JSON) and is lost
-    // when every line is flush left. The width of a letter is the typical width of a word's letters, so it is exact for the monospaced
-    // fonts code is shown in and close enough for others, where a gap of under half a letter counts as no indent.
-    private static int[] Indents(IReadOnlyList<RecognizedLine> lines, (double Width, bool Monospaced)? measured)
-    {
-        var indents = new int[lines.Count];
-        if (measured is not { } size)
-        {
-            return indents;
-        }
-
-        var letter = size.Width;
-        var lefts = lines.Select(line => line.Words.Count == 0 || LineOrder.ContainsRightToLeft(line.Text) ? double.NaN : line.Words.Min(word => word.X)).ToList();
-        var known = lefts.Where(left => !double.IsNaN(left)).Order().ToList();
-        if (known.Count < 2)
-        {
-            return indents;
-        }
-
-        // The left edge of the text is the leftmost place that two lines share. A lone mark further left (a border, a bullet read as a letter)
-        // does not move it, and when no two lines share an edge it is simply the leftmost.
-        var margin = known.FirstOrDefault(left => known.Count(other => Math.Abs(other - left) < letter / 2) >= 2, known[0]);
-        for (var i = 0; i < indents.Length; i++)
-        {
-            if (!double.IsNaN(lefts[i]))
-            {
-                indents[i] = (int)Math.Clamp(Math.Round((lefts[i] - margin) / letter), 0, MaxIndent);
-            }
-        }
-
-        return indents;
+        return ReadingText.Write(lines);
     }
 
     /// <summary>Chooses the reading to use, combining a right-to-left reading with a reading in another script when there are both.</summary>
@@ -191,8 +132,8 @@ public static class ReadingMerge
     // The Latin reading with each symbol it is unsure of swapped for the symbol another reading has there. The same reading when nothing changes.
     private static IReadOnlyList<RecognizedLine> Refine(IReadOnlyList<RecognizedLine> latin, List<IReadOnlyList<RecognizedLine>> rivals)
     {
-        var symbols = rivals.SelectMany(reading => reading).SelectMany(line => line.Words).Where(IsSymbolsOnly).ToList();
-        if (symbols.Count == 0)
+        var others = rivals.SelectMany(reading => reading).SelectMany(line => line.Words).ToList();
+        if (others.Count == 0)
         {
             return latin;
         }
@@ -205,8 +146,8 @@ public static class ReadingMerge
             var lineChanged = false;
             foreach (var word in line.Words)
             {
-                var swap = word.Confidence < SureOfSymbols && IsSymbolsOnly(word) ? symbols.FindIndex(known => Overlap(known, word)) : -1;
-                words.Add(swap >= 0 ? symbols[swap] : word);
+                var swap = word.Confidence < SureOfSymbols ? others.FindIndex(known => Overlap(known, word) && Replaces(known, word)) : -1;
+                words.Add(swap >= 0 ? others[swap] : word);
                 lineChanged |= swap >= 0;
             }
 
@@ -215,6 +156,54 @@ public static class ReadingMerge
         }
 
         return changed ? lines : latin;
+    }
+
+    // Another engine's word replaces one the Latin engine is unsure of when both are only symbols (a chevron icon read as ">>" by the English
+    // model and as ">" by Windows), or when they have the same letters in the same places and differ only in digits and symbols: the English
+    // model read the blue "[80," of a dark JSON block as "(86," with confidence 59, and Windows read it right. A word with a letter of its own
+    // is never swapped, so the Windows engine's "1" for "l" and "O" for "0" do not come in.
+    private static bool Replaces(RecognizedWord other, RecognizedWord latin)
+    {
+        if (IsSymbolsOnly(latin))
+        {
+            return IsSymbolsOnly(other);
+        }
+
+        if (other.Text.Length != latin.Text.Length || other.Text == latin.Text)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < latin.Text.Length; i++)
+        {
+            if (other.Text[i] != latin.Text[i] && !SameKind(other.Text[i], latin.Text[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Two characters that may stand for each other: two digits, or two symbols that are not an opening and a closing bracket. The Arabic
+    // engine mirrors brackets ("[i]" comes back as "]i["), and a digit for a symbol is a different kind of mistake, not a better reading.
+    // Quotes are never given up: the English model reads them well, and the Windows engine made a dash of the closing quote of "log".
+    private static bool SameKind(char one, char two)
+    {
+        if (char.IsLetter(one) || char.IsLetter(two) || one is '"' or '\'' || two is '"' or '\'')
+        {
+            return false;
+        }
+
+        if (char.IsDigit(one) || char.IsDigit(two))
+        {
+            return char.IsDigit(one) && char.IsDigit(two);
+        }
+
+        const string Opening = "([{<";
+        const string Closing = ")]}>";
+        return !(Opening.Contains(one, StringComparison.Ordinal) && Closing.Contains(two, StringComparison.Ordinal))
+            && !(Closing.Contains(one, StringComparison.Ordinal) && Opening.Contains(two, StringComparison.Ordinal));
     }
 
     private static bool IsSymbolsOnly(RecognizedWord word) => word.Text.Any(c => !char.IsWhiteSpace(c)) && !word.Text.Any(char.IsLetterOrDigit);
@@ -304,30 +293,6 @@ public static class ReadingMerge
 
         var smaller = Math.Min(a.Width * a.Height, b.Width * b.Height);
         return smaller > 0 && (width * height) / smaller >= OverlapShare;
-    }
-
-    private static string LineText(RecognizedLine line, double joinBelow)
-    {
-        if (LineOrder.ContainsRightToLeft(line.Text))
-        {
-            return LineOrder.ToLogical([.. line.Words.OrderBy(word => word.X).Select(word => word.Text)]);
-        }
-
-        // The engine puts a space between two words it sees apart, and in code it sees "Model." and "from_pretrained(" apart because a dot is
-        // narrow. In a monospaced font a real space is a whole letter wide, so less than that between two words is no space.
-        if (joinBelow <= 0 || line.Words.Count < 2 || line.Text != string.Join(' ', line.Words.Select(word => word.Text)))
-        {
-            return line.Text;
-        }
-
-        var text = new StringBuilder(line.Words[0].Text);
-        for (var i = 1; i < line.Words.Count; i++)
-        {
-            var gap = line.Words[i].X - (line.Words[i - 1].X + line.Words[i - 1].Width);
-            _ = gap < joinBelow ? text.Append(line.Words[i].Text) : text.Append(' ').Append(line.Words[i].Text);
-        }
-
-        return text.ToString();
     }
 
     private static string Joined(IReadOnlyList<RecognizedLine> lines) => string.Join("\n", lines.Select(line => line.Text));

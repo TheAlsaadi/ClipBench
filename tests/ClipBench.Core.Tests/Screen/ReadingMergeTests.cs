@@ -134,6 +134,160 @@ public class ReadingMergeTests
         ReadingMerge.ToText(Reading(line, Line(M("tokenizer", 0, 20)), Line(M("another", 0, 40)))).ShouldStartWith("AutoModel.  from_pretrained(");
     }
 
+    // --- the zero of a code font read as "@" ---
+
+    [Theory]
+    [InlineData(@"net10.@-windows10.@.19041.@\win-x64", @"net10.0-windows10.0.19041.0\win-x64")]
+    [InlineData("v@.2.@", "v0.2.0")]
+    [InlineData("version 1.@.3 and 2@25", "version 1.0.3 and 2025")]
+    public void An_at_sign_between_the_digits_and_dots_of_a_number_is_a_zero(string read, string expected)
+    {
+        ReadingMerge.ToText(Reading(new RecognizedLine(read, []))).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("mail me@example.com or user1@host.org")]
+    [InlineData("@property")]
+    [InlineData("x = a @ b")]
+    [InlineData("10.@example.com")]
+    public void An_at_sign_in_an_address_a_decorator_or_an_operator_stays(string text)
+    {
+        ReadingMerge.ToText(Reading(new RecognizedLine(text, []))).ShouldBe(text);
+    }
+
+    // --- a closing bracket read as something else, in code ---
+
+    // Lines of code in a monospaced font, 10 pixels a letter and 20 a line: each word placed at its column, so the indentation is kept.
+    private static RecognizedLine[] Code(params string[] text) =>
+    [
+        .. text.Select((line, row) =>
+        {
+            var words = new List<RecognizedWord>();
+            var column = 0;
+            foreach (var token in line.Split(' '))
+            {
+                if (token.Length > 0)
+                {
+                    words.Add(M(token, column * 10, row * 20));
+                }
+
+                column += token.Length + 1;
+            }
+
+            return Line([.. words]);
+        }),
+    ];
+
+    [Fact]
+    public void A_closing_bracket_that_does_not_match_the_open_one_is_the_one_that_closes_it()
+    {
+        var text = ReadingMerge.ToText(Code("{", " \"ports\": [80, 2222, 28081),", " \"name\": \"x\"", "}"));
+
+        text.Split("\r\n")[1].ShouldBe(" \"ports\": [80, 2222, 28081],");
+    }
+
+    [Fact]
+    public void A_line_of_one_stroke_where_an_open_bracket_closes_at_its_indent_is_that_closing_bracket()
+    {
+        // "]," read as "1," at the end of a JSON list, and ")" read as "d" at the end of a Python call.
+        var json = ReadingMerge.ToText(Code("{", " \"extensions\": [", "  \"one\",", "  \"two\"", " 1,", "}")).Split("\r\n");
+        var python = ReadingMerge.ToText(Code("model = load(", "  \"name\",", "  trust=True,", "d", "model.cuda()")).Split("\r\n");
+
+        json[4].ShouldBe(" ],");
+        python[3].ShouldBe(")");
+    }
+
+    [Fact]
+    public void Brackets_are_changed_only_when_that_leaves_fewer_of_them_unmatched()
+    {
+        // "string[] args" read as "string]]args": the first "]" is a misread "[", so closing the "(" there would leave one more unmatched.
+        ReadingMerge.ToText(Code("public void Main(string]]args)")).ShouldBe("public void Main(string]]args)");
+    }
+
+    [Fact]
+    public void A_stroke_or_a_bracket_is_left_alone_where_no_open_bracket_explains_it()
+    {
+        // No bracket is open; the open one closes at another indent; the closing bracket matches; a bracket in a string; prose.
+        ReadingMerge.ToText(Code("x = 1", "d", "y = 2")).Split("\r\n")[1].ShouldBe("d");
+        ReadingMerge.ToText(Code("call(", "  first,", "  d", "after")).Split("\r\n")[2].ShouldBe("  d");
+        ReadingMerge.ToText(Code("items = [1, 2]", "other = (3)", "z")).ShouldBe("items = [1, 2]\r\nother = (3)\r\nz");
+        ReadingMerge.ToText(Code("text = \"[a)\"", "next = 1", "last = 2")).Split("\r\n")[0].ShouldBe("text = \"[a)\"");
+        ReadingMerge.ToText(Reading(new RecognizedLine("see [note) here", []))).ShouldBe("see [note) here");
+    }
+
+    // --- a bullet read as a letter ---
+
+    // A reading of prose 22 pixels high with lowercase letters 16 high, so a bullet (a small dot) is clearly smaller than a letter.
+    private static RecognizedLine Prose(double y, params (string Text, double X, double Width, double Height)[] words) =>
+        Line([.. words.Select(word => new RecognizedWord(word.Text, word.X, y + 22 - word.Height, word.Width, word.Height))]);
+
+    [Fact]
+    public void A_small_round_mark_read_as_e_before_a_line_is_a_bullet()
+    {
+        var lines = Reading(
+            Prose(0, ("e", 2, 10, 10), ("Your", 50, 61, 22), ("hand", 120, 66, 22), ("test.", 196, 56, 20)),
+            Prose(40, ("a", 50, 13, 16), ("command", 72, 130, 22), ("one", 210, 50, 16)),
+            Prose(80, ("e?", 2, 10, 10), ("Your", 50, 61, 22), ("approval", 120, 117, 28)));
+
+        var text = ReadingMerge.ToText(lines).Split("\r\n");
+
+        text[0].ShouldBe((char)0x2022 + " Your hand test.");
+        text[2].ShouldBe((char)0x2022 + " Your approval");
+    }
+
+    [Fact]
+    public void A_real_letter_e_as_tall_as_the_other_lowercase_letters_is_kept()
+    {
+        var lines = Reading(
+            Prose(0, ("e", 2, 13, 16), ("poi", 24, 40, 22)),
+            Prose(40, ("a", 2, 13, 16), ("one", 24, 50, 16)));
+
+        ReadingMerge.ToText(lines).Split("\r\n")[0].ShouldBe("e poi");
+    }
+
+    [Fact]
+    public void A_lone_round_mark_read_as_an_at_sign_at_the_start_of_a_line_is_a_bullet_followed_by_a_space()
+    {
+        // The command marks of a terminal. "@" on its own is not a word; here it is also closer to the next word than a monospaced space.
+        var lines = Reading(
+            Line(new RecognizedWord("@", 0, 0, 10, 10), M("PS", 18, 0), M(@"C:\Users\me>", 50, 0)),
+            Line(new RecognizedWord("@", 0, 20, 10, 10), M("PS", 18, 20), M(@"C:\Users\me>", 50, 20)),
+            Line(M("third", 0, 40), M("line", 60, 40)));
+
+        ReadingMerge.ToText(lines).Split("\r\n")[0].ShouldBe((char)0x2022 + @" PS C:\Users\me>");
+    }
+
+    [Fact]
+    public void Words_whose_boxes_touch_or_overlap_keep_their_space_when_the_font_is_not_known_to_be_monospaced()
+    {
+        // "foo() > bar()": the engine's boxes for "foo()" and ">" overlap by a pixel; with too few words to judge the font, nothing is joined.
+        var lines = Reading(Line(new RecognizedWord("foo()", 0, 0, 52, 10), new RecognizedWord(">", 51, 0, 10, 10), new RecognizedWord("bar()", 70, 0, 52, 10)));
+
+        ReadingMerge.ToText(lines).ShouldBe("foo() > bar()");
+    }
+
+    [Fact]
+    public void A_few_words_with_one_odd_width_are_not_enough_to_call_a_font_monospaced()
+    {
+        // Three words of even letters and one wider: with so few words that is as likely a proportional font, so narrow gaps stay spaces.
+        var lines = Reading(Line(M("abc", 0, 0), M("defg", 35, 0), M("hij", 80, 0), new RecognizedWord("WWW", 115, 0, 60, 10)));
+
+        ReadingMerge.ToText(lines).ShouldBe("abc defg hij WWW");
+    }
+
+    [Fact]
+    public void One_word_box_stretched_over_the_words_after_it_does_not_hide_that_the_font_is_monospaced()
+    {
+        // The engine gave the first path a box 1.6 times too wide that runs over "19041", which made the letters look uneven, so words
+        // the engine had split were not joined again.
+        var lines = Reading(
+            Line(M(@"C:\Users\me>", 0, 0), new RecognizedWord("windows10.0.", 130, 0, 192, 10), M("19041", 250, 0), M(@".0\win-x64", 300, 0)),
+            Line(M(@"C:\Users\me>", 0, 20), M("another", 130, 20)),
+            Line(M("third", 0, 40), M("line", 60, 40)));
+
+        ReadingMerge.ToText(lines).Split("\r\n")[0].ShouldBe(@"C:\Users\me> windows10.0.19041.0\win-x64");
+    }
+
     // --- choosing among readings in different languages ---
 
     [Fact]
@@ -348,6 +502,41 @@ public class ReadingMergeTests
         ReadingMerge.ToText(ReadingMerge.Choose([unsureLetters, windows], latinIndex: 0)).ShouldBe("v4lue");
         ReadingMerge.ToText(ReadingMerge.Choose([unsureAlone, elsewhere], latinIndex: 0)).ShouldBe(">>");
         ReadingMerge.ToText(ReadingMerge.Choose([unsureAlone, wordsOnly], latinIndex: 0)).ShouldBe(">>");
+    }
+
+    [Fact]
+    public void Digits_and_brackets_the_latin_engine_is_unsure_of_give_way_to_another_engine_that_read_the_same_word_with_other_digits_and_brackets()
+    {
+        // Blue numbers in a dark JSON block: the English model read "[80," as "(86," with confidence 59, the Windows engine read it right.
+        var latin = Reading(Line(WC("\"ports\":", 0, 90, 89), WC("(86,", 100, 40, 59), WC("2222,", 150, 50, 96)));
+        var windows = Reading(Line(W("\"ports\".", 0, 90), W("[80,", 100, 40), W("2222,", 150, 50)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([latin, windows], latinIndex: 0)).ShouldBe("\"ports\": [80, 2222,");
+    }
+
+    [Fact]
+    public void A_sure_word_a_word_of_another_length_or_a_word_that_differs_in_a_letter_is_not_replaced_by_another_engine()
+    {
+        var windows = Reading(Line(W("[80,", 100, 40), W("2081),", 150, 60), W("Re1ease", 220, 70)));
+
+        var sure = Reading(Line(WC("(86,", 100, 40, 75)));
+        var longer = Reading(Line(WC("28081),", 150, 60, 50)));
+        var letter = Reading(Line(WC("Release", 220, 70, 40)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([sure, windows], latinIndex: 0)).ShouldBe("(86,");
+        ReadingMerge.ToText(ReadingMerge.Choose([longer, windows], latinIndex: 0)).ShouldBe("28081),");
+        ReadingMerge.ToText(ReadingMerge.Choose([letter, windows], latinIndex: 0)).ShouldBe("Release");
+    }
+
+    [Fact]
+    public void A_mirrored_bracket_or_a_digit_in_place_of_a_symbol_from_another_engine_is_not_taken()
+    {
+        // The Arabic engine mirrors brackets ("[i]" comes back as "]i["), and a "0" where the Latin engine read ")" is no better.
+        // And a quote, which the English model reads well, is not given up for the dash the Windows engine made of it.
+        var latin = Reading(Line(WC("items[i];", 0, 90, 50), WC("foo)", 120, 40, 50), WC("find\"log\"", 200, 90, 50)));
+        var other = Reading(Line(W("items]i[;", 0, 90), W("foo0", 120, 40), W("find\"log-", 200, 90)));
+
+        ReadingMerge.ToText(ReadingMerge.Choose([latin, other], latinIndex: 0)).ShouldBe("items[i]; foo) find\"log\"");
     }
 
     [Fact]
