@@ -26,6 +26,11 @@ public partial class App : Application
         _paths = paths;
         _guard = guard;
         InitializeComponent();
+
+        // ClipBench lives in the tray, and every way out calls Exit itself. By default the message loop ends when the last
+        // window closes, which happens half way through shutting down (the popup and the queue window are closed first),
+        // so the history would never be closed and the shortcuts never given back.
+        DispatcherShutdownMode = DispatcherShutdownMode.OnExplicitShutdown;
     }
 
     /// <inheritdoc />

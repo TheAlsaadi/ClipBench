@@ -163,6 +163,8 @@ internal sealed class AppRoot : IAsyncDisposable
                 log.Write(ActivityLevel.Warning, ActivityEvent.StartupRegistrationFailed, new ActivityDetails { Error = reconciled.Error.Code });
             }
 
+            // Loading trims the history to its limits, for good, so the limits the user chose must be in place first.
+            await services.GetRequiredService<SettingsApplier>().WhenIdleAsync();
             var library = services.GetRequiredService<ClipLibrary>();
             var loaded = await library.LoadAsync(cancellationToken);
             if (loaded.IsFailure)
@@ -380,6 +382,9 @@ internal sealed class AppRoot : IAsyncDisposable
         _hud.Close();
         _settingsWindow?.Shutdown();
         await _services.GetRequiredService<ExpirySweeper>().StopAsync();
+
+        // A change of limits still being applied writes to the history, which is about to close.
+        await _services.GetRequiredService<SettingsApplier>().WhenIdleAsync();
         await DisposeAllAsync(_services, _storage, _platform);
     }
 
