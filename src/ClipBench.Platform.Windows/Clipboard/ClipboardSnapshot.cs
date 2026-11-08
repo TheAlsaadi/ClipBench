@@ -16,7 +16,8 @@ internal sealed class ClipboardSnapshot : IDisposable
 
     /// <summary>
     /// Copies every format that is plain memory. Formats that are handles to graphics objects are left out
-    /// (Windows makes them again from the bitmap formats), and so are formats that cannot be read.
+    /// (Windows makes the bitmap handle again from the bitmap formats; metafile pictures are lost, ADR 0011), and so are
+    /// formats that cannot be read.
     /// </summary>
     /// <param name="session">The open clipboard.</param>
     /// <param name="maxBytes">The most bytes to copy in all.</param>
