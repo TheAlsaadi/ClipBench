@@ -82,7 +82,7 @@ public static class FindReplace
         var regex = Compile(options, limit, out var failure);
         return regex is null
             ? Result.Failure<TextTransform>(failure)
-            : Result.Success(Wrap(text => ReplacePattern(text, regex, options.Replace, maxCharacters)));
+            : Result.Success(Wrap(text => ReplacePattern(text, regex, options.Replace, maxCharacters, NamesCarriageReturn(options.Find))));
     }
 
     private static TextTransform Wrap(Func<string, Result<string>> apply) =>
@@ -108,10 +108,11 @@ public static class FindReplace
     }
 
     // "$" in a pattern matches before a line feed only, so a text with Windows line breaks is matched with plain line
-    // feeds and given its line breaks back. Text with any other mix of line breaks is matched as it is.
-    private static Result<string> ReplacePattern(string text, Regex regex, string replacement, int maxCharacters)
+    // feeds and given its line breaks back. Text with any other mix of line breaks, or a pattern that names the
+    // carriage return itself (which would then never be found), is matched as it is.
+    private static Result<string> ReplacePattern(string text, Regex regex, string replacement, int maxCharacters, bool namesCarriageReturn)
     {
-        var windowsLines = HasOnlyWindowsLineBreaks(text);
+        var windowsLines = !namesCarriageReturn && HasOnlyWindowsLineBreaks(text);
         var input = windowsLines ? text.Replace(WindowsBreak, UnixBreak, StringComparison.Ordinal) : text;
 
         long growth = 0;
@@ -161,6 +162,38 @@ public static class FindReplace
         return windows > 0
             && text.AsSpan().Count('\r') == windows
             && text.AsSpan().Count('\n') == windows;
+    }
+
+    // True when the pattern writes a carriage return, as itself or as an escape: r, x0D, u000D, cM or 015 after a
+    // backslash. A doubled backslash stands for a backslash, so the letter after it is not an escape.
+    private static bool NamesCarriageReturn(string pattern)
+    {
+        for (var at = 0; at < pattern.Length; at++)
+        {
+            if (pattern[at] == '\r')
+            {
+                return true;
+            }
+
+            if (pattern[at] != '\\' || at + 1 >= pattern.Length)
+            {
+                continue;
+            }
+
+            var rest = pattern.AsSpan(at + 1);
+            if (rest[0] == 'r'
+                || rest.StartsWith("x0D", StringComparison.OrdinalIgnoreCase)
+                || rest.StartsWith("u000D", StringComparison.OrdinalIgnoreCase)
+                || rest.StartsWith("cM", StringComparison.OrdinalIgnoreCase)
+                || rest.StartsWith("015", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            at++;
+        }
+
+        return false;
     }
 
     // The engine that cannot backtrack is used whenever the pattern allows it, so most patterns cannot be made to take

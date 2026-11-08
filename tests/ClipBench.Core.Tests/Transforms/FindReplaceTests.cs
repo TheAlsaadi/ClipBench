@@ -108,6 +108,27 @@ public class FindReplaceTests
         Pattern("a\r\nb", "^", "- ").ShouldBe("- a\r\n- b");
     }
 
+    [Theory]
+    [InlineData(@"\r\n", ",", "a,b")]
+    [InlineData(@"\r", "", "a\nb")]
+    [InlineData(@"[\r\n]+", " ", "a b")]
+    [InlineData(@"\x0D", "", "a\nb")]
+    [InlineData(@"\x0d\n", ",", "a,b")]
+    [InlineData(@"\u000D\n", ",", "a,b")]
+    [InlineData(@"\cM\n", ",", "a,b")]
+    [InlineData(@"\015\n", ",", "a,b")]
+    [InlineData("\r\n", ",", "a,b")]
+    public void A_pattern_that_names_the_carriage_return_finds_it_in_text_with_Windows_line_breaks(string pattern, string replace, string expected)
+    {
+        Pattern("a\r\nb", pattern, replace).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void An_escaped_backslash_before_r_is_not_read_as_a_carriage_return()
+    {
+        Pattern("a\\r\r\nb\r\n", @"\\r$", "!").ShouldBe("a!\r\nb\r\n");
+    }
+
     [Fact]
     public void A_pattern_that_would_take_forever_on_a_backtracking_engine_finishes()
     {
