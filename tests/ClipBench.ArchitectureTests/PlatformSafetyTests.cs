@@ -189,6 +189,19 @@ public partial class PlatformSafetyTests
     }
 
     [Fact]
+    public void The_app_runs_commands_through_the_runner_that_skips_one_still_running()
+    {
+        // ICommand.Execute on an async command starts it again and cancels the run in progress (CommandRunner says why).
+        var offenders = SourceFiles()
+            .Where(file => file.Path.StartsWith("src/ClipBench.App/", StringComparison.Ordinal)
+                && LineComments().Replace(file.Text, string.Empty).Contains("Command.Execute(", StringComparison.Ordinal))
+            .Select(file => file.Path)
+            .ToList();
+
+        offenders.ShouldBeEmpty("use TryExecute from ClipBench.Presentation.Hosting.CommandRunner");
+    }
+
+    [Fact]
     public void Only_the_Windows_layer_uses_the_Tesseract_library()
     {
         var users = SourceArchitecture.Value.Assemblies

@@ -1,4 +1,5 @@
 using ClipBench.Presentation.Boards;
+using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Snippets;
 using Microsoft.UI.Xaml;
@@ -56,7 +57,7 @@ public sealed partial class PopupWindow
     {
         if (ChooseRow(sender) is not null)
         {
-            ViewModel.ToggleMarkCommand.Execute(null);
+            ViewModel.ToggleMarkCommand.TryExecute(null);
         }
     }
 
@@ -64,7 +65,7 @@ public sealed partial class PopupWindow
     {
         if (ChooseRow(sender) is not null)
         {
-            ViewModel.TogglePinCommand.Execute(null);
+            ViewModel.TogglePinCommand.TryExecute(null);
         }
     }
 
@@ -72,7 +73,7 @@ public sealed partial class PopupWindow
     {
         if (ChooseRow(sender) is not null)
         {
-            ViewModel.DeleteCommand.Execute(null);
+            ViewModel.DeleteCommand.TryExecute(null);
         }
     }
 
@@ -127,20 +128,20 @@ public sealed partial class PopupWindow
             return;
         }
 
-        ViewModel.Sidebar.SelectEntryCommand.Execute(index);
+        ViewModel.Sidebar.SelectEntryCommand.TryExecute(index);
         args.Handled = true;
 
         var menu = new MenuFlyout();
         if (entry.IsBoard)
         {
-            AddItem(menu.Items, "Rename", "F2", () => ViewModel.Sidebar.StartRenameCommand.Execute(null));
-            AddItem(menu.Items, "Delete the board", "Ctrl+Shift+Delete", () => ViewModel.Sidebar.DeleteBoardCommand.Execute(null));
+            AddItem(menu.Items, "Rename", "F2", () => ViewModel.Sidebar.StartRenameCommand.TryExecute(null));
+            AddItem(menu.Items, "Delete the board", "Ctrl+Shift+Delete", () => ViewModel.Sidebar.DeleteBoardCommand.TryExecute(null));
             menu.Items.Add(new MenuFlyoutSeparator());
         }
 
         if (entry.Scope == PopupScope.Snippets)
         {
-            AddItem(menu.Items, "Edit the snippets…", "Ctrl+E", () => ViewModel.EditSnippetsCommand.Execute(null));
+            AddItem(menu.Items, "Edit the snippets…", "Ctrl+E", () => ViewModel.EditSnippetsCommand.TryExecute(null));
         }
 
         AddItem(menu.Items, "New board…", "Ctrl+N", StartNewBoard);
@@ -171,23 +172,23 @@ public sealed partial class PopupWindow
     private void ShowRowMenu(ClipRowViewModel row, FrameworkElement anchor, Point? position)
     {
         var menu = new MenuFlyout();
-        AddItem(menu.Items, "Paste", "Enter", () => ViewModel.PasteCommand.Execute(null));
-        AddItem(menu.Items, "Change the text, then paste…", "Shift+Enter", () => ViewModel.OpenTransformsCommand.Execute(null));
+        AddItem(menu.Items, "Paste", "Enter", () => ViewModel.PasteCommand.TryExecute(null));
+        AddItem(menu.Items, "Change the text, then paste…", "Shift+Enter", () => ViewModel.OpenTransformsCommand.TryExecute(null));
         if (row.LinkAddress is not null)
         {
             // Only offered for a web address, and only opened when this is chosen.
-            AddItem(menu.Items, "Open the link in your browser", null, () => ViewModel.OpenLinkCommand.Execute(null));
+            AddItem(menu.Items, "Open the link in your browser", null, () => ViewModel.OpenLinkCommand.TryExecute(null));
         }
 
         menu.Items.Add(new MenuFlyoutSeparator());
-        AddItem(menu.Items, row.IsMarked ? "Unselect" : "Select, to paste several clips", "Space", () => ViewModel.ToggleMarkCommand.Execute(null));
-        AddItem(menu.Items, row.IsPinned ? "Unpin" : "Pin", "Ctrl+P", () => ViewModel.TogglePinCommand.Execute(null));
+        AddItem(menu.Items, row.IsMarked ? "Unselect" : "Select, to paste several clips", "Space", () => ViewModel.ToggleMarkCommand.TryExecute(null));
+        AddItem(menu.Items, row.IsPinned ? "Unpin" : "Pin", "Ctrl+P", () => ViewModel.TogglePinCommand.TryExecute(null));
 
         var boards = new MenuFlyoutSubItem { Text = "Add to a board" };
         foreach (var entry in ViewModel.Sidebar.BoardEntries)
         {
             var id = entry.Board!.Value;
-            AddItem(boards.Items, entry.Name, null, () => ViewModel.AddToBoardCommand.Execute(id));
+            AddItem(boards.Items, entry.Name, null, () => ViewModel.AddToBoardCommand.TryExecute(id));
         }
 
         if (boards.Items.Count > 0)
@@ -200,30 +201,30 @@ public sealed partial class PopupWindow
 
         if (row.IsOnBoard)
         {
-            AddItem(menu.Items, "Take off its board", "Ctrl+Shift+D", () => ViewModel.RemoveFromBoardCommand.Execute(null));
+            AddItem(menu.Items, "Take off its board", "Ctrl+Shift+D", () => ViewModel.RemoveFromBoardCommand.TryExecute(null));
         }
 
         if (ViewModel.Sidebar.Scope == PopupScope.Board && string.IsNullOrEmpty(ViewModel.SearchText))
         {
-            AddItem(menu.Items, "Move up", "Ctrl+Up", () => ViewModel.MoveUpInBoardCommand.Execute(null));
-            AddItem(menu.Items, "Move down", "Ctrl+Down", () => ViewModel.MoveDownInBoardCommand.Execute(null));
+            AddItem(menu.Items, "Move up", "Ctrl+Up", () => ViewModel.MoveUpInBoardCommand.TryExecute(null));
+            AddItem(menu.Items, "Move down", "Ctrl+Down", () => ViewModel.MoveDownInBoardCommand.TryExecute(null));
         }
 
         if (row.IsSensitive)
         {
-            AddItem(menu.Items, row.IsRevealed ? "Hide" : "Show", "Ctrl+R", () => ViewModel.RevealCommand.Execute(null));
+            AddItem(menu.Items, row.IsRevealed ? "Hide" : "Show", "Ctrl+R", () => ViewModel.RevealCommand.TryExecute(null));
         }
 
         menu.Items.Add(new MenuFlyoutSeparator());
-        AddItem(menu.Items, "Delete", "Del", () => ViewModel.DeleteCommand.Execute(null));
+        AddItem(menu.Items, "Delete", "Del", () => ViewModel.DeleteCommand.TryExecute(null));
         ShowMenu(menu, anchor, position);
     }
 
     private void ShowSnippetMenu(FrameworkElement anchor, Point? position)
     {
         var menu = new MenuFlyout();
-        AddItem(menu.Items, "Paste", "Enter", () => ViewModel.PasteCommand.Execute(null));
-        AddItem(menu.Items, "Edit the snippets…", "Ctrl+E", () => ViewModel.EditSnippetsCommand.Execute(null));
+        AddItem(menu.Items, "Paste", "Enter", () => ViewModel.PasteCommand.TryExecute(null));
+        AddItem(menu.Items, "Edit the snippets…", "Ctrl+E", () => ViewModel.EditSnippetsCommand.TryExecute(null));
         ShowMenu(menu, anchor, position);
     }
 

@@ -1,6 +1,7 @@
 using ClipBench.Core.Pasting;
 using ClipBench.Core.Screen;
 using ClipBench.Presentation.Boards;
+using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Rows;
 using ClipBench.Presentation.Snippets;
@@ -147,7 +148,7 @@ public sealed partial class PopupWindow : Window
         // Clicking anywhere else, or switching to another window, puts the popup away. A locked popup stays.
         if (args.WindowActivationState == WindowActivationState.Deactivated && ViewModel.IsOpen && !ViewModel.IsLocked)
         {
-            ViewModel.CloseNowCommand.Execute(null);
+            ViewModel.CloseNowCommand.TryExecute(null);
         }
     }
 
@@ -355,7 +356,7 @@ public sealed partial class PopupWindow : Window
         {
             var item = new MenuFlyoutItem { Text = entry.Name };
             var id = entry.Board!.Value;
-            item.Click += (_, _) => ViewModel.AddToBoardCommand.Execute(id);
+            item.Click += (_, _) => ViewModel.AddToBoardCommand.TryExecute(id);
             BoardMenu.Items.Add(item);
         }
 
@@ -392,7 +393,7 @@ public sealed partial class PopupWindow : Window
     private void StartNewBoard()
     {
         ViewModel.Sidebar.IsOpen = true;
-        ViewModel.Sidebar.StartNewCommand.Execute(null);
+        ViewModel.Sidebar.StartNewCommand.TryExecute(null);
     }
 
     private void OnTransformsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -414,22 +415,22 @@ public sealed partial class PopupWindow : Window
         if (e.ClickedItem is TransformItemViewModel item)
         {
             ViewModel.Transforms.SelectedIndex = ViewModel.Transforms.Items.IndexOf(item);
-            ViewModel.ConfirmTransformCommand.Execute(null);
+            ViewModel.ConfirmTransformCommand.TryExecute(null);
         }
     }
 
-    private void TransformBack_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.Execute(null);
+    private void TransformBack_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.TryExecute(null);
 
     private void SnippetList_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is SnippetRowViewModel row)
         {
             ViewModel.SelectedIndex = ViewModel.Snippets.Rows.IndexOf(row);
-            ViewModel.PasteCommand.Execute(null);
+            ViewModel.PasteCommand.TryExecute(null);
         }
     }
 
-    private void SnippetPromptCancel_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.Execute(null);
+    private void SnippetPromptCancel_Click(object sender, RoutedEventArgs e) => ViewModel.EscapeCommand.TryExecute(null);
 
     // The first field of the prompt takes the cursor as it appears, so the user can start typing at once.
     private void SnippetField_Loaded(object sender, RoutedEventArgs e)
@@ -445,7 +446,7 @@ public sealed partial class PopupWindow : Window
         if (e.ClickedItem is ClipRowViewModel row)
         {
             ViewModel.SelectedIndex = ViewModel.Rows.IndexOf(row);
-            ViewModel.PasteCommand.Execute(null);
+            ViewModel.PasteCommand.TryExecute(null);
         }
     }
 
@@ -455,7 +456,7 @@ public sealed partial class PopupWindow : Window
         foreach (var option in PopupViewModel.SeparatorOptions)
         {
             var item = new MenuFlyoutItem { Text = option.Label };
-            item.Click += (_, _) => ViewModel.ChooseSeparatorCommand.Execute(option.Choice);
+            item.Click += (_, _) => ViewModel.ChooseSeparatorCommand.TryExecute(option.Choice);
             SeparatorMenu.Items.Add(item);
         }
 
@@ -493,7 +494,7 @@ public sealed partial class PopupWindow : Window
         {
             if (args.Key == VirtualKey.Enter)
             {
-                ViewModel.SetCustomSeparatorCommand.Execute(box.Text);
+                ViewModel.SetCustomSeparatorCommand.TryExecute(box.Text);
                 flyout.Hide();
                 args.Handled = true;
             }
@@ -513,9 +514,9 @@ public sealed partial class PopupWindow : Window
         flyout.ShowAt(SeparatorButton);
     }
 
-    private void TableColumn_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.Execute(TableLayout.Column);
+    private void TableColumn_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.TryExecute(TableLayout.Column);
 
-    private void TableRow_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.Execute(TableLayout.Row);
+    private void TableRow_Click(object sender, RoutedEventArgs e) => ViewModel.PasteTableCommand.TryExecute(TableLayout.Row);
 
     private void Root_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -556,19 +557,19 @@ public sealed partial class PopupWindow : Window
                 e.Handled = true;
                 break;
             case VirtualKey.Enter when shift:
-                ViewModel.OpenTransformsCommand.Execute(null);
+                ViewModel.OpenTransformsCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.K when control:
-                ViewModel.ToggleLockCommand.Execute(null);
+                ViewModel.ToggleLockCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.B when control:
-                ViewModel.Sidebar.ToggleCommand.Execute(null);
+                ViewModel.Sidebar.ToggleCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.E when control:
-                ViewModel.EditSnippetsCommand.Execute(null);
+                ViewModel.EditSnippetsCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.N when control:
@@ -576,15 +577,15 @@ public sealed partial class PopupWindow : Window
                 e.Handled = true;
                 break;
             case VirtualKey.F2:
-                ViewModel.Sidebar.StartRenameCommand.Execute(null);
+                ViewModel.Sidebar.StartRenameCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Delete when control && shift:
-                ViewModel.Sidebar.DeleteBoardCommand.Execute(null);
+                ViewModel.Sidebar.DeleteBoardCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.D when control && shift:
-                ViewModel.RemoveFromBoardCommand.Execute(null);
+                ViewModel.RemoveFromBoardCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.D when control:
@@ -592,73 +593,73 @@ public sealed partial class PopupWindow : Window
                 e.Handled = true;
                 break;
             case VirtualKey.Up when control:
-                ViewModel.MoveUpInBoardCommand.Execute(null);
+                ViewModel.MoveUpInBoardCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Down when control:
-                ViewModel.MoveDownInBoardCommand.Execute(null);
+                ViewModel.MoveDownInBoardCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.PageDown when control:
-                ViewModel.Sidebar.NextCommand.Execute(null);
+                ViewModel.Sidebar.NextCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.PageUp when control:
-                ViewModel.Sidebar.PreviousCommand.Execute(null);
+                ViewModel.Sidebar.PreviousCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case >= VirtualKey.Number1 and <= VirtualKey.Number9 when control:
-                ViewModel.Sidebar.SelectEntryCommand.Execute(e.Key - VirtualKey.Number1);
+                ViewModel.Sidebar.SelectEntryCommand.TryExecute(e.Key - VirtualKey.Number1);
                 e.Handled = true;
                 break;
             case VirtualKey.Down:
-                ViewModel.MoveDownCommand.Execute(null);
+                ViewModel.MoveDownCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Up:
-                ViewModel.MoveUpCommand.Execute(null);
+                ViewModel.MoveUpCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Enter:
-                ViewModel.PasteCommand.Execute(null);
+                ViewModel.PasteCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Escape:
-                ViewModel.EscapeCommand.Execute(null);
+                ViewModel.EscapeCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Delete when SearchBox.SelectionStart >= SearchBox.Text.Length:
                 // At the end of the text there is nothing to delete forward, so the key removes the clip instead.
-                ViewModel.DeleteCommand.Execute(null);
+                ViewModel.DeleteCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Space when control || SearchBox.Text.Length == 0:
                 // With nothing typed a space cannot start a search, so it marks the clip. Ctrl+Space marks while searching.
-                ViewModel.ToggleMarkCommand.Execute(null);
+                ViewModel.ToggleMarkCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.P when control:
-                ViewModel.TogglePinCommand.Execute(null);
+                ViewModel.TogglePinCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.R when control:
-                ViewModel.RevealCommand.Execute(null);
+                ViewModel.RevealCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.T when control:
-                ViewModel.PasteTableCommand.Execute(shift ? TableLayout.Row : TableLayout.Column);
+                ViewModel.PasteTableCommand.TryExecute(shift ? TableLayout.Row : TableLayout.Column);
                 e.Handled = true;
                 break;
             case VirtualKey.L when control:
-                ViewModel.ToggleCollectCommand.Execute(null);
+                ViewModel.ToggleCollectCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Q when control:
-                ViewModel.QueueCommand.Execute(null);
+                ViewModel.QueueCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.S when control:
-                ViewModel.NextSeparatorCommand.Execute(null);
+                ViewModel.NextSeparatorCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             default:
@@ -689,7 +690,7 @@ public sealed partial class PopupWindow : Window
                 var onLast = FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox { DataContext: SnippetFieldViewModel field } && ReferenceEquals(field, fields.LastOrDefault());
                 if (onLast)
                 {
-                    ViewModel.SubmitSnippetPromptCommand.Execute(null);
+                    ViewModel.SubmitSnippetPromptCommand.TryExecute(null);
                 }
                 else
                 {
@@ -699,7 +700,7 @@ public sealed partial class PopupWindow : Window
                 e.Handled = true;
                 break;
             case VirtualKey.Escape:
-                ViewModel.EscapeCommand.Execute(null);
+                ViewModel.EscapeCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             default:
@@ -713,11 +714,11 @@ public sealed partial class PopupWindow : Window
         switch (e.Key)
         {
             case VirtualKey.Enter:
-                ViewModel.Sidebar.SubmitEditCommand.Execute(null);
+                ViewModel.Sidebar.SubmitEditCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Escape:
-                ViewModel.EscapeCommand.Execute(null);
+                ViewModel.EscapeCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             default:
@@ -733,11 +734,11 @@ public sealed partial class PopupWindow : Window
         switch (e.Key)
         {
             case VirtualKey.Down when choosing:
-                picker.MoveDownCommand.Execute(null);
+                picker.MoveDownCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Up when choosing:
-                picker.MoveUpCommand.Execute(null);
+                picker.MoveUpCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Enter:
@@ -745,15 +746,15 @@ public sealed partial class PopupWindow : Window
                 e.Handled = true;
                 break;
             case VirtualKey.Escape:
-                ViewModel.EscapeCommand.Execute(null);
+                ViewModel.EscapeCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Space when control && choosing:
-                picker.AddToChainCommand.Execute(null);
+                picker.AddToChainCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Back when choosing && TransformFilterBox.Text.Length == 0:
-                picker.RemoveLastFromChainCommand.Execute(null);
+                picker.RemoveLastFromChainCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             default:

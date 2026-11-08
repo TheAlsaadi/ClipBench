@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using ClipBench.Core.Hotkeys;
+using ClipBench.Presentation.Hosting;
 using ClipBench.Presentation.Popup;
 using ClipBench.Presentation.Preferences;
 using ClipBench.Presentation.Snippets;
@@ -301,13 +302,13 @@ public sealed partial class SettingsWindow : Window
     }
 
     private void ApplyCustomSeparator_Click(object sender, RoutedEventArgs e) =>
-        ViewModel.Paste.ApplyCustomSeparatorCommand.Execute(CustomSeparatorBox.Text);
+        ViewModel.Paste.ApplyCustomSeparatorCommand.TryExecute(CustomSeparatorBox.Text);
 
     private void CustomSeparatorBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Enter)
         {
-            ViewModel.Paste.ApplyCustomSeparatorCommand.Execute(CustomSeparatorBox.Text);
+            ViewModel.Paste.ApplyCustomSeparatorCommand.TryExecute(CustomSeparatorBox.Text);
             e.Handled = true;
         }
     }
@@ -316,7 +317,7 @@ public sealed partial class SettingsWindow : Window
     {
         if (sender is FrameworkElement { Tag: string program })
         {
-            ViewModel.Privacy.RemoveProgramCommand.Execute(program);
+            ViewModel.Privacy.RemoveProgramCommand.TryExecute(program);
         }
     }
 
@@ -324,7 +325,7 @@ public sealed partial class SettingsWindow : Window
     {
         if (e.Key == VirtualKey.Enter)
         {
-            ViewModel.Privacy.AddProgramCommand.Execute(null);
+            ViewModel.Privacy.AddProgramCommand.TryExecute(null);
             e.Handled = true;
         }
     }
@@ -386,31 +387,31 @@ public sealed partial class SettingsWindow : Window
         switch (e.Key)
         {
             case VirtualKey.S when control && snippets:
-                ViewModel.Snippets.SaveCommand.Execute(null);
+                ViewModel.Snippets.SaveCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.N when control && snippets:
-                ViewModel.Snippets.NewCommand.Execute(null);
+                ViewModel.Snippets.NewCommand.TryExecute(null);
                 _ = NameBox.Focus(FocusState.Programmatic);
                 e.Handled = true;
                 break;
             case VirtualKey.Delete when control && snippets:
-                ViewModel.Snippets.DeleteCommand.Execute(null);
+                ViewModel.Snippets.DeleteCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.Escape:
                 // Backs out of one thing at a time: a question, then unsaved changes, then the window.
                 if (ViewModel.Privacy.IsConfirmingWipe)
                 {
-                    ViewModel.Privacy.CancelWipeCommand.Execute(null);
+                    ViewModel.Privacy.CancelWipeCommand.TryExecute(null);
                 }
                 else if (snippets && ViewModel.Snippets.IsConfirmingDelete)
                 {
-                    ViewModel.Snippets.CancelDeleteCommand.Execute(null);
+                    ViewModel.Snippets.CancelDeleteCommand.TryExecute(null);
                 }
                 else if (snippets && ViewModel.Snippets.IsDirty)
                 {
-                    ViewModel.Snippets.DiscardCommand.Execute(null);
+                    ViewModel.Snippets.DiscardCommand.TryExecute(null);
                 }
                 else
                 {
