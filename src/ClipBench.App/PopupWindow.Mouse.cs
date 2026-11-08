@@ -171,24 +171,34 @@ public sealed partial class PopupWindow
 
     private void ShowRowMenu(ClipRowViewModel row, FrameworkElement anchor, Point? position)
     {
+        // The menu acts on the highlighted clip. If the clicked clip left the list while the menu was open (a secret that
+        // expired, say), the highlight moved to a neighbour; nothing is done then, rather than act on a clip not chosen.
+        Action Only(Action action) => () =>
+        {
+            if (ViewModel.Current?.Id == row.Id)
+            {
+                action();
+            }
+        };
+
         var menu = new MenuFlyout();
-        AddItem(menu.Items, "Paste", "Enter", () => ViewModel.PasteCommand.TryExecute(null));
-        AddItem(menu.Items, "Change the text, then paste…", "Shift+Enter", () => ViewModel.OpenTransformsCommand.TryExecute(null));
+        AddItem(menu.Items, "Paste", "Enter", Only(() => ViewModel.PasteCommand.TryExecute(null)));
+        AddItem(menu.Items, "Change the text, then paste…", "Shift+Enter", Only(() => ViewModel.OpenTransformsCommand.TryExecute(null)));
         if (row.LinkAddress is not null)
         {
             // Only offered for a web address, and only opened when this is chosen.
-            AddItem(menu.Items, "Open the link in your browser", null, () => ViewModel.OpenLinkCommand.TryExecute(null));
+            AddItem(menu.Items, "Open the link in your browser", null, Only(() => ViewModel.OpenLinkCommand.TryExecute(null)));
         }
 
         menu.Items.Add(new MenuFlyoutSeparator());
-        AddItem(menu.Items, row.IsMarked ? "Unselect" : "Select, to paste several clips", "Space", () => ViewModel.ToggleMarkCommand.TryExecute(null));
-        AddItem(menu.Items, row.IsPinned ? "Unpin" : "Pin", "Ctrl+P", () => ViewModel.TogglePinCommand.TryExecute(null));
+        AddItem(menu.Items, row.IsMarked ? "Unselect" : "Select, to paste several clips", "Space", Only(() => ViewModel.ToggleMarkCommand.TryExecute(null)));
+        AddItem(menu.Items, row.IsPinned ? "Unpin" : "Pin", "Ctrl+P", Only(() => ViewModel.TogglePinCommand.TryExecute(null)));
 
         var boards = new MenuFlyoutSubItem { Text = "Add to a board" };
         foreach (var entry in ViewModel.Sidebar.BoardEntries)
         {
             var id = entry.Board!.Value;
-            AddItem(boards.Items, entry.Name, null, () => ViewModel.AddToBoardCommand.TryExecute(id));
+            AddItem(boards.Items, entry.Name, null, Only(() => ViewModel.AddToBoardCommand.TryExecute(id)));
         }
 
         if (boards.Items.Count > 0)
@@ -201,22 +211,22 @@ public sealed partial class PopupWindow
 
         if (row.IsOnBoard)
         {
-            AddItem(menu.Items, "Take off its board", "Ctrl+Shift+D", () => ViewModel.RemoveFromBoardCommand.TryExecute(null));
+            AddItem(menu.Items, "Take off its board", "Ctrl+Shift+D", Only(() => ViewModel.RemoveFromBoardCommand.TryExecute(null)));
         }
 
         if (ViewModel.Sidebar.Scope == PopupScope.Board && string.IsNullOrEmpty(ViewModel.SearchText))
         {
-            AddItem(menu.Items, "Move up", "Ctrl+Up", () => ViewModel.MoveUpInBoardCommand.TryExecute(null));
-            AddItem(menu.Items, "Move down", "Ctrl+Down", () => ViewModel.MoveDownInBoardCommand.TryExecute(null));
+            AddItem(menu.Items, "Move up", "Ctrl+Up", Only(() => ViewModel.MoveUpInBoardCommand.TryExecute(null)));
+            AddItem(menu.Items, "Move down", "Ctrl+Down", Only(() => ViewModel.MoveDownInBoardCommand.TryExecute(null)));
         }
 
         if (row.IsSensitive)
         {
-            AddItem(menu.Items, row.IsRevealed ? "Hide" : "Show", "Ctrl+R", () => ViewModel.RevealCommand.TryExecute(null));
+            AddItem(menu.Items, row.IsRevealed ? "Hide" : "Show", "Ctrl+R", Only(() => ViewModel.RevealCommand.TryExecute(null)));
         }
 
         menu.Items.Add(new MenuFlyoutSeparator());
-        AddItem(menu.Items, "Delete", "Del", () => ViewModel.DeleteCommand.TryExecute(null));
+        AddItem(menu.Items, "Delete", "Del", Only(() => ViewModel.DeleteCommand.TryExecute(null)));
         ShowMenu(menu, anchor, position);
     }
 
