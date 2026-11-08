@@ -47,12 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The settings file gained the keys for all of these. An older file loads with the defaults, and a number out of its
   range is moved to the nearest end.
 
-### Changed
-
-- The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
-  and the **Restore clipboard after paste** tick (now a switch under Paste).
-- Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.
-
 - Transforms, boards and snippets (ADR 0016). **Transforms**: Shift+Enter in the popup, or the Transform button,
   opens a picker over the list. Type to narrow it, move with the arrow keys, and Enter pastes the highlighted
   transform applied to the text that would have been pasted (the highlighted clip, or the marked clips joined by
@@ -98,6 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
+  and the **Restore clipboard after paste** tick (now a switch under Paste).
+- Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.
 - The popup is a little wider (440 instead of 420 device-independent pixels), and grows by 168 more while the sidebar
   is shown. The footer gains a Transform button and a Board button, and the tray menu gains Snippets.
 - The messages that quote a limit write the number the same way on every machine ("10,000"), whatever the language of

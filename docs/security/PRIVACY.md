@@ -4,7 +4,7 @@ This page says, in plain words, what ClipBench records, what it hides, how long 
 
 ## The promise
 
-ClipBench makes **no network connections**: no telemetry, no analytics, no update check, no cloud sync. Your history never leaves this PC. The code is tested to reference no networking library. The one thing that touches the internet is a link you click yourself: **Settings → About → the project's page** asks Windows to open it in your own browser.
+ClipBench makes **no network connections**: no telemetry, no analytics, no update check, no cloud sync. Your history never leaves this PC. The code is tested to reference no networking library. The only things that touch the internet are links you choose to open yourself: **Settings → About → the project's page**, and **Open the link in your browser** on a clip that is a web address. Windows opens them in your own browser; ClipBench makes no connection.
 
 ## What is recorded
 

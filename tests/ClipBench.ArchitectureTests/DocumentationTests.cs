@@ -66,7 +66,7 @@ public partial class DocumentationTests
             var relative = Path.GetRelativePath(root, file).Replace('\\', '/');
             var skipped = relative.Split('/').SkipLast(1).Any(folder => _skippedFolders.Contains(folder));
             var extension = Path.GetExtension(file);
-            var named = Path.GetFileName(file) is ".editorconfig" or ".gitattributes" or ".gitignore";
+            var named = Path.GetFileName(file) is ".editorconfig" or ".gitattributes" or ".gitignore" or "LICENSE";
             if (skipped || (!named && !_textExtensions.Contains(extension, StringComparer.OrdinalIgnoreCase)))
             {
                 continue;

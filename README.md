@@ -12,7 +12,9 @@ several items, and paste them in one action.
 > history, the Windows integration and the app are built and tested: a tray icon, a
 > shortcut (Win+Alt+V) that opens a search popup, pasting one clip into the program you
 > were in, and multi-paste: batch, queue, collect (Win+Alt+C) and table paste.
-> Transforms (Shift+Enter), boards and snippets are built too. The settings window, OCR and the installer come next. Nothing is released yet and there is nothing to install; you
+> Transforms (Shift+Enter), boards and snippets, the settings window and privacy center, and local
+> text recognition from the screen (Win+Alt+O) with smart detection of colors, links and code are
+> built too. The installer comes next. Nothing is released yet and there is nothing to install; you
 > can build it from source and check it by hand with [docs/MANUAL_QA.md](docs/MANUAL_QA.md).
 
 ## Privacy promise
@@ -37,13 +39,17 @@ several items, and paste them in one action.
 These are project commitments. Each one is enforced by an automated test as the
 matching feature is built; see [docs/security](docs/security) as it is added.
 
-## Planned features
+## Features
+
+Built so far:
 
 - Searchable, encrypted clipboard history (text, rich text, images, files)
 - Batch paste, queue paste, collect mode and table paste
 - Paste-time transforms, pinned boards and snippets
 - Privacy center with an app exclusion list and auto-expiring sensitive clips
-- Local OCR for copying text from anywhere on screen
+- Local OCR for copying text from anywhere on screen, and detection of colors, links, email addresses, phone numbers and code
+
+Still planned: the installer and portable zip, and the release work after them.
 
 The phased plan lives in [PLAN.md](PLAN.md).
 
