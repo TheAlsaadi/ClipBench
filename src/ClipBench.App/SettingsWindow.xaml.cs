@@ -241,7 +241,7 @@ public sealed partial class SettingsWindow : Window
     private void OnOpenRepositoryRequested(object? sender, OpenAddressEventArgs e)
     {
         // The address is one we wrote ourselves. The user's own browser opens it; ClipBench makes no connection.
-        if (Uri.TryCreate(e.Url, UriKind.Absolute, out var address) && address.Scheme == Uri.UriSchemeHttps)
+        if (ClipBench.Core.Detection.LinkDetector.ToBrowserAddress(e.Url) is { } address && address.Scheme == Uri.UriSchemeHttps)
         {
             _ = Launcher.LaunchUriAsync(address);
         }

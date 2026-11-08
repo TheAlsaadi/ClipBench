@@ -6,12 +6,14 @@ namespace ClipBench.ArchitectureTests;
 /// <summary>Security baseline S1: no source assembly uses networking types.</summary>
 public class NetworkRulesTests
 {
-    // Namespaces that only exist to talk over a network.
-    private const string NetworkNamespaces = @"^System\.Net\.(Http|Sockets|WebSockets|Mail)(\..*)?$";
+    // Namespaces that only exist to talk over a network: the .NET ones, the Windows Runtime ones (Windows.Web.Http,
+    // Windows.Networking.Sockets, BackgroundTransfer), and the WebView2 browser control.
+    private const string NetworkNamespaces =
+        @"^(System\.Net\.(Http|Sockets|WebSockets|Mail|Quic|NetworkInformation)|Windows\.Web|Windows\.Networking|Microsoft\.Web\.WebView2)(\..*)?$";
 
     // Network entry points that live in the plain System.Net namespace. WebUtility, IPAddress and
     // similar value types are deliberately not listed: they make no network calls.
-    private const string NetworkClasses = @"^System\.Net\.(WebClient|WebRequest|HttpWebRequest|FtpWebRequest|Dns)$";
+    private const string NetworkClasses = @"^System\.Net\.(WebClient|WebRequest|HttpWebRequest|FtpWebRequest|Dns|HttpListener)$";
 
 
     public static TheoryData<string> AssemblyNames => new(SourceAssemblies.Names);

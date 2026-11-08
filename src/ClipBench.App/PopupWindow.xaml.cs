@@ -240,7 +240,7 @@ public sealed partial class PopupWindow : Window
     // and ClipBench itself makes no connection. Anything that is not http or https is refused here as well.
     private void OnOpenLinkRequested(object? sender, ClipBench.Presentation.Preferences.OpenAddressEventArgs e)
     {
-        if (Uri.TryCreate(e.Url, UriKind.Absolute, out var address) && (address.Scheme == Uri.UriSchemeHttps || address.Scheme == Uri.UriSchemeHttp))
+        if (ClipBench.Core.Detection.LinkDetector.ToBrowserAddress(e.Url) is { } address)
         {
             _ = Launcher.LaunchUriAsync(address);
         }
