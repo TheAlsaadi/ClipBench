@@ -297,6 +297,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         EditText = string.Empty;
         EditError = null;
         IsEditing = true;
+        IsOpen = true;
     }
 
     [RelayCommand]
@@ -312,6 +313,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         EditText = Current.Name;
         EditError = null;
         IsEditing = true;
+        IsOpen = true;
     }
 
     [RelayCommand]
@@ -373,6 +375,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         if (!IsConfirmingDelete)
         {
             IsConfirmingDelete = true;
+            IsOpen = true;
             return;
         }
 
