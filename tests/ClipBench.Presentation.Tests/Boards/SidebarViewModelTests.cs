@@ -94,6 +94,22 @@ public sealed class SidebarViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task The_first_board_and_the_snippets_each_start_a_group_so_a_divider_goes_above_them()
+    {
+        _sidebar.Entries.Select(entry => entry.StartsGroup).ShouldBe([false, false, true]);
+
+        var work = await NewBoardAsync("Work");
+        await NewBoardAsync("Home");
+
+        _sidebar.Entries.Select(entry => entry.StartsGroup).ShouldBe([false, false, true, false, true]);
+
+        await _catalog.DeleteAsync(work.Id, Ct);
+
+        Names().ShouldBe(["History", "Pinned", "Home", "Snippets"]);
+        _sidebar.Entries.Select(entry => entry.StartsGroup).ShouldBe([false, false, true, true]);
+    }
+
+    [Fact]
     public async Task The_counts_follow_the_clips()
     {
         await NewClipAsync("one");
