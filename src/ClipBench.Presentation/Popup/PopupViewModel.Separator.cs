@@ -69,6 +69,12 @@ public sealed partial class PopupViewModel
             {
                 OnPropertyChanged(nameof(SeparatorLabel));
                 OnPropertyChanged(nameof(StatusText));
+
+                // Rows decide whether to hide a secret when they are made, so a change of that choice makes them again.
+                if (IsOpen && _rowsMasked != _settings.Current.MaskSensitive)
+                {
+                    Refresh(keepSelection: true);
+                }
             });
         }
     }
