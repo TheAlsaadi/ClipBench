@@ -1,0 +1,40 @@
+name: PR text
+
+# ci.yml does not run when only a pull request's title or body changes, so text added after its guard passed would
+# stay green. This runs the same guard again on an edit. The job keeps the required check's name and scans the
+# commits as well as the text, so its result can stand in for the first run's. The build is not repeated here: a
+# skipped build job in ci.yml would count as passed.
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-text-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attribution-guard:
+    name: attribution-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Test the guard
+        run: bash scripts/tests/test-attribution-guard.sh
+
+      - name: Scan commits and pull request text
+        # Event text reaches the script only through environment variables and is read as data.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bash scripts/attribution-guard.sh "$BASE_SHA" "$HEAD_SHA"

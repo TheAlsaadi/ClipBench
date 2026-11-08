@@ -20,7 +20,8 @@ public partial class WorkflowTests
     [GeneratedRegex(@"\$\{\{[^}]*(github\.event\.|github\.head_ref)", RegexOptions.None)]
     private static partial Regex EventExpression();
 
-    [GeneratedRegex(@"^\s+[A-Za-z_][A-Za-z0-9_]*:\s+\$\{\{.*\}\}\s*$")]
+    // run: and script: hold code, so an expression there is injection even when it fills the whole line.
+    [GeneratedRegex(@"^\s+(?!(run|script):)[A-Za-z_][A-Za-z0-9_]*:\s+\$\{\{.*\}\}\s*$")]
     private static partial Regex EnvMappingLine();
 
     // The concurrency group may read the pull request number, which is numeric and cannot inject.
@@ -40,7 +41,7 @@ public partial class WorkflowTests
     [Fact]
     public void The_expected_workflows_exist()
     {
-        ListWorkflows().ShouldBe(["ci.yml", "codeql.yml", "dependency-review.yml", "scorecard.yml"]);
+        ListWorkflows().ShouldBe(["ci.yml", "codeql.yml", "dependency-review.yml", "pr-text.yml", "scorecard.yml"]);
     }
 
     [Theory]
@@ -150,6 +151,48 @@ public partial class WorkflowTests
 
         floors.ShouldContainKey("Storage");
         floors["Storage"].ShouldBeGreaterThanOrEqualTo(85, "Rule 2 sets ClipBench.Storage at 85% line coverage from Phase 2");
+    }
+
+    [Fact]
+    public void Ci_workflow_enforces_a_coverage_floor_of_at_least_80_on_Presentation()
+    {
+        var floors = CoverageFloorEntry().Matches(Read("ci.yml"))
+            .ToDictionary(match => match.Groups["name"].Value, match => int.Parse(match.Groups["floor"].Value, CultureInfo.InvariantCulture));
+
+        floors.ShouldContainKey("Presentation");
+        floors["Presentation"].ShouldBeGreaterThanOrEqualTo(80, "Rule 2 sets ClipBench.Presentation at 80% line coverage from Phase 4");
+    }
+
+    [Fact]
+    public void Editing_a_pull_request_title_or_body_runs_the_whole_attribution_guard_again()
+    {
+        // A plain pull_request trigger does not run on "edited", so text added after the check passed would stay green.
+        // The edit gets its own workflow: in ci.yml it would cancel the build and leave a skipped build-test, which counts as passed.
+        // The job has the required check's name and scans the commits too, so its result can stand in for the first run.
+        var text = Read("pr-text.yml");
+
+        text.ShouldMatch(@"(?m)^\s+types:\s*\[\s*edited\s*\]\s*$");
+        text.ShouldMatch(@"(?m)^  attribution-guard:\s*$");
+        text.ShouldMatch(@"(?m)^    name: attribution-guard\s*$");
+        text.ShouldContain("fetch-depth: 0");
+        text.ShouldContain("bash scripts/tests/test-attribution-guard.sh");
+        text.ShouldContain("bash scripts/attribution-guard.sh \"$BASE_SHA\" \"$HEAD_SHA\"");
+        text.ShouldNotContain("build-test");
+    }
+
+    [Theory]
+    [InlineData("        run: echo ${{ github.event.pull_request.title }}")]
+    [InlineData("        run: ${{ github.event.pull_request.title }}")]
+    [InlineData("          script: ${{ github.event.pull_request.body }}")]
+    public void An_expression_on_a_run_or_script_line_is_never_taken_for_an_env_mapping(string line)
+    {
+        EnvMappingLine().IsMatch(line).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void An_expression_on_its_own_env_line_is_an_env_mapping()
+    {
+        EnvMappingLine().IsMatch("          PR_TITLE: ${{ github.event.pull_request.title }}").ShouldBeTrue();
     }
 
     [Fact]
