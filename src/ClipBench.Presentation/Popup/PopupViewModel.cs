@@ -374,6 +374,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
 
             ShowMarks();
             OnPropertyChanged(nameof(MarkedCount));
+            OnPropertyChanged(nameof(ShowsMultiPasteBar));
+            OnPropertyChanged(nameof(MarkedSummary));
             OnPropertyChanged(nameof(PasteLabel));
             OnPropertyChanged(nameof(StatusText));
         }
@@ -660,6 +662,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CurrentSnippet));
         OnPropertyChanged(nameof(ItemCount));
         OnPropertyChanged(nameof(MarkedCount));
+        OnPropertyChanged(nameof(ShowsMultiPasteBar));
+        OnPropertyChanged(nameof(MarkedSummary));
         OnPropertyChanged(nameof(PasteLabel));
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(EmptyText));

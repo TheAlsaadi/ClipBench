@@ -211,6 +211,28 @@ public sealed class PopupBatchTests : IDisposable
     }
 
     [Fact]
+    public async Task The_multi_paste_bar_shows_only_while_two_or_more_clips_are_selected()
+    {
+        await AddAsync(TestClips.Text("one"), TestClips.Text("two"), TestClips.Text("three"));
+        _vm.Open();
+        _vm.ShowsMultiPasteBar.ShouldBeFalse();
+        var changed = new List<string?>();
+        _vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Mark(0);
+        _vm.ShowsMultiPasteBar.ShouldBeFalse();
+
+        Mark(1, 2);
+        _vm.ShowsMultiPasteBar.ShouldBeTrue();
+        _vm.MarkedSummary.ShouldBe("3 selected");
+        changed.ShouldContain(nameof(PopupViewModel.ShowsMultiPasteBar));
+        changed.ShouldContain(nameof(PopupViewModel.MarkedSummary));
+
+        Mark(1, 2);
+        _vm.ShowsMultiPasteBar.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Without_marks_the_footer_offers_marking()
     {
         await AddAsync(TestClips.Text("one"));

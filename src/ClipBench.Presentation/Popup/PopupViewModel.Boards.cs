@@ -89,6 +89,8 @@ public sealed partial class PopupViewModel
         _marks.Clear();
         ShowMarks();
         OnPropertyChanged(nameof(MarkedCount));
+        OnPropertyChanged(nameof(ShowsMultiPasteBar));
+        OnPropertyChanged(nameof(MarkedSummary));
         OnPropertyChanged(nameof(PasteLabel));
         OnPropertyChanged(nameof(StatusText));
     }

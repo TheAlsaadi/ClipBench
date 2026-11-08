@@ -94,6 +94,12 @@ public sealed partial class PopupViewModel
     /// <summary>The label of the paste button: how many clips Enter pastes.</summary>
     public string PasteLabel => MarkedCount > 1 ? $"Paste {MarkedCount}" : "Paste";
 
+    /// <summary>True while two or more clips are selected, so the controls for pasting them together are shown.</summary>
+    public bool ShowsMultiPasteBar => MarkedCount > 1;
+
+    /// <summary>How many clips are selected, for the multi-paste bar.</summary>
+    public string MarkedSummary => $"{MarkedCount} selected";
+
     /// <summary>The label of the collect button: what choosing it does.</summary>
     public string CollectLabel => IsCollecting ? $"Finish ({_collect.Collect.Count})" : "Collect";
 
