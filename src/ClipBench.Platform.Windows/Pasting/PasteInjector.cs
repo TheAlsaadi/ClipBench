@@ -118,8 +118,16 @@ internal sealed class PasteInjector : IPasteInjector
             }
 
             var keys = KeystrokePlan.CtrlV(held.Value);
-            if (_keyboard.Send(keys) != keys.Length)
+            var accepted = _keyboard.Send(keys);
+            if (accepted != keys.Length)
             {
+                // Windows took the first keys and stopped: whatever they pressed is still down.
+                var letGo = KeystrokePlan.LetGoAfter(keys, accepted);
+                if (letGo.Length > 0)
+                {
+                    _keyboard.Send(letGo);
+                }
+
                 return Failure(ErrorCode.InputBlocked, "Windows did not accept the keystrokes.");
             }
 

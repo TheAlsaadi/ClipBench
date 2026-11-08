@@ -249,6 +249,31 @@ public class PasteInjectorTests
         ClipboardText().ShouldBe("what the user had");
     }
 
+    [Theory]
+    [InlineData(1, new ushort[] { Control })]
+    [InlineData(2, new ushort[] { V, Control })]
+    [InlineData(3, new ushort[] { Control })]
+    public async Task If_Windows_takes_only_the_first_keys_the_keys_left_down_are_let_go(int accepted, ushort[] letGo)
+    {
+        _input.AcceptOnly = accepted;
+
+        var result = await Paste(Request(restore: false));
+
+        result.Error.Code.ShouldBe(ErrorCode.InputBlocked);
+        _input.Sent.Count.ShouldBe(2, "the paste, then the keys to let go");
+        _input.Sent[1].ShouldBe([.. letGo.Select(key => new KeyEvent(key, true))], "Ctrl stuck down would turn the user's next keys into shortcuts");
+    }
+
+    [Fact]
+    public async Task If_Windows_takes_none_of_the_keys_there_is_nothing_to_let_go()
+    {
+        _input.AcceptOnly = 0;
+
+        await Paste(Request(restore: false));
+
+        _input.Sent.Count.ShouldBe(1);
+    }
+
     [Fact]
     public async Task A_clipboard_that_stays_busy_fails_the_paste_before_any_key_is_sent()
     {
