@@ -186,6 +186,8 @@ For each of **Notepad, Word, a browser text box, VS Code**: put the cursor in a 
 
 Every privacy setting has an item here. Open the Settings window from the tray menu (**Settings…**).
 
+- [ ] The gear in the popup's header, and **Ctrl+,** in the popup, open Settings in front of other windows, also while the popup is locked; a locked popup stays on screen.
+
 ### The window
 
 - [ ] The list on the left shows General, Shortcuts, History, Privacy, Paste, Snippets and About; each opens its page. **Esc** hides the window; the tray item opens it again where it was.

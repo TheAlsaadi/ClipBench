@@ -101,6 +101,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A selected row is shown by its background alone, with no colored bar beside it.
   - The separator, Queue and Table controls show only while two or more clips are selected, in a bar that says how many.
   - Thin dividers set the boards and the snippets apart in the sidebar.
+  - A gear in the header opens Settings (also **Ctrl+,**). The Snippets view's button for the snippet editor has its own
+    icon instead of a gear.
+  - The border around the popup is drawn by Windows along its rounded corner, in a quiet grey that follows the theme
+    (Windows' own colour in high contrast). The popup's own border line parted from that corner on a scaled screen and
+    showed odd colours there.
 
   In Settings, each section has an icon, and each setting is a card with an icon, its title, a line about it and its
   control on the right.
@@ -119,6 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Settings opened from a locked popup (the snippet editor, and now the gear) came up behind the window in front,
+  because a click on a locked popup does not make ClipBench the active program. It is now brought to the front.
 - The popup lost three pixels on every side to a frame that Windows keeps around a window like it, so its contents were
   six pixels too narrow and too short: the last button of the footer and the edge of the sidebar could be cut off.
   The contents now fill the whole window.
