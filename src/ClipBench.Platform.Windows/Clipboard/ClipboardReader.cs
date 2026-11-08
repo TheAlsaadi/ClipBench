@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Security.Cryptography;
 using System.Text;
 using ClipBench.Core.Capture;
 using ClipBench.Core.Clips;
@@ -144,6 +145,7 @@ internal sealed class ClipboardReader : IClipboardReader
                     bitmap = found.Bitmap;
                     break;
                 case TooLarge:
+                    Wipe(bitmap);
                     return new Ended(Result.Success(ClipboardCapture.Rejected(sequence, CaptureRejection.TooLarge)));
                 case Damaged:
                     sawDamage = true;
@@ -172,6 +174,7 @@ internal sealed class ClipboardReader : IClipboardReader
                 return Judge(decoded.Content, decoded.Source, filter, sequence);
             case PendingBitmap pending:
                 var png = Dib.ToPng(pending.Bitmap);
+                Wipe(pending.Bitmap);
                 if (png.IsSuccess)
                 {
                     return Judge(new ImageContent(png.Value), pending.Source, filter, sequence);
@@ -207,8 +210,15 @@ internal sealed class ClipboardReader : IClipboardReader
                         return outcome!;
                     }
 
-                    var paths = DropFiles.Parse(bytes, textCap);
-                    return paths.IsSuccess ? new Found(new FilesContent(paths.Value)) : new Damaged();
+                    try
+                    {
+                        var paths = DropFiles.Parse(bytes, textCap);
+                        return paths.IsSuccess ? new Found(new FilesContent(paths.Value)) : new Damaged();
+                    }
+                    finally
+                    {
+                        Wipe(bytes);
+                    }
                 }
 
             case Candidate.Text:
@@ -231,6 +241,7 @@ internal sealed class ClipboardReader : IClipboardReader
                     }
 
                     var fragment = HtmlFormat.ExtractFragment(bytes, textCap);
+                    Wipe(bytes);
                     if (fragment.IsFailure)
                     {
                         return new Damaged();
@@ -261,6 +272,7 @@ internal sealed class ClipboardReader : IClipboardReader
                     }
 
                     var rtf = CutAtNul(Encoding.Latin1.GetString(bytes));
+                    Wipe(bytes);
                     if (string.IsNullOrWhiteSpace(rtf))
                     {
                         return new Nothing();
@@ -308,9 +320,19 @@ internal sealed class ClipboardReader : IClipboardReader
     {
         var bytes = Copy(session, ClipboardFormats.UnicodeText, cap, out failure);
 
+        if (bytes is null)
+        {
+            return null;
+        }
+
         // Decoding replaces a lone surrogate, which would be refused later when the clip is stored.
-        return bytes is null ? null : CutAtNul(Encoding.Unicode.GetString(bytes));
+        var text = CutAtNul(Encoding.Unicode.GetString(bytes));
+        Wipe(bytes);
+        return text;
     }
+
+    // The raw copies are overwritten as soon as the clip is made from them, like the snapshot's and the capture's.
+    private static void Wipe(byte[]? bytes) => CryptographicOperations.ZeroMemory(bytes);
 
     private static string CutAtNul(string text)
     {
@@ -332,7 +354,9 @@ internal sealed class ClipboardReader : IClipboardReader
         }
 
         var bytes = session.Read(format.Value, MaxHistoryFlagBytes);
-        return bytes is { Length: >= 4 } ? BitConverter.ToInt32(bytes, 0) : null;
+        var flag = bytes is { Length: >= 4 } ? BitConverter.ToInt32(bytes, 0) : (int?)null;
+        Wipe(bytes);
+        return flag;
     }
 
     private static FormatIds Identify(IReadOnlyList<ClipboardFormat> formats)

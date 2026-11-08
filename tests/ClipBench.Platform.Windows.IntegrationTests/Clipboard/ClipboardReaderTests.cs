@@ -586,4 +586,47 @@ public class ClipboardReaderTests
 
         await Should.ThrowAsync<TaskCanceledException>(reading);
     }
+
+    // --- the raw copies do not stay in memory ---
+
+    [Theory]
+    [InlineData("text")]
+    [InlineData("html")]
+    [InlineData("rtf")]
+    [InlineData("files")]
+    [InlineData("image")]
+    [InlineData("image beside text")]
+    public async Task The_raw_bytes_copied_from_the_clipboard_are_overwritten_once_the_clip_is_made(string kind)
+    {
+        switch (kind)
+        {
+            case "text":
+                _api.PutText("a secret");
+                break;
+            case "html":
+                _api.PutHtml("<b>a secret</b>");
+                _api.PutText("a secret");
+                break;
+            case "rtf":
+                _api.PutRtf(@"{\rtf1 a secret}");
+                _api.PutText("a secret");
+                break;
+            case "files":
+                _api.PutFiles(@"C:\secret\plan.txt");
+                break;
+            case "image":
+                _api.Put(ClipboardFormats.Dib, Dib24(4, 3, 7));
+                break;
+            default:
+                _api.Put(ClipboardFormats.Dib, Dib24(4, 3, 7));
+                _api.Put("Some Private Format", [1]);
+                _api.PutHtml("<img src=x>");
+                break;
+        }
+
+        await Content();
+
+        _api.HandedOut.ShouldNotBeEmpty();
+        _api.HandedOut.All(buffer => buffer.All(value => value == 0)).ShouldBeTrue("every copy of the content is overwritten");
+    }
 }
