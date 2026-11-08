@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/clipbench-logo.svg" alt="ClipBench logo" width="128" height="128"></p>
+
 # ClipBench
 
 [![CI](https://github.com/TheAlsaadi/ClipBench/actions/workflows/ci.yml/badge.svg)](https://github.com/TheAlsaadi/ClipBench/actions/workflows/ci.yml)

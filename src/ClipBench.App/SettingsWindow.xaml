@@ -96,11 +96,12 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <FontIcon
+                            <Image
+                                Width="40"
+                                Height="40"
                                 VerticalAlignment="Top"
-                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                Glyph="&#xE946;"
-                                Style="{StaticResource CardIconStyle}" />
+                                AutomationProperties.AccessibilityView="Raw"
+                                Source="{x:Bind local:Glyphs.Logo()}" />
                             <StackPanel Grid.Column="1" Spacing="10">
                                 <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Welcome to ClipBench" />
                                 <TextBlock
@@ -890,16 +891,11 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Border
-                                Width="48"
-                                Height="48"
-                                Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                CornerRadius="10">
-                                <FontIcon
-                                    FontSize="24"
-                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                                    Glyph="&#xE77F;" />
-                            </Border>
+                            <Image
+                                Width="56"
+                                Height="56"
+                                AutomationProperties.AccessibilityView="Raw"
+                                Source="{x:Bind local:Glyphs.Logo()}" />
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                                 <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind prefs:AboutViewModel.Title}" />
                                 <TextBlock

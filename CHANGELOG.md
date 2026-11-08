@@ -104,6 +104,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   In Settings, each section has an icon, and each setting is a card with an icon, its title, a line about it and its
   control on the right.
+- A new logo: a clipboard on a workbench, on a blue tile (`docs/images/clipbench-logo.svg`). It is the program, tray
+  and window icon, and shows in Settings and the README. The incognito tray icon is the same logo in grey with a slash.
+  `scripts/make-app-icon.ps1` makes every icon from the SVG.
 - The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
   and the **Restore clipboard after paste** tick (now a switch under Paste).
 - Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.

@@ -46,6 +46,13 @@ internal static class Glyphs
         _ => ((char)0xE8F1).ToString(),
     };
 
+    /// <summary>The app icon beside the program, for the title bar and the taskbar button of a window that has them.</summary>
+    public static string IconPath => Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico");
+
+    /// <summary>The ClipBench logo, from the file beside the program. Loaded from disk, so it works without an app package.</summary>
+    /// <returns>The picture.</returns>
+    public static BitmapImage Logo() => new(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench-256.png")));
+
     /// <summary>The Segoe Fluent Icons character for a section of the Settings window.</summary>
     /// <param name="section">The section.</param>
     /// <returns>The glyph.</returns>
