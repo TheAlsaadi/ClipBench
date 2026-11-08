@@ -1,5 +1,5 @@
-using CommunityToolkit.Mvvm.Input;
 using ClipBench.Presentation.Hosting;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ClipBench.Presentation.Tests.Hosting;
 
