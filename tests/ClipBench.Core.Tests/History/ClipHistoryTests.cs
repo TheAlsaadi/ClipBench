@@ -140,6 +140,22 @@ public class ClipHistoryTests
     }
 
     [Fact]
+    public void Text_that_differs_only_by_half_of_a_surrogate_pair_against_the_replacement_character_is_a_duplicate()
+    {
+        // Both are stored as the same bytes, so they must be one clip in memory too, or saving one replaces the other.
+        var history = Create();
+        var pinned = history.Add(TestClips.Text("a" + (char)0xFFFD)).Clip;
+        history.Pin(pinned.Id);
+
+        var result = history.Add(TestClips.Text("a" + (char)0xD800));
+
+        result.WasDuplicate.ShouldBeTrue();
+        result.Clip.Id.ShouldBe(pinned.Id);
+        result.Clip.IsPinned.ShouldBeTrue();
+        history.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public void Content_of_a_different_format_is_not_a_duplicate_even_with_the_same_text()
     {
         var history = Create();

@@ -162,4 +162,42 @@ public class ClipContentTests
         text.ShouldBe(new TextContent("same"));
         html.ShouldBe(new HtmlContent("same", "same"));
     }
+
+    // --- half of a surrogate pair ---
+
+    // Built from code points: a lone surrogate written as an escape in an edited file can turn into a broken character.
+    private static readonly string High = ((char)0xD800).ToString();
+    private static readonly string Low = ((char)0xDC00).ToString();
+    private static readonly string Replacement = ((char)0xFFFD).ToString();
+    private static readonly string Pair = char.ConvertFromUtf32(0x1F600);
+
+    [Fact]
+    public void Half_of_a_surrogate_pair_in_text_becomes_the_replacement_character_as_it_would_on_disk()
+    {
+        new TextContent("a" + High + "b").Text.ShouldBe("a" + Replacement + "b");
+        new TextContent(Low + "a" + High).Text.ShouldBe(Replacement + "a" + Replacement);
+        new TextContent(Low + High).Text.ShouldBe(Replacement + Replacement);
+        new TextContent("a" + High).ShouldBe(new TextContent("a" + Replacement));
+    }
+
+    [Fact]
+    public void A_whole_surrogate_pair_is_kept()
+    {
+        new TextContent("a" + Pair + "b").Text.ShouldBe("a" + Pair + "b");
+    }
+
+    [Fact]
+    public void Half_of_a_surrogate_pair_becomes_the_replacement_character_in_every_text_format()
+    {
+        var html = new HtmlContent("<b>" + High + "</b>", Low);
+        var rtf = new RtfContent("{" + Low + "}", "x" + High);
+        var files = new FilesContent([@"C:\a" + High + ".txt"]);
+
+        html.Html.ShouldBe("<b>" + Replacement + "</b>");
+        html.Text.ShouldBe(Replacement);
+        rtf.Rtf.ShouldBe("{" + Replacement + "}");
+        rtf.Text.ShouldBe("x" + Replacement);
+        files.Paths.ShouldBe([@"C:\a" + Replacement + ".txt"]);
+        files.ShouldBe(new FilesContent([@"C:\a" + Replacement + ".txt"]));
+    }
 }

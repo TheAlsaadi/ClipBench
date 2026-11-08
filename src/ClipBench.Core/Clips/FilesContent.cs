@@ -8,7 +8,7 @@ public sealed record FilesContent : ClipContent
 {
     private readonly long _sizeInBytes;
 
-    /// <summary>Creates file list content. The paths are copied.</summary>
+    /// <summary>Creates file list content. The paths are copied, and half of a surrogate pair becomes the replacement character.</summary>
     /// <param name="paths">The file paths, in order.</param>
     public FilesContent(IEnumerable<string> paths)
     {
@@ -24,8 +24,8 @@ public sealed record FilesContent : ClipContent
             throw new ArgumentException("A file path cannot be blank.", nameof(paths));
         }
 
-        Paths = copy;
-        _sizeInBytes = copy.Sum(path => (long)Encoding.UTF8.GetByteCount(path));
+        Paths = copy.Select(WellFormedText.Repair).ToImmutableArray();
+        _sizeInBytes = Paths.Sum(path => (long)Encoding.UTF8.GetByteCount(path));
     }
 
     /// <summary>The file paths, in order.</summary>

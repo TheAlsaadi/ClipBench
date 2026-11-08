@@ -85,6 +85,35 @@ public class ClipStoreTests : RepositoryTestBase
     }
 
     [Fact]
+    public async Task A_clip_with_half_of_a_surrogate_pair_loads_back_equal_to_the_clip_in_memory()
+    {
+        var store = await OpenStoreAsync();
+        var clip = TestClips.Text("a" + (char)0xD800 + "b");
+        await store.SaveAsync(clip, Ct);
+
+        (await store.LoadAsync(Ct)).Value.Clips.Single().ShouldBe(clip);
+    }
+
+    [Fact]
+    public async Task A_pinned_clip_is_not_lost_when_text_that_is_stored_as_the_same_bytes_is_copied()
+    {
+        // The pinned text has the replacement character; the new copy has half of a surrogate pair in its place.
+        // Both are the same bytes on disk, so the history must treat them as one clip or the pinned row is replaced.
+        var store = await OpenStoreAsync();
+        var history = new ClipHistory(new HistoryOptions(), Clock);
+        var pinned = history.Add(TestClips.Text("a" + (char)0xFFFD)).Clip;
+        pinned = history.Pin(pinned.Id).Value;
+        await store.SaveAsync(pinned, Ct);
+
+        var copied = history.Add(TestClips.Text("a" + (char)0xD800)).Clip;
+        await store.SaveAsync(copied, Ct);
+
+        var loaded = (await store.LoadAsync(Ct)).Value.Clips.Single();
+        loaded.Id.ShouldBe(pinned.Id);
+        loaded.IsPinned.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task A_pin_is_kept_and_can_be_cleared()
     {
         var store = await OpenStoreAsync();
