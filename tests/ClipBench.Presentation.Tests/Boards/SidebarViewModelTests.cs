@@ -325,6 +325,43 @@ public sealed class SidebarViewModelTests : IDisposable
     // --- renaming ---
 
     [Fact]
+    public async Task Renaming_a_board_chosen_while_the_sidebar_is_hidden_shows_the_sidebar_so_the_name_box_can_be_seen()
+    {
+        await NewBoardAsync("Work");
+        _sidebar.IsOpen = false;
+        _sidebar.SelectEntryCommand.Execute(2);
+
+        _sidebar.StartRenameCommand.Execute(null);
+
+        _sidebar.IsEditing.ShouldBeTrue();
+        _sidebar.IsOpen.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Starting_a_new_board_shows_the_sidebar()
+    {
+        _sidebar.IsOpen = false;
+
+        _sidebar.StartNewCommand.Execute(null);
+
+        _sidebar.IsOpen.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Asking_to_delete_a_board_while_the_sidebar_is_hidden_shows_the_question()
+    {
+        // The question lives in the sidebar: hidden, the second press would delete the board without the user seeing it.
+        await NewBoardAsync("Work");
+        _sidebar.IsOpen = false;
+        _sidebar.SelectEntryCommand.Execute(2);
+
+        await _sidebar.DeleteBoardCommand.ExecuteAsync(null);
+
+        _sidebar.IsConfirmingDelete.ShouldBeTrue();
+        _sidebar.IsOpen.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task A_board_is_renamed_in_place()
     {
         var work = await NewBoardAsync("Work");

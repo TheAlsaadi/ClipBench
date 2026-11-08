@@ -17,4 +17,31 @@ internal static class KeystrokePlan
     public static KeyEvent[] CtrlV(HotkeyModifiers held) => (held & HotkeyModifiers.Control) != 0
         ? [new KeyEvent(VkV, false), new KeyEvent(VkV, true)]
         : [new KeyEvent(VkControl, false), new KeyEvent(VkV, false), new KeyEvent(VkV, true), new KeyEvent(VkControl, true)];
+
+    /// <summary>
+    /// The key-ups that let go of every key pressed in the first <paramref name="accepted"/> events of a plan and not
+    /// let go of within them, last pressed first. Windows takes events in order and stops at the first it refuses, so
+    /// a short count leaves those keys logically down, and a Ctrl stuck down would turn the user's next keys into shortcuts.
+    /// </summary>
+    /// <param name="plan">The events that were sent.</param>
+    /// <param name="accepted">How many of them Windows took.</param>
+    /// <returns>The key-ups to send, or none.</returns>
+    public static KeyEvent[] LetGoAfter(ReadOnlySpan<KeyEvent> plan, int accepted)
+    {
+        var down = new List<ushort>();
+        foreach (var key in plan[..Math.Clamp(accepted, 0, plan.Length)])
+        {
+            if (key.KeyUp)
+            {
+                down.Remove(key.VirtualKey);
+            }
+            else if (!down.Contains(key.VirtualKey))
+            {
+                down.Add(key.VirtualKey);
+            }
+        }
+
+        down.Reverse();
+        return [.. down.Select(key => new KeyEvent(key, true))];
+    }
 }

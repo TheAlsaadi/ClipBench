@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ClipBench.Core.Detection;
 
 namespace ClipBench.Core.Tests.Detection;
@@ -84,6 +85,25 @@ public class CodeDetectorTests
 
         CodeDetector.Guess("def f(x):\n    return x\n").ShouldBe("Python");
         CodeDetector.Guess("just words").ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_signal_that_runs_out_of_time_counts_as_absent_instead_of_throwing_into_the_caller()
+    {
+        // A backtracking pattern that cannot finish on this text in time; the detector's own patterns share the same
+        // check, so a slow machine gives a weaker guess, never an exception in the popup.
+        var slow = new Regex("^(a+)+$(?!x)", RegexOptions.None, TimeSpan.FromMilliseconds(10));
+
+        CodeDetector.Matches(slow, new string('a', 45) + "!").ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_signal_that_finishes_in_time_is_reported()
+    {
+        var quick = new Regex("^a+$", RegexOptions.None, TimeSpan.FromSeconds(1));
+
+        CodeDetector.Matches(quick, "aaa").ShouldBeTrue();
+        CodeDetector.Matches(quick, "aab").ShouldBeFalse();
     }
 
     [Fact]

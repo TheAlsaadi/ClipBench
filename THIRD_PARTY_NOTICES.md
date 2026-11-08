@@ -2,6 +2,20 @@
 
 ClipBench is MIT-licensed (see `LICENSE`). The release also contains the software below, under its own licenses. The packages ClipBench needs only to be built or tested are not listed; they are not shipped.
 
+## Application framework and storage
+
+| Component | Version | License | Where it is |
+|---|---|---|---|
+| Windows App SDK (WinUI 3), by Microsoft | 2.5.1 | Microsoft Software License Terms for the Windows App SDK | beside the program |
+| .NET runtime, by Microsoft and the .NET Foundation | 10 | MIT | beside the program (self-contained) |
+| Microsoft.Data.Sqlite, by Microsoft and the .NET Foundation | 10.0.12 | MIT | beside the program |
+| SQLitePCLRaw (`SQLitePCLRaw.core`, `bundle_e_sqlite3`, `provider.e_sqlite3`), by Eric Sink | 2.1.12 | Apache-2.0 | beside the program |
+| SQLite (`e_sqlite3.dll`), by the SQLite developers | bundled with SQLitePCLRaw 2.1.12 | Public domain | beside the program |
+| CommunityToolkit.Mvvm, by Microsoft and the .NET Foundation | 8.4.2 | MIT | beside the program |
+| Microsoft.Extensions.DependencyInjection, by Microsoft | 10.0.13 | MIT | beside the program |
+
+The Visual C++ runtime that the text-recognition libraries need is to ship beside the program from Phase 10, under Microsoft's redistribution terms, and gets its row then. The full MIT and Apache-2.0 texts ship with the installer and the portable zip (Phase 10 checklist).
+
 ## Text recognition (ADR 0019)
 
 | Component | Version | License | Where it is |

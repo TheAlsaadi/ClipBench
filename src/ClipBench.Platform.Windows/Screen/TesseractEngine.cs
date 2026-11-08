@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using ClipBench.Core.Results;
 using ClipBench.Core.Screen;
 using TesseractOCR;
@@ -17,6 +18,10 @@ namespace ClipBench.Platform.Windows.Screen;
 public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
 {
     private const string Language = "eng";
+
+    // The English model that ships with the app, from tessdata_fast (ADR 0019). It is about 4 MB.
+    private const string ModelSha256 = "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2";
+    private const long MaxModelBytes = 64L * 1024 * 1024;
 
     // The same limits as the enlarging step, so a picture that was enlarged is always readable.
     private const int MaxSide = 10_000;
@@ -38,7 +43,10 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
 
     /// <summary>Starts the engine on the model in a folder.</summary>
     /// <param name="dataFolder">The folder that holds <c>eng.traineddata</c>.</param>
-    /// <returns>The engine, or null where it cannot start: no model, a model that is not one, no ARM64 build, or no Visual C++ runtime.</returns>
+    /// <returns>
+    /// The engine, or null where it cannot start: no model, a model that is not the one ClipBench ships (damaged, cut off or
+    /// replaced), no ARM64 build, or no Visual C++ runtime.
+    /// </returns>
     internal static TesseractEngine? TryCreate(string dataFolder) => TryCreate(dataFolder, folder => new Engine(folder, Language, EngineMode.LstmOnly));
 
     /// <summary>Starts the engine with the given way of starting it (for tests).</summary>
@@ -49,7 +57,7 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
     {
         ArgumentNullException.ThrowIfNull(start);
         ArgumentException.ThrowIfNullOrWhiteSpace(dataFolder);
-        if (!File.Exists(Path.Combine(dataFolder, Language + ".traineddata")))
+        if (!IsPinnedModel(Path.Combine(dataFolder, Language + ".traineddata")))
         {
             return null;
         }
@@ -97,6 +105,41 @@ public sealed class TesseractEngine : ILatinWordRecognizer, IDisposable
     {
         _engine.Dispose();
         _gate.Dispose();
+    }
+
+    // Native Tesseract trusts its model file, and a damaged one can crash the whole program, so only the model that ships
+    // with ClipBench is handed to it. The file is read in pieces and no further than the limit.
+    private static bool IsPinnedModel(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 0, FileOptions.SequentialScan);
+            if (stream.Length > MaxModelBytes)
+            {
+                return false;
+            }
+
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            var buffer = new byte[81_920];
+            long total = 0;
+            int read;
+            while ((read = stream.Read(buffer)) > 0)
+            {
+                total += read;
+                if (total > MaxModelBytes)
+                {
+                    return false;
+                }
+
+                hash.AppendData(buffer, 0, read);
+            }
+
+            return string.Equals(Convert.ToHexStringLower(hash.GetHashAndReset()), ModelSha256, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private static bool IsDark(ScreenImage image)

@@ -47,12 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The settings file gained the keys for all of these. An older file loads with the defaults, and a number out of its
   range is moved to the nearest end.
 
-### Changed
-
-- The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
-  and the **Restore clipboard after paste** tick (now a switch under Paste).
-- Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.
-
 - Transforms, boards and snippets (ADR 0016). **Transforms**: Shift+Enter in the popup, or the Transform button,
   opens a picker over the list. Type to narrow it, move with the arrow keys, and Enter pastes the highlighted
   transform applied to the text that would have been pasted (the highlighted clip, or the marked clips joined by
@@ -98,6 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
+  and the **Restore clipboard after paste** tick (now a switch under Paste).
+- Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.
 - The popup is a little wider (440 instead of 420 device-independent pixels), and grows by 168 more while the sidebar
   is shown. The footer gains a Transform button and a Board button, and the tray menu gains Snippets.
 - The messages that quote a limit write the number the same way on every machine ("10,000"), whatever the language of
@@ -116,6 +113,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or a flyout now belong to it.
 - A snippet that asked for values, or a transform, could paste nowhere: the popup moved the cursor in its own hidden
   window as it closed and took the focus from the program being pasted into.
+- Holding a key in the popup (Del, Ctrl+P, Ctrl+Up or Ctrl+Down) started the same action again before the first had
+  finished, which cancelled the first: the app could close, or a deleted clip could come back at the next start. A
+  second click on a locked popup cut a paste short. An action still running is now left to finish.
+- Shutting down stopped half way: closing the last window ended the app before it closed the history and gave back the
+  shortcuts. The saved history limits now also reach the history before loading trims it.
+- After a paste that could not get the clipboard, ClipBench could put the old clipboard back over something another
+  program had put there since (a password manager clearing it, say). It now puts it back only after clearing it itself.
+- When Windows took only some of the keys of a paste, Ctrl could stay held down. The keys are now let go.
+- A clipboard with more formats than ClipBench lists, or from a program in a very deep folder, could slip past the
+  privacy markers or the exclusion list. Both are now handled.
+- A damaged text-recognition model is refused (its SHA-256 is checked) instead of being handed to Tesseract.
+- A regular expression with `\r` in Find and replace never matched text with Windows line breaks.
+- An API key in the same text as a certificate was not marked as a secret.
+- Text with half of a surrogate pair was a different clip in memory than on disk, so copying it again could delete a
+  pinned clip.
+- The paste queue kept its clips in memory after it was stopped, even after wiping everything.
+- F2, a new board and deleting a board while the sidebar was hidden edited or asked in a box nobody could see.
+- Turning on "hide secrets" left secrets already in an open popup visible.
+- A clip's right-click menu could act on the next clip if the clicked one left the list while the menu was open.
+- `--data-dir //server/share` was accepted as a local folder.
+- Raw clipboard bytes the reader and writer copy are overwritten once used.
+
+### Security
+
+- The architecture rules now also forbid the Windows Runtime and WinHTTP, WinINet and Winsock networking APIs, keep the
+  Tesseract library in the Windows layer, forbid hand-written native imports, and allow the app to open only checked web
+  addresses, from two places. The attribution guard runs again when a pull request's title or body is edited.
 
 ## [0.1.0] - 2026-10-23
 

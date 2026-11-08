@@ -15,7 +15,7 @@ namespace ClipBench.Platform.Windows.Pasting;
 /// </summary>
 internal sealed class PasteInjector : IPasteInjector
 {
-    private readonly IClipboardWriter _writer;
+    private readonly ClipboardWriter _writer;
     private readonly IClipboardApi _clipboard;
     private readonly ITargetInspector _inspector;
     private readonly IWindowApi _windows;
@@ -35,7 +35,7 @@ internal sealed class PasteInjector : IPasteInjector
     /// <param name="timing">The waits and limits, or null for the defaults.</param>
     /// <param name="retry">How long to keep trying when another program holds the clipboard, or null for the default.</param>
     public PasteInjector(
-        IClipboardWriter writer,
+        ClipboardWriter writer,
         IClipboardApi clipboard,
         ITargetInspector inspector,
         IWindowApi windows,
@@ -85,7 +85,9 @@ internal sealed class PasteInjector : IPasteInjector
         long? written = null;
         try
         {
-            var write = await _writer.WriteAsync(request.Content, cancellationToken).ConfigureAwait(false);
+            var report = await _writer.WriteAndReportAsync(request.Content, cancellationToken).ConfigureAwait(false);
+            written = report.SequenceLeft;
+            var write = report.Result;
             if (write.IsFailure)
             {
                 return Result.Failure(write.Error);
@@ -116,8 +118,16 @@ internal sealed class PasteInjector : IPasteInjector
             }
 
             var keys = KeystrokePlan.CtrlV(held.Value);
-            if (_keyboard.Send(keys) != keys.Length)
+            var accepted = _keyboard.Send(keys);
+            if (accepted != keys.Length)
             {
+                // Windows took the first keys and stopped: whatever they pressed is still down.
+                var letGo = KeystrokePlan.LetGoAfter(keys, accepted);
+                if (letGo.Length > 0)
+                {
+                    _keyboard.Send(letGo);
+                }
+
                 return Failure(ErrorCode.InputBlocked, "Windows did not accept the keystrokes.");
             }
 
@@ -134,37 +144,33 @@ internal sealed class PasteInjector : IPasteInjector
         {
             if (kept is not null)
             {
-                await RestoreAsync(kept.Value.Snapshot, written, kept.Value.Sequence).ConfigureAwait(false);
-                kept.Value.Snapshot.Dispose();
+                await RestoreAsync(kept, written).ConfigureAwait(false);
+                kept.Dispose();
             }
         }
     }
 
     // Copies what the user has on the clipboard. Null when the clipboard is busy or too large: the paste goes ahead
     // and the old content is simply not put back.
-    private async Task<(ClipboardSnapshot Snapshot, long Sequence)?> KeepClipboardAsync()
+    private async Task<ClipboardSnapshot?> KeepClipboardAsync()
     {
-        var use = await ClipboardOpener.UseAsync<(ClipboardSnapshot Snapshot, long Sequence)?>(
+        var use = await ClipboardOpener.UseAsync(
             _clipboard,
             _retry,
             _time,
-            session =>
-            {
-                var sequence = _clipboard.SequenceNumber;
-                var snapshot = ClipboardSnapshot.Take(session, _timing.SnapshotLimit);
-                return snapshot is null ? null : (snapshot, sequence);
-            },
+            session => ClipboardSnapshot.Take(session, _timing.SnapshotLimit),
             CancellationToken.None).ConfigureAwait(false);
 
         return use.Value;
     }
 
-    // Puts the user's clipboard back, but only if it is still what ClipBench left: after a successful write that is the
-    // number the write returned; after a failed write it is anything that differs from the start.
-    private async Task RestoreAsync(ClipboardSnapshot snapshot, long? written, long sequenceAtStart)
+    // Puts the user's clipboard back, but only if the write cleared it and it is still what ClipBench left. A write that
+    // never got the clipboard (busy, cancelled, refused before opening) changed nothing, and anything that differs since
+    // came from another program, such as a password manager clearing it.
+    private async Task RestoreAsync(ClipboardSnapshot snapshot, long? written)
     {
         var now = _clipboard.SequenceNumber;
-        if (written is { } receipt ? now != receipt : now == sequenceAtStart)
+        if (written is not { } receipt || now != receipt)
         {
             return;
         }

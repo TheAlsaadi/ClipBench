@@ -48,6 +48,15 @@ public static class LinkDetector
         return uri.AbsoluteUri;
     }
 
+    /// <summary>
+    /// The one check before an address is handed to the user's browser: only text that <see cref="TryParse"/> accepts as a web
+    /// address becomes a <see cref="Uri"/>, so a <c>file:</c>, <c>ms-</c> or other protocol address can never start a program.
+    /// </summary>
+    /// <param name="text">The address to open.</param>
+    /// <returns>The address, or null when it is not one web address.</returns>
+    public static Uri? ToBrowserAddress(string text) =>
+        TryParse(text) is { } address ? new Uri(address, UriKind.Absolute) : null;
+
     // "https://www." and "https:///path" have no real host. A single word is only a host for localhost.
     private static bool HasUsableHost(Uri uri)
     {

@@ -20,6 +20,7 @@ public partial class PlatformSafetyTests
         ("Raw input and keyboard-state reads can record keystrokes. Only the modifier keys are ever read, with GetAsyncKeyState.", @"^(RegisterRawInputDevices|GetRawInput|GetKeyboardState|GetKeyState|ToUnicode|GetKeyNameText)"),
         ("Starting programs could run a path that came from the clipboard.", @"^(ShellExecute|CreateProcess|WinExec|CreateProcessAsUser|CreateProcessWithLogon|CreateProcessWithToken)"),
         ("ClipBench never changes its privileges or acts as another user (it runs as invoker).", @"^(AdjustTokenPrivileges|LookupPrivilegeValue|ImpersonateLoggedOnUser|DuplicateToken|LogonUser|SetThreadToken)"),
+        ("ClipBench makes no network connections (ADR 0002).", @"^(WinHttp|InternetOpen|InternetConnect|InternetReadFile|HttpOpenRequest|HttpSendRequest|URLDownload|WSA|socket$|connect$|getaddrinfo$|GetAddrInfo)"),
         ("ClipBench never reads or writes the memory of another process.", @"^(ReadProcessMemory|WriteProcessMemory|VirtualAllocEx|VirtualProtectEx|CreateRemoteThread|NtCreateThread|QueueUserAPC|SetWindowLongPtr)"),
     ];
 
@@ -150,7 +151,7 @@ public partial class PlatformSafetyTests
     [MemberData(nameof(AssembliesThatNeverStartPrograms))]
     public void These_assemblies_do_not_depend_on_anything_that_starts_a_program(string assemblyName)
     {
-        // The app project is left out until it has code of its own to judge; Phase 4 adds its rule.
+        // The app has its own rule below: it may hand a checked web address to the browser, and nothing else.
         var assembly = SourceArchitecture.Value.Assemblies.Single(candidate => candidate.Name == assemblyName);
         var rule = Types().That().ResideInAssembly(assembly)
             .Should().NotDependOnAnyTypesThat().HaveFullNameMatching(@"^(System\.Diagnostics\.(Process|ProcessStartInfo)|Windows\.System\.Launcher)$")
@@ -159,6 +160,74 @@ public partial class PlatformSafetyTests
         var violations = rule.Evaluate(SourceArchitecture.Value).Where(result => !result.Passed).Select(result => result.Description).ToList();
 
         violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_app_starts_no_program_and_opens_web_addresses_only_from_the_popup_and_the_settings_window()
+    {
+        var app = SourceArchitecture.Value.Assemblies.Single(candidate => candidate.Name == "ClipBench.App");
+        var processes = Types().That().ResideInAssembly(app)
+            .Should().NotDependOnAnyTypesThat().HaveFullNameMatching(@"^System\.Diagnostics\.(Process|ProcessStartInfo)$")
+            .WithoutRequiringPositiveResults();
+        var violations = processes.Evaluate(SourceArchitecture.Value).Where(result => !result.Passed).Select(result => result.Description).ToList();
+        violations.ShouldBeEmpty();
+
+        // Each caller first passes the address through LinkDetector.ToBrowserAddress, so only http and https reach the launcher.
+        var launchers = SourceFiles()
+            .Where(file => file.Path.StartsWith("src/ClipBench.App/", StringComparison.Ordinal) && file.Text.Contains("Launcher.", StringComparison.Ordinal))
+            .Select(file => file.Path)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        launchers.ShouldBe(["src/ClipBench.App/PopupWindow.xaml.cs", "src/ClipBench.App/SettingsWindow.xaml.cs"]);
+        foreach (var path in launchers)
+        {
+            var text = LineComments().Replace(SourceFiles().Single(file => file.Path == path).Text, string.Empty);
+            text.ShouldNotContain("LaunchFileAsync");
+            text.ShouldNotContain("LaunchFolder");
+            text.ShouldContain("LinkDetector.ToBrowserAddress(");
+        }
+    }
+
+    [Fact]
+    public void The_app_runs_commands_through_the_runner_that_skips_one_still_running()
+    {
+        // ICommand.Execute on an async command starts it again and cancels the run in progress (CommandRunner says why).
+        var offenders = SourceFiles()
+            .Where(file => file.Path.StartsWith("src/ClipBench.App/", StringComparison.Ordinal)
+                && LineComments().Replace(file.Text, string.Empty).Contains("Command.Execute(", StringComparison.Ordinal))
+            .Select(file => file.Path)
+            .ToList();
+
+        offenders.ShouldBeEmpty("use TryExecute from ClipBench.Presentation.Hosting.CommandRunner");
+    }
+
+    [Fact]
+    public void Only_the_Windows_layer_uses_the_Tesseract_library()
+    {
+        var users = SourceArchitecture.Value.Assemblies
+            .Where(assembly => SourceAssemblies.Names.Contains(assembly.Name) && assembly.Name != "ClipBench.Platform.Windows")
+            .SelectMany(assembly => Types().That().ResideInAssembly(assembly)
+                .Should().NotDependOnAnyTypesThat().ResideInNamespaceMatching(@"^TesseractOCR(\..*)?$")
+                .WithoutRequiringPositiveResults()
+                .Evaluate(SourceArchitecture.Value))
+            .Where(result => !result.Passed)
+            .Select(result => result.Description)
+            .ToList();
+
+        users.ShouldBeEmpty("ADR 0019 allows the Tesseract library in the Windows layer only");
+    }
+
+    [Fact]
+    public void No_source_file_declares_its_own_native_import()
+    {
+        // Windows functions come from the CsWin32 generator (ADR 0010), so their list is the one the rules above check.
+        var offenders = SourceFiles()
+            .Where(file => LineComments().Replace(file.Text, string.Empty) is var code
+                && (code.Contains("DllImport", StringComparison.Ordinal) || code.Contains("LibraryImport", StringComparison.Ordinal)))
+            .Select(file => file.Path)
+            .ToList();
+
+        offenders.ShouldBeEmpty();
     }
 
     // --- unsafe code ---

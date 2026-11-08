@@ -59,7 +59,7 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
         // Formats that are not blocks of memory (a bitmap object, for instance) cannot be copied and are left out.
         return await TestClipboard.UseAsync<IReadOnlyList<(uint Id, string? Name, byte[] Data)>>(
             clipboard.ForeignApi,
-            session => [.. session.Formats()
+            session => [.. session.Formats()!
                 .Select(format => (format.Id, format.Name, Data: session.Read(format.Id, 64 * 1024 * 1024)))
                 .Where(entry => entry.Data is not null)
                 .Select(entry => (entry.Id, entry.Name, entry.Data!))],
@@ -379,7 +379,7 @@ public sealed class RealClipboardTests(RealClipboardFixture clipboard)
         await PutAsync((ClipboardFormats.Dib, DibBuilder.Join(DibBuilder.InfoHeader(3, 3, 24), DibBuilder.Rows(rows))));
         var (formats, size, data) = await TestClipboard.UseAsync(
             clipboard.ForeignApi,
-            session => (session.Formats().Select(format => format.Id).ToList(), session.SizeOf(2), session.Read(2, 1 << 20)),
+            session => (session.Formats()!.Select(format => format.Id).ToList(), session.SizeOf(2), session.Read(2, 1 << 20)),
             Ct);
         formats.ShouldContain(2u, "Windows made a bitmap handle from the DIB");
         size.ShouldBeNull();

@@ -12,6 +12,7 @@ internal sealed class FakeClipboardApi : IClipboardApi
     private readonly Dictionary<uint, byte[]> _data = [];
     private readonly Dictionary<string, uint> _registered = new(StringComparer.OrdinalIgnoreCase);
     private uint _nextRegistered = 0xC000;
+    private int _openAttempts;
 
     /// <summary>What happened, in order: "open", "busy", "read:13", "size:13", "empty", "set:13", "close".</summary>
     public List<string> Log { get; } = [];
@@ -30,6 +31,9 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
     /// <summary>Sizes to report instead of the real ones, to test limits without holding gigabytes in memory.</summary>
     public Dictionary<uint, int> ReportedSizes { get; } = [];
+
+    /// <summary>When true, the list of formats is reported as cut short, as when a clipboard holds more than can be listed.</summary>
+    public bool FormatListCutShort { get; set; }
 
     /// <summary>When true, emptying the clipboard fails.</summary>
     public bool RefuseEmpty { get; set; }
@@ -50,6 +54,9 @@ internal sealed class FakeClipboardApi : IClipboardApi
     /// <summary>Called whenever a program (the test) changes the clipboard through <see cref="Put(uint, byte[])"/>.</summary>
     public Action? OnChanged { get; set; }
 
+    /// <summary>Called at every attempt to open the clipboard, before it is known to be busy, with how many attempts there have been, so a test can have another program act at that moment.</summary>
+    public Action<int>? OnTryOpen { get; set; }
+
     public IReadOnlyList<uint> FormatIds => _order;
 
     public byte[]? DataOf(uint format) => _data.GetValueOrDefault(format);
@@ -64,6 +71,7 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
     public IClipboardSession? TryOpen()
     {
+        OnTryOpen?.Invoke(++_openAttempts);
         if (BusyAttempts > 0)
         {
             BusyAttempts--;
@@ -139,7 +147,7 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
     private sealed class Session(FakeClipboardApi owner) : IClipboardSession
     {
-        public IReadOnlyList<ClipboardFormat> Formats() =>
+        public IReadOnlyList<ClipboardFormat>? Formats() => owner.FormatListCutShort ? null :
         [
             .. owner._order.Select(id => new ClipboardFormat(id, owner._registered.FirstOrDefault(pair => pair.Value == id).Key)),
         ];

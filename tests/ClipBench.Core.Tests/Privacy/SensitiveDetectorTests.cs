@@ -275,6 +275,21 @@ public class SensitiveDetectorTests
         Detect(text).ShouldBe(SensitiveKind.None);
     }
 
+    [Theory]
+    [InlineData("-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa\n-----END CERTIFICATE-----\napi_key=k3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA\n")]
+    [InlineData("api_key=k3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA\r\n-----BEGIN CERTIFICATE-----\r\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa\r\n-----END CERTIFICATE-----\r\n")]
+    [InlineData("-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\n-----END PUBLIC KEY-----\ntoken: k3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA\n-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa\n-----END CERTIFICATE-----")]
+    public void A_token_beside_a_certificate_block_is_still_flagged(string text)
+    {
+        Detect(text).ShouldBe(SensitiveKind.Token);
+    }
+
+    [Fact]
+    public void A_certificate_block_with_no_end_line_is_not_flagged()
+    {
+        Detect("-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa").ShouldBe(SensitiveKind.None);
+    }
+
     [Fact]
     public void A_begin_line_with_no_end_of_header_is_not_flagged_and_does_not_hang()
     {

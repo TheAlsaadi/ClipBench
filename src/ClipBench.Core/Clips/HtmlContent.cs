@@ -7,16 +7,16 @@ public sealed record HtmlContent : ClipContent
 {
     private readonly long _sizeInBytes;
 
-    /// <summary>Creates HTML content.</summary>
+    /// <summary>Creates HTML content. Half of a surrogate pair becomes the replacement character, as it would when stored.</summary>
     /// <param name="html">The HTML fragment.</param>
     /// <param name="text">The plain text alternative.</param>
     public HtmlContent(string html, string text)
     {
         ArgumentNullException.ThrowIfNull(html);
         ArgumentNullException.ThrowIfNull(text);
-        Html = html;
-        Text = text;
-        _sizeInBytes = (long)Encoding.UTF8.GetByteCount(html) + Encoding.UTF8.GetByteCount(text);
+        Html = WellFormedText.Repair(html);
+        Text = WellFormedText.Repair(text);
+        _sizeInBytes = (long)Encoding.UTF8.GetByteCount(Html) + Encoding.UTF8.GetByteCount(Text);
     }
 
     /// <summary>The HTML fragment.</summary>

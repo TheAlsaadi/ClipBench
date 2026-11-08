@@ -357,4 +357,55 @@ public class PasteQueueTests
         queue.Progress.ShouldBe(new QueueProgress(QueueState.Pasting, 1, 3));
         new PasteQueue().Progress.ShouldBe(new QueueProgress(QueueState.Idle, 0, 0));
     }
+
+    // --- letting go of the clips ---
+
+    [Theory]
+    [InlineData(QueueState.Armed)]
+    [InlineData(QueueState.Pasting)]
+    public void A_cancelled_queue_lets_go_of_its_clips_so_wiping_the_history_leaves_none_in_memory(QueueState before)
+    {
+        var queue = new PasteQueue();
+        var clip = ArmWithUnreferencedClip(queue, before);
+
+        queue.Cancel();
+
+        CollectGarbage();
+        clip.IsAlive.ShouldBeFalse();
+        queue.Progress.ShouldBe(new QueueProgress(QueueState.Cancelled, 0, 1));
+    }
+
+    [Fact]
+    public void A_finished_queue_lets_go_of_its_clips_and_still_reports_how_many_it_pasted()
+    {
+        var queue = new PasteQueue();
+        var clip = ArmWithUnreferencedClip(queue, QueueState.Pasting);
+
+        queue.Complete();
+
+        CollectGarbage();
+        clip.IsAlive.ShouldBeFalse();
+        queue.Progress.ShouldBe(new QueueProgress(QueueState.Exhausted, 1, 1));
+    }
+
+    // Kept out of line, so nothing in the test method holds the clip and only the queue can keep it alive.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static WeakReference ArmWithUnreferencedClip(PasteQueue queue, QueueState state)
+    {
+        var clip = TestClips.Text("private text");
+        queue.Arm([clip]).IsSuccess.ShouldBeTrue();
+        if (state == QueueState.Pasting)
+        {
+            queue.Next().IsSuccess.ShouldBeTrue();
+        }
+
+        return new WeakReference(clip);
+    }
+
+    private static void CollectGarbage()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
 }

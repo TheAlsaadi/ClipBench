@@ -11,11 +11,11 @@ namespace ClipBench.Platform.Windows.Clipboard;
 /// </summary>
 internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
 {
-    // Windows numbers registered formats from 0xC000. A clipboard never holds thousands, so a count past this is a fault.
+    // Windows numbers registered formats from 0xC000. A clipboard never holds thousands, so a count past this is a fault,
+    // and the list is reported as cut short rather than read in part.
     private const int MaxFormats = 1_000;
     private const uint FirstRegisteredFormat = 0xC000;
     private const int MaxFormatNameLength = 256;
-    private const int MaxImagePathLength = 1_024;
 
     private readonly HWND _owner;
 
@@ -69,12 +69,16 @@ internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
 
         try
         {
-            Span<char> path = stackalloc char[MaxImagePathLength];
-            var length = (uint)path.Length;
-            fixed (char* buffer = path)
+            return ProcessImagePath.Read((Span<char> path, out int written) =>
             {
-                return PInvoke.QueryFullProcessImageName(process, PROCESS_NAME_FORMAT.PROCESS_NAME_WIN32, new PWSTR(buffer), &length) ? new string(path[..(int)length]) : null;
-            }
+                var length = (uint)path.Length;
+                fixed (char* buffer = path)
+                {
+                    var ok = PInvoke.QueryFullProcessImageName(process, PROCESS_NAME_FORMAT.PROCESS_NAME_WIN32, new PWSTR(buffer), &length);
+                    written = ok ? (int)length : 0;
+                    return ok;
+                }
+            });
         }
         finally
         {
@@ -84,12 +88,17 @@ internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
 
     private sealed class Session : IClipboardSession
     {
-        public IReadOnlyList<ClipboardFormat> Formats()
+        public IReadOnlyList<ClipboardFormat>? Formats()
         {
             List<ClipboardFormat> formats = [];
             var format = 0u;
-            while (formats.Count < MaxFormats && (format = PInvoke.EnumClipboardFormats(format)) != 0)
+            while ((format = PInvoke.EnumClipboardFormats(format)) != 0)
             {
+                if (formats.Count == MaxFormats)
+                {
+                    return null;
+                }
+
                 formats.Add(new ClipboardFormat(format, format >= FirstRegisteredFormat ? NameOf(format) : null));
             }
 

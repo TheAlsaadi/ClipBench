@@ -22,6 +22,29 @@ public class LinkEmailPhoneTests
     }
 
     [Theory]
+    [InlineData("https://github.com/TheAlsaadi/ClipBench", "https://github.com/TheAlsaadi/ClipBench")]
+    [InlineData("http://example.com/a?b=1", "http://example.com/a?b=1")]
+    [InlineData("www.example.com", "https://www.example.com/")]
+    public void An_address_the_browser_may_open_is_a_full_web_address(string text, string expected)
+    {
+        LinkDetector.ToBrowserAddress(text)!.AbsoluteUri.ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("file:///C:/Windows/System32/cmd.exe")]
+    [InlineData("ms-settings:privacy")]
+    [InlineData("search-ms:query=x")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("\\\\server\\share")]
+    [InlineData("https://paypal.com@evil.example/")]
+    [InlineData("C:\\Windows\\notepad.exe")]
+    [InlineData("")]
+    public void Nothing_else_is_handed_to_the_browser(string text)
+    {
+        LinkDetector.ToBrowserAddress(text).ShouldBeNull();
+    }
+
+    [Theory]
     [InlineData("example.com")]
     [InlineData("ftp://example.com/file")]
     [InlineData("file:///C:/Windows/System32/cmd.exe")]

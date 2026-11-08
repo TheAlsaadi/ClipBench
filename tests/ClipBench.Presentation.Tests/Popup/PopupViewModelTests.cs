@@ -711,6 +711,20 @@ public sealed class PopupViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Turning_masking_on_while_the_popup_is_open_hides_a_secret_already_shown()
+    {
+        await _settings.UpdateAsync(settings => settings with { MaskSensitive = false }, Ct);
+        await CopyAsync(Jwt);
+        _vm.Open();
+        _vm.Current!.DisplayText.ShouldNotBe(ClipRowViewModel.Mask);
+
+        await _settings.UpdateAsync(settings => settings with { MaskSensitive = true }, Ct);
+
+        _vm.Current!.IsSensitive.ShouldBeTrue();
+        _vm.Current!.DisplayText.ShouldBe(ClipRowViewModel.Mask);
+    }
+
+    [Fact]
     public async Task With_masking_on_which_is_the_default_a_secret_is_hidden()
     {
         await CopyAsync(Jwt);

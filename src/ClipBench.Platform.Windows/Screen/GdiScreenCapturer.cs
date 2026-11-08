@@ -47,9 +47,18 @@ public sealed unsafe class GdiScreenCapturer : IScreenCapturer
             }
 
             previous = PInvoke.SelectObject(memory, bitmap);
+            if (previous.IsNull)
+            {
+                return Result.Failure<ScreenImage>(Failure("Windows had no room to copy that part of the screen."));
+            }
 
             // CAPTUREBLT includes windows that are layered, such as the tooltips and menus a program draws.
-            if (!PInvoke.BitBlt(memory, 0, 0, region.Width, region.Height, screen, region.X, region.Y, ROP_CODE.SRCCOPY | ROP_CODE.CAPTUREBLT))
+            var copied = PInvoke.BitBlt(memory, 0, 0, region.Width, region.Height, screen, region.X, region.Y, ROP_CODE.SRCCOPY | ROP_CODE.CAPTUREBLT);
+
+            // GetDIBits must not be given a bitmap that is still selected into a device context, so it is taken out first.
+            _ = PInvoke.SelectObject(memory, previous);
+            previous = default;
+            if (!copied)
             {
                 return Result.Failure<ScreenImage>(Failure("Windows would not let ClipBench read that part of the screen."));
             }
@@ -90,6 +99,7 @@ public sealed unsafe class GdiScreenCapturer : IScreenCapturer
         }
         finally
         {
+            // Only when a failure came between selecting the bitmap and taking it out again.
             if (!previous.IsNull && !memory.IsNull)
             {
                 _ = PInvoke.SelectObject(memory, previous);

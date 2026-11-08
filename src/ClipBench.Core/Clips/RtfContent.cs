@@ -7,16 +7,16 @@ public sealed record RtfContent : ClipContent
 {
     private readonly long _sizeInBytes;
 
-    /// <summary>Creates RTF content.</summary>
+    /// <summary>Creates RTF content. Half of a surrogate pair becomes the replacement character, as it would when stored.</summary>
     /// <param name="rtf">The RTF document.</param>
     /// <param name="text">The plain text alternative.</param>
     public RtfContent(string rtf, string text)
     {
         ArgumentNullException.ThrowIfNull(rtf);
         ArgumentNullException.ThrowIfNull(text);
-        Rtf = rtf;
-        Text = text;
-        _sizeInBytes = (long)Encoding.UTF8.GetByteCount(rtf) + Encoding.UTF8.GetByteCount(text);
+        Rtf = WellFormedText.Repair(rtf);
+        Text = WellFormedText.Repair(text);
+        _sizeInBytes = (long)Encoding.UTF8.GetByteCount(Rtf) + Encoding.UTF8.GetByteCount(Text);
     }
 
     /// <summary>The RTF document.</summary>

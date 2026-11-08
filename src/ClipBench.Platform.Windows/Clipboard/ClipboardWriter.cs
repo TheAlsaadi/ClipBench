@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using ClipBench.Core.Capture;
 using ClipBench.Core.Clips;
@@ -5,6 +6,14 @@ using ClipBench.Core.Results;
 using ClipBench.Platform.Windows.Formats;
 
 namespace ClipBench.Platform.Windows.Clipboard;
+
+/// <summary>What came of a write.</summary>
+/// <param name="Result">The clipboard's sequence number after a write that worked, or why it did not.</param>
+/// <param name="SequenceLeft">
+/// The sequence number the write left the clipboard at when it cleared it, whether or not the write then worked; null
+/// when it never cleared it, so the user's own content is still there.
+/// </param>
+internal readonly record struct ClipboardWriteReport(Result<long> Result, long? SequenceLeft);
 
 /// <summary>
 /// Puts a clip on the clipboard in every form that suits it, tagged with the private format that tells
@@ -32,35 +41,75 @@ internal sealed class ClipboardWriter : IClipboardWriter
     }
 
     /// <inheritdoc/>
-    public async Task<Result<long>> WriteAsync(ClipContent content, CancellationToken cancellationToken)
+    public async Task<Result<long>> WriteAsync(ClipContent content, CancellationToken cancellationToken) =>
+        (await WriteAndReportAsync(content, cancellationToken).ConfigureAwait(false)).Result;
+
+    /// <summary>
+    /// Writes like <see cref="WriteAsync"/> and also says whether the user's clipboard was cleared on the way, which a
+    /// write that fails part way leaves behind. A write that never opened the clipboard, or that Windows would not let
+    /// clear it, changed nothing.
+    /// </summary>
+    /// <param name="content">What to put on the clipboard.</param>
+    /// <param name="cancellationToken">Ends the wait for a busy clipboard.</param>
+    /// <returns>The result, and the clipboard's sequence number after the write when it cleared the clipboard.</returns>
+    public async Task<ClipboardWriteReport> WriteAndReportAsync(ClipContent content, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(content);
 
         var parts = Prepare(content);
         if (parts.IsFailure)
         {
-            return Result.Failure<long>(parts.Error);
+            return new(Result.Failure<long>(parts.Error), null);
         }
 
+        try
+        {
+            return await PutOnClipboardAsync(parts.Value, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The converted copies are content too. Windows holds its own copies of what it took.
+            foreach (var (_, data) in parts.Value)
+            {
+                CryptographicOperations.ZeroMemory(data);
+            }
+        }
+    }
+
+    private async Task<ClipboardWriteReport> PutOnClipboardAsync(List<(uint Format, byte[] Data)> parts, CancellationToken cancellationToken)
+    {
         var marker = _api.RegisterFormat(ClipboardFormatNames.OwnWrite);
         if (marker == 0)
         {
-            return Failure(ErrorCode.ClipboardWriteFailed, "Windows would not prepare the clipboard for ClipBench.");
+            return new(Failure(ErrorCode.ClipboardWriteFailed, "Windows would not prepare the clipboard for ClipBench."), null);
         }
 
         // The writing runs inside the opener, in the same stretch as the open and the close.
-        var use = await ClipboardOpener.UseAsync(_api, _retry, _time, session => Put(session, parts.Value, marker), cancellationToken).ConfigureAwait(false);
+        var cleared = false;
+        var use = await ClipboardOpener.UseAsync(
+            _api,
+            _retry,
+            _time,
+            session =>
+            {
+                var put = Put(session, parts, marker, out var emptied);
+                cleared = emptied;
+                return put;
+            },
+            cancellationToken).ConfigureAwait(false);
         if (!use.Opened)
         {
-            return Failure(ErrorCode.ClipboardBusy, "Another program is using the clipboard. Try again in a moment.");
+            return new(Failure(ErrorCode.ClipboardBusy, "Another program is using the clipboard. Try again in a moment."), null);
         }
 
-        return use.Value.IsFailure ? Result.Failure<long>(use.Value.Error) : Result.Success(_api.SequenceNumber);
+        var left = cleared ? _api.SequenceNumber : (long?)null;
+        return new(use.Value.IsFailure ? Result.Failure<long>(use.Value.Error) : Result.Success(_api.SequenceNumber), left);
     }
 
-    private static Result Put(IClipboardSession session, List<(uint Format, byte[] Data)> parts, uint marker)
+    private static Result Put(IClipboardSession session, List<(uint Format, byte[] Data)> parts, uint marker, out bool emptied)
     {
-        if (!session.Empty())
+        emptied = session.Empty();
+        if (!emptied)
         {
             return Result.Failure(new ResultError(ErrorCode.ClipboardWriteFailed, "Windows would not clear the clipboard."));
         }

@@ -119,6 +119,10 @@ public class StartupOptionsTests
     [Theory]
     [InlineData(@"\\server\share\clips")]
     [InlineData(@"\\?\C:\clips")]
+    [InlineData("//server/share/clips")]
+    [InlineData("//?/UNC/server/share")]
+    [InlineData(@"\/server\share")]
+    [InlineData(@"/\server\share")]
     public void A_network_or_device_path_is_ignored_with_a_note_because_the_app_makes_no_network_calls(string path)
     {
         var options = StartupOptions.Parse(["--data-dir", path]);

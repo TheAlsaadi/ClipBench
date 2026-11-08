@@ -42,6 +42,33 @@ public class TesseractEngineTests
 
     private static ScreenImage Code(string text, int size = 14) => WindowsOcrEngineTests.RenderTight(text, size, "Consolas", Color.Black, Color.White);
 
+    // Whether the folder's model gets as far as the native engine. The engine is not really started here.
+    private static bool StartsNativeEngine(string folder)
+    {
+        var started = false;
+        TesseractEngine.TryCreate(folder, _ =>
+        {
+            started = true;
+            throw new InvalidOperationException("Not started in this test.");
+        }).ShouldBeNull();
+        return started;
+    }
+
+    private static void WithModel(byte[] model, Action<string> test)
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "clipbench-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            File.WriteAllBytes(Path.Combine(folder, "eng.traineddata"), model);
+            test(folder);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
     // --- starting ---
 
     [Fact]
@@ -73,6 +100,37 @@ public class TesseractEngineTests
         {
             Directory.Delete(folder, recursive: true);
         }
+    }
+
+    [Fact]
+    public void A_damaged_model_is_never_handed_to_the_native_engine_which_could_crash_on_it()
+    {
+        var model = File.ReadAllBytes(Path.Combine(ModelFolder, "eng.traineddata"));
+        WithModel(model[..(model.Length / 2)], folder => StartsNativeEngine(folder).ShouldBeFalse("a cut-off copy of the real model"));
+
+        var flipped = (byte[])model.Clone();
+        flipped[model.Length / 3] ^= 0xFF;
+        WithModel(flipped, folder => StartsNativeEngine(folder).ShouldBeFalse("one byte changed"));
+    }
+
+    [Fact]
+    public void A_model_file_far_larger_than_the_real_one_is_not_read_at_all()
+    {
+        WithModel([], folder =>
+        {
+            using (var stream = new FileStream(Path.Combine(folder, "eng.traineddata"), FileMode.Open, FileAccess.Write))
+            {
+                stream.SetLength((64L * 1024 * 1024) + 1);
+            }
+
+            StartsNativeEngine(folder).ShouldBeFalse();
+        });
+    }
+
+    [Fact]
+    public void The_pinned_model_is_handed_to_the_native_engine()
+    {
+        StartsNativeEngine(ModelFolder).ShouldBeTrue();
     }
 
     [Fact]

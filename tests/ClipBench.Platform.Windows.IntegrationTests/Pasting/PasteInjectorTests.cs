@@ -249,6 +249,31 @@ public class PasteInjectorTests
         ClipboardText().ShouldBe("what the user had");
     }
 
+    [Theory]
+    [InlineData(1, new ushort[] { Control })]
+    [InlineData(2, new ushort[] { V, Control })]
+    [InlineData(3, new ushort[] { Control })]
+    public async Task If_Windows_takes_only_the_first_keys_the_keys_left_down_are_let_go(int accepted, ushort[] letGo)
+    {
+        _input.AcceptOnly = accepted;
+
+        var result = await Paste(Request(restore: false));
+
+        result.Error.Code.ShouldBe(ErrorCode.InputBlocked);
+        _input.Sent.Count.ShouldBe(2, "the paste, then the keys to let go");
+        _input.Sent[1].ShouldBe([.. letGo.Select(key => new KeyEvent(key, true))], "Ctrl stuck down would turn the user's next keys into shortcuts");
+    }
+
+    [Fact]
+    public async Task If_Windows_takes_none_of_the_keys_there_is_nothing_to_let_go()
+    {
+        _input.AcceptOnly = 0;
+
+        await Paste(Request(restore: false));
+
+        _input.Sent.Count.ShouldBe(1);
+    }
+
     [Fact]
     public async Task A_clipboard_that_stays_busy_fails_the_paste_before_any_key_is_sent()
     {
@@ -258,6 +283,67 @@ public class PasteInjectorTests
 
         result.Error.Code.ShouldBe(ErrorCode.ClipboardBusy);
         _input.Sent.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_write_that_never_got_the_clipboard_does_not_put_the_old_content_over_what_another_program_left()
+    {
+        // A password manager clears the clipboard while the write waits for it, and the write gives up.
+        GiveTheUserSomethingCopied();
+        _clipboard.OnTryOpen = attempt =>
+        {
+            if (attempt == 2)
+            {
+                _clipboard.BusyAttempts = ClipboardRetryPolicy.Default.Attempts;
+                _clipboard.Clear();
+            }
+        };
+
+        var result = await Paste(Request());
+
+        result.Error.Code.ShouldBe(ErrorCode.ClipboardBusy);
+        ClipboardText().ShouldBeNull("the write never touched the clipboard, so there is nothing of ClipBench's to undo");
+    }
+
+    [Fact]
+    public async Task Cancelling_while_the_write_waits_for_the_clipboard_does_not_put_the_old_content_over_what_another_program_left()
+    {
+        GiveTheUserSomethingCopied();
+        _clipboard.OnTryOpen = attempt =>
+        {
+            if (attempt == 2)
+            {
+                _clipboard.BusyAttempts = 1;
+                _clipboard.PutText("someone else copied this");
+            }
+        };
+        using var cancellation = new CancellationTokenSource();
+        var pasting = Injector().PasteAsync(Request(), cancellation.Token);
+
+        await cancellation.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(pasting);
+        ClipboardText().ShouldBe("someone else copied this");
+    }
+
+    [Fact]
+    public async Task A_write_that_cleared_the_clipboard_and_then_failed_puts_the_users_clipboard_back()
+    {
+        GiveTheUserSomethingCopied();
+        _clipboard.RefusedFormats.Add(ClipboardFormats.UnicodeText);
+        _clipboard.OnTryOpen = attempt =>
+        {
+            if (attempt == 3)
+            {
+                _clipboard.RefusedFormats.Clear();   // only the write is refused, not the restore
+            }
+        };
+
+        var result = await Paste(Request());
+
+        result.Error.Code.ShouldBe(ErrorCode.ClipboardWriteFailed);
+        _input.Sent.ShouldBeEmpty();
+        ClipboardText().ShouldBe("what the user had");
     }
 
     [Fact]

@@ -16,7 +16,7 @@ public class ClipboardOpenerTests
     [Fact]
     public async Task A_clipboard_that_is_free_runs_the_work_at_once_without_waiting_and_closes_afterwards()
     {
-        var use = await Use(session => session.Formats().Count);
+        var use = await Use(session => session.Formats()!.Count);
 
         use.Opened.ShouldBeTrue();
         use.Value.ShouldBe(0);

@@ -594,6 +594,8 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
     }
 
     // With masking off, a secret is shown like any other text, so it counts as none.
+    private bool _rowsMasked;
+
     private SensitiveKind MaskedKind(Clip clip) =>
         _settings.Current.MaskSensitive ? _library.GetSensitivity(clip) : SensitiveKind.None;
 
@@ -609,6 +611,7 @@ public sealed partial class PopupViewModel : ObservableObject, IDisposable
         var previousIndex = SelectedIndex;
         var wasConfirming = IsConfirmingDelete;
         var now = _timeProvider.GetUtcNow();
+        _rowsMasked = _settings.Current.MaskSensitive;
 
         // A search only hides marked clips, but a clip that left the history leaves the marks.
         var present = _library.Clips.Select(clip => clip.Id).ToHashSet();

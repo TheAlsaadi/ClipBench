@@ -35,8 +35,11 @@ internal interface IClipboardApi
 internal interface IClipboardSession : IDisposable
 {
     /// <summary>The formats on the clipboard, with the names of registered ones.</summary>
-    /// <returns>Every format present. No data is read.</returns>
-    IReadOnlyList<ClipboardFormat> Formats();
+    /// <returns>
+    /// Every format present, or null when there are more than can be listed. A list cut short could miss a privacy
+    /// marker further on, so callers treat null as a clipboard they cannot judge. No data is read.
+    /// </returns>
+    IReadOnlyList<ClipboardFormat>? Formats();
 
     /// <summary>The size in bytes of a format's data.</summary>
     /// <param name="format">The format number.</param>
