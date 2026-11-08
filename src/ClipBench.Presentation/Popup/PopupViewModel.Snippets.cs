@@ -31,6 +31,17 @@ public sealed partial class PopupViewModel
     public SnippetRowViewModel? CurrentSnippet =>
         _sidebar.Scope == PopupScope.Snippets && SelectedIndex >= 0 && SelectedIndex < _snippets.Rows.Count ? _snippets.Rows[SelectedIndex] : null;
 
+    /// <summary>Raised when the user asked for the Settings window from the popup.</summary>
+    public event EventHandler? SettingsRequested;
+
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        // Asked for first, while the popup still has the focus, as for the snippet editor. A locked popup stays on screen.
+        SettingsRequested?.Invoke(this, EventArgs.Empty);
+        Dismiss();
+    }
+
     [RelayCommand]
     private void EditSnippets()
     {

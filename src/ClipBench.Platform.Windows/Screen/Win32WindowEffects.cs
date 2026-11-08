@@ -13,7 +13,8 @@ namespace ClipBench.Platform.Windows.Screen;
 internal sealed unsafe class Win32WindowEffects : IWindowEffects
 {
     // DWMWA_COLOR_NONE: the value that asks for no border line at all.
-    private const uint DwmColorNone = 0xFFFFFFFE;
+    // DWMWA_COLOR_DEFAULT: Windows chooses the colour.
+    private const uint DwmColorDefault = 0xFFFFFFFF;
 
     private const uint WmNcCalcSize = 0x0083;
     private const uint WmMouseActivate = 0x0021;
@@ -109,21 +110,27 @@ internal sealed unsafe class Win32WindowEffects : IWindowEffects
     }
 
     /// <inheritdoc/>
-    public Result HideSystemBorder(WindowHandle window)
+    public Result SetSystemBorderColor(WindowHandle window, byte red, byte green, byte blue) =>
+        SetBorder(window, red | ((uint)green << 8) | ((uint)blue << 16));
+
+    /// <inheritdoc/>
+    public Result UseDefaultSystemBorder(WindowHandle window) => SetBorder(window, DwmColorDefault);
+
+    // The colour is a COLORREF: 0x00BBGGRR.
+    private static Result SetBorder(WindowHandle window, uint color)
     {
         if (window.IsNone)
         {
             return Failure("That window does not exist.");
         }
 
-        var none = DwmColorNone;
         var hresult = PInvoke.DwmSetWindowAttribute(
             ToHwnd(window),
             DWMWINDOWATTRIBUTE.DWMWA_BORDER_COLOR,
-            &none,
+            &color,
             sizeof(uint));
 
-        return hresult.Succeeded ? Result.Success() : Failure("Windows would not remove the window border.");
+        return hresult.Succeeded ? Result.Success() : Failure("Windows would not set the colour of the window border.");
     }
 
     /// <inheritdoc/>

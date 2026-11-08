@@ -13,12 +13,9 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <!-- Windows draws no border of its own (see HideSystemBorder), so this one follows the theme and the corner radius of the window. -->
-    <Border
-        x:Name="Chrome"
-        BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
-        BorderThickness="1"
-        CornerRadius="8">
+    <!-- The border line is drawn by Windows along its own rounded corner, in a colour that follows the theme (ApplyBorder):
+         a line drawn here parts from that corner on a scaled screen and shows odd colours there. -->
+    <Border x:Name="Chrome">
     <Grid
         x:Name="Frame"
         Padding="8"
@@ -235,7 +232,7 @@
                         Command="{x:Bind ViewModel.EditSnippetsCommand}"
                         ToolTipService.ToolTip="Edit the snippets (Ctrl+E)"
                         Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
-                        <FontIcon FontSize="14" Glyph="&#xE713;" />
+                        <FontIcon FontSize="14" Glyph="&#xE943;" />
                     </Button>
                 </StackPanel>
                 </StackPanel>
@@ -256,6 +253,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -330,9 +328,18 @@
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                     Glyph="&#xE76F;" />
             </Border>
+            <Button
+                Grid.Column="3"
+                AutomationProperties.AutomationId="SettingsButton"
+                AutomationProperties.Name="Settings"
+                Command="{x:Bind ViewModel.OpenSettingsCommand}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Settings (Ctrl+,)">
+                <FontIcon FontSize="15" Glyph="&#xE713;" />
+            </Button>
             <ToggleButton
                 x:Name="LockButton"
-                Grid.Column="3"
+                Grid.Column="4"
                 AllowFocusOnInteraction="False"
                 AutomationProperties.AutomationId="LockButton"
                 AutomationProperties.Name="Keep the popup on screen"
@@ -343,7 +350,7 @@
                 <FontIcon FontSize="14" Glyph="{x:Bind local:Glyphs.LockGlyph(ViewModel.IsLocked), Mode=OneWay}" />
             </ToggleButton>
             <Button
-                Grid.Column="4"
+                Grid.Column="5"
                 AutomationProperties.AutomationId="CloseButton"
                 AutomationProperties.Name="Close"
                 Command="{x:Bind ViewModel.CloseNowCommand}"

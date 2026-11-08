@@ -239,6 +239,37 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
         AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue();
     }
 
+    // A click on a locked popup does not make ClipBench the active program, and Windows kept the Settings window behind the
+    // window in front, so it looked as if Settings did not open.
+    [Fact]
+    public void The_settings_button_of_a_locked_popup_brings_settings_to_the_front()
+    {
+        app.ClosePopup();
+        using var target = PasteTargetWindow.Create();
+        if (!target.TryActivate())
+        {
+            Assert.Skip("Windows would not let the test window take focus (it protects the window you are working in). Run this test from a terminal that is in front.");
+        }
+
+        var popup = app.OpenPopup();
+        PointClick(Control(popup, "LockButton").Center());
+        AppUnderTest.WaitFor(() => IsLocked(popup), 10_000).ShouldBeTrue("the lock button did not lock the popup");
+        target.TryActivate().ShouldBeTrue("the test window could not be brought back to the front");
+
+        PointClick(Control(popup, "SettingsButton").Center());
+
+        Window? settings = null;
+        AppUnderTest.WaitFor(() => (settings = app.FindWindow("ClipBench settings")) is not null, 15_000).ShouldBeTrue("the settings window did not open");
+        AppUnderTest.WaitFor(() => AppUnderTest.IsInFront(settings!), 10_000)
+            .ShouldBeTrue("the settings window opened behind another window. In front: " + AppUnderTest.ForegroundDescription());
+        app.FindPopup().ShouldNotBeNull("opening settings put a locked popup away");
+
+        settings!.Close();
+        AppUnderTest.WaitFor(() => app.FindWindow("ClipBench settings") is null, 10_000).ShouldBeTrue("the settings window did not hide");
+        PointClick(Control(popup, "CloseButton").Center());
+        AppUnderTest.WaitFor(() => app.FindPopup() is null, 10_000).ShouldBeTrue("the close button did not close a locked popup");
+    }
+
     [Fact]
     public void A_fast_drag_ends_exactly_as_far_from_where_it_started_as_the_pointer_went()
     {
