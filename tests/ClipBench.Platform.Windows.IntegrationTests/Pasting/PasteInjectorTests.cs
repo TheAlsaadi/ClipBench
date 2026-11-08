@@ -261,6 +261,67 @@ public class PasteInjectorTests
     }
 
     [Fact]
+    public async Task A_write_that_never_got_the_clipboard_does_not_put_the_old_content_over_what_another_program_left()
+    {
+        // A password manager clears the clipboard while the write waits for it, and the write gives up.
+        GiveTheUserSomethingCopied();
+        _clipboard.OnTryOpen = attempt =>
+        {
+            if (attempt == 2)
+            {
+                _clipboard.BusyAttempts = ClipboardRetryPolicy.Default.Attempts;
+                _clipboard.Clear();
+            }
+        };
+
+        var result = await Paste(Request());
+
+        result.Error.Code.ShouldBe(ErrorCode.ClipboardBusy);
+        ClipboardText().ShouldBeNull("the write never touched the clipboard, so there is nothing of ClipBench's to undo");
+    }
+
+    [Fact]
+    public async Task Cancelling_while_the_write_waits_for_the_clipboard_does_not_put_the_old_content_over_what_another_program_left()
+    {
+        GiveTheUserSomethingCopied();
+        _clipboard.OnTryOpen = attempt =>
+        {
+            if (attempt == 2)
+            {
+                _clipboard.BusyAttempts = 1;
+                _clipboard.PutText("someone else copied this");
+            }
+        };
+        using var cancellation = new CancellationTokenSource();
+        var pasting = Injector().PasteAsync(Request(), cancellation.Token);
+
+        await cancellation.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(pasting);
+        ClipboardText().ShouldBe("someone else copied this");
+    }
+
+    [Fact]
+    public async Task A_write_that_cleared_the_clipboard_and_then_failed_puts_the_users_clipboard_back()
+    {
+        GiveTheUserSomethingCopied();
+        _clipboard.RefusedFormats.Add(ClipboardFormats.UnicodeText);
+        _clipboard.OnTryOpen = attempt =>
+        {
+            if (attempt == 3)
+            {
+                _clipboard.RefusedFormats.Clear();   // only the write is refused, not the restore
+            }
+        };
+
+        var result = await Paste(Request());
+
+        result.Error.Code.ShouldBe(ErrorCode.ClipboardWriteFailed);
+        _input.Sent.ShouldBeEmpty();
+        ClipboardText().ShouldBe("what the user had");
+    }
+
+    [Fact]
     public async Task Cancelling_while_waiting_for_focus_ends_the_paste_puts_the_clipboard_back_and_sends_no_key()
     {
         GiveTheUserSomethingCopied();
