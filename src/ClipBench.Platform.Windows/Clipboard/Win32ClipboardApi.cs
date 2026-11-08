@@ -16,7 +16,6 @@ internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
     private const int MaxFormats = 1_000;
     private const uint FirstRegisteredFormat = 0xC000;
     private const int MaxFormatNameLength = 256;
-    private const int MaxImagePathLength = 1_024;
 
     private readonly HWND _owner;
 
@@ -70,12 +69,16 @@ internal sealed unsafe class Win32ClipboardApi : IClipboardApi, IProcessLookup
 
         try
         {
-            Span<char> path = stackalloc char[MaxImagePathLength];
-            var length = (uint)path.Length;
-            fixed (char* buffer = path)
+            return ProcessImagePath.Read((Span<char> path, out int written) =>
             {
-                return PInvoke.QueryFullProcessImageName(process, PROCESS_NAME_FORMAT.PROCESS_NAME_WIN32, new PWSTR(buffer), &length) ? new string(path[..(int)length]) : null;
-            }
+                var length = (uint)path.Length;
+                fixed (char* buffer = path)
+                {
+                    var ok = PInvoke.QueryFullProcessImageName(process, PROCESS_NAME_FORMAT.PROCESS_NAME_WIN32, new PWSTR(buffer), &length);
+                    written = ok ? (int)length : 0;
+                    return ok;
+                }
+            });
         }
         finally
         {
