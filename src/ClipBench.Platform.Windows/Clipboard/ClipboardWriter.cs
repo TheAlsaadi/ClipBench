@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using ClipBench.Core.Capture;
 using ClipBench.Core.Clips;
@@ -61,6 +62,22 @@ internal sealed class ClipboardWriter : IClipboardWriter
             return new(Result.Failure<long>(parts.Error), null);
         }
 
+        try
+        {
+            return await PutOnClipboardAsync(parts.Value, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // The converted copies are content too. Windows holds its own copies of what it took.
+            foreach (var (_, data) in parts.Value)
+            {
+                CryptographicOperations.ZeroMemory(data);
+            }
+        }
+    }
+
+    private async Task<ClipboardWriteReport> PutOnClipboardAsync(List<(uint Format, byte[] Data)> parts, CancellationToken cancellationToken)
+    {
         var marker = _api.RegisterFormat(ClipboardFormatNames.OwnWrite);
         if (marker == 0)
         {
@@ -75,7 +92,7 @@ internal sealed class ClipboardWriter : IClipboardWriter
             _time,
             session =>
             {
-                var put = Put(session, parts.Value, marker, out var emptied);
+                var put = Put(session, parts, marker, out var emptied);
                 cleared = emptied;
                 return put;
             },
