@@ -24,6 +24,7 @@ public sealed class PasteQueue
     private readonly Lock _gate = new();
     private ImmutableArray<Clip> _clips = [];
     private QueueState _state = QueueState.Idle;
+    private int _count;
     private int _pasted;
     private bool _loop;
 
@@ -39,14 +40,14 @@ public sealed class PasteQueue
         }
     }
 
-    /// <summary>How many clips are loaded.</summary>
+    /// <summary>How many clips were loaded by the last <see cref="Arm"/>, also once the queue has ended.</summary>
     public int Count
     {
         get
         {
             lock (_gate)
             {
-                return _clips.Length;
+                return _count;
             }
         }
     }
@@ -70,7 +71,7 @@ public sealed class PasteQueue
         {
             lock (_gate)
             {
-                return new QueueProgress(_state, _pasted, _clips.Length);
+                return new QueueProgress(_state, _pasted, _count);
             }
         }
     }
@@ -108,6 +109,7 @@ public sealed class PasteQueue
             }
 
             _clips = [.. clips];
+            _count = _clips.Length;
             _pasted = 0;
             _loop = loop;
             _state = QueueState.Armed;
@@ -146,7 +148,7 @@ public sealed class PasteQueue
             }
 
             _pasted++;
-            if (_pasted < _clips.Length)
+            if (_pasted < _count)
             {
                 _state = QueueState.Armed;
             }
@@ -158,13 +160,17 @@ public sealed class PasteQueue
             else
             {
                 _state = QueueState.Exhausted;
+                _clips = [];
             }
 
             return Result.Success();
         }
     }
 
-    /// <summary>Stops a queue that is armed or pasting. In any other state it does nothing.</summary>
+    /// <summary>
+    /// Stops a queue that is armed or pasting. In any other state it does nothing. A queue that ended, by this or by
+    /// pasting its last clip, lets go of its clips, so wiping the history leaves none of their content held here.
+    /// </summary>
     public void Cancel()
     {
         lock (_gate)
@@ -172,6 +178,7 @@ public sealed class PasteQueue
             if (_state is QueueState.Armed or QueueState.Pasting)
             {
                 _state = QueueState.Cancelled;
+                _clips = [];
             }
         }
     }
