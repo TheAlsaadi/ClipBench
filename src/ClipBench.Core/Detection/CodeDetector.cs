@@ -127,21 +127,35 @@ public static class CodeDetector
             return "XML";
         }
 
-        if (head.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) || _htmlTag.Value.IsMatch(head))
+        if (head.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase) || Matches(_htmlTag.Value, head))
         {
             return "HTML";
         }
 
-        return _tag.Value.IsMatch(head) ? "XML" : null;
+        return Matches(_tag.Value, head) ? "XML" : null;
     }
 
     private static bool CodeLikeLines(string head)
     {
         var lines = head.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return lines.Length >= 2 && lines.Count(line => _lineEnding.Value.IsMatch(line)) >= 2;
+        return lines.Length >= 2 && lines.Count(line => Matches(_lineEnding.Value, line)) >= 2;
     }
 
     private static Regex Create(string pattern) => new(pattern, Options, _timeout);
+
+    // A signal whose pattern runs out of time (a slow or busy machine) counts as absent: the guess may be weaker, but the
+    // popup and the clip details that ask for it never see an exception.
+    internal static bool Matches(Regex regex, string text)
+    {
+        try
+        {
+            return regex.IsMatch(text);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+    }
 
     private static Language[] BuildLanguages()
     {
@@ -254,7 +268,7 @@ public static class CodeDetector
             var own = 0;
             for (var i = 0; i < signals.Length; i++)
             {
-                if (signals[i].Regex.IsMatch(text))
+                if (Matches(signals[i].Regex, text))
                 {
                     total += signals[i].Weight;
                     if (i >= signals.Length - required)
