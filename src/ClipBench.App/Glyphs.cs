@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using ClipBench.Core.Clips;
 using ClipBench.Presentation.Boards;
+using ClipBench.Presentation.Preferences;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Streams;
@@ -44,6 +45,27 @@ internal static class Glyphs
         PopupScope.Snippets => ((char)0xE77F).ToString(),
         _ => ((char)0xE8F1).ToString(),
     };
+
+    /// <summary>The app icon beside the program, for the title bar and the taskbar button of a window that has them.</summary>
+    public static string IconPath => Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench.ico");
+
+    /// <summary>The ClipBench logo, from the file beside the program. Loaded from disk, so it works without an app package.</summary>
+    /// <returns>The picture.</returns>
+    public static BitmapImage Logo() => new(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets", "ClipBench-256.png")));
+
+    /// <summary>The Segoe Fluent Icons character for a section of the Settings window.</summary>
+    /// <param name="section">The section.</param>
+    /// <returns>The glyph.</returns>
+    public static string ForSection(SettingsSection section) => ((char)(section switch
+    {
+        SettingsSection.General => 0xE713,
+        SettingsSection.Hotkeys => 0xE765,
+        SettingsSection.History => 0xE81C,
+        SettingsSection.Privacy => 0xEA18,
+        SettingsSection.Paste => 0xE77F,
+        SettingsSection.Snippets => 0xE943,
+        _ => 0xE946,
+    })).ToString();
 
     /// <summary>The icon of the button that pins a clip or lets it go.</summary>
     /// <param name="pinned">True when the clip is pinned now.</param>

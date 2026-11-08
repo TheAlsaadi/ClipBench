@@ -325,4 +325,17 @@ public sealed class PopupLockTests : IDisposable
         asked.ShouldBe(1);
         _vm.IsOpen.ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task Opening_settings_from_a_locked_popup_leaves_it_on_screen()
+    {
+        await LockedAsync("one");
+        var asked = 0;
+        _vm.SettingsRequested += (_, _) => asked++;
+
+        _vm.OpenSettingsCommand.Execute(null);
+
+        asked.ShouldBe(1);
+        _vm.IsOpen.ShouldBeTrue();
+    }
 }

@@ -38,6 +38,7 @@ public sealed partial class SettingsWindow : Window
         ArgumentNullException.ThrowIfNull(viewModel);
         ViewModel = viewModel;
         InitializeComponent();
+        AppWindow.SetIcon(Glyphs.IconPath);
 
         _panels = new Dictionary<SettingsSection, FrameworkElement>
         {

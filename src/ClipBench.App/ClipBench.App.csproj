@@ -32,6 +32,8 @@
     <!-- The tray icon loads its picture from this file next to the program. -->
     <Content Include="Assets\ClipBench.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\ClipBench-incognito.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The logo shown in Settings, made from docs/images/clipbench-logo.svg by scripts/make-app-icon.ps1. -->
+    <Content Include="Assets\ClipBench-256.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

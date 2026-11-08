@@ -102,20 +102,36 @@ public class RealWindowEffectsTests
     }
 
     [Fact]
-    public void The_system_border_can_be_turned_off_on_a_real_window_and_is_refused_for_a_missing_one()
+    public void The_system_border_takes_a_colour_on_a_real_window_and_is_refused_for_a_missing_one()
     {
         using var form = TestEditForm.Create();
 
         // Windows 10 has no window border colour and says so: the call is allowed to fail there, and never throws.
         var onWindows11 = Environment.OSVersion.Version.Build >= 22000;
-        var result = _effects.HideSystemBorder(new WindowHandle(form.Handle));
+        var result = _effects.SetSystemBorderColor(new WindowHandle(form.Handle), 61, 61, 61);
         if (onWindows11)
         {
             result.IsSuccess.ShouldBeTrue();
         }
 
-        _effects.HideSystemBorder(new WindowHandle(0x7FFF_FFF0)).IsFailure.ShouldBeTrue();
-        _effects.HideSystemBorder(WindowHandle.None).IsFailure.ShouldBeTrue();
+        _effects.SetSystemBorderColor(new WindowHandle(0x7FFF_FFF0), 61, 61, 61).IsFailure.ShouldBeTrue();
+        _effects.SetSystemBorderColor(WindowHandle.None, 61, 61, 61).IsFailure.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_system_border_can_be_given_back_to_windows_and_is_refused_for_a_missing_one()
+    {
+        using var form = TestEditForm.Create();
+
+        var onWindows11 = Environment.OSVersion.Version.Build >= 22000;
+        var result = _effects.UseDefaultSystemBorder(new WindowHandle(form.Handle));
+        if (onWindows11)
+        {
+            result.IsSuccess.ShouldBeTrue();
+        }
+
+        _effects.UseDefaultSystemBorder(new WindowHandle(0x7FFF_FFF0)).IsFailure.ShouldBeTrue();
+        _effects.UseDefaultSystemBorder(WindowHandle.None).IsFailure.ShouldBeTrue();
     }
 
     [Fact]

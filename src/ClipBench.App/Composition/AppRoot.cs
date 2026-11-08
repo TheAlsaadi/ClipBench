@@ -212,11 +212,11 @@ internal sealed class AppRoot : IAsyncDisposable
 
             _ = platform.WindowEffects.RemoveFrame(new Core.Pasting.WindowHandle(handle));
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
-            _ = platform.WindowEffects.HideSystemBorder(new Core.Pasting.WindowHandle(handle));
 
             hud = CreateQueueWindow(services, platform, options);
             var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
             popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSettings(SettingsSection.Snippets);
+            popupViewModel.SettingsRequested += (_, _) => root.OpenSettings();
             await root.ShowTrayAsync(cancellationToken);
 
             // A shortcut on the command line is a developer's override; otherwise the user's saved shortcut is used.
@@ -356,6 +356,10 @@ internal sealed class AppRoot : IAsyncDisposable
         }
 
         _settingsWindow.ShowSection(section);
+
+        // A click on a locked popup does not make ClipBench the active program, and Windows then keeps a new window behind
+        // the one in front. Switching to the window, as the task switcher does, is allowed.
+        _ = _platform.WindowEffects.BringToFront(new Core.Pasting.WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(_settingsWindow)));
     }
 
     /// <summary>Stops everything in the order that keeps data safe: no new clips, then the history, then Windows.</summary>

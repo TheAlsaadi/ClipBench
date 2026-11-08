@@ -206,7 +206,7 @@ The user's choices that last between runs, kept in `settings.json`: the Separato
 _Avoid_: preferences, options
 
 **Settings window**:
-The window with the sections General, Shortcuts, History, Privacy, Paste, Snippets and About. It opens from the tray menu (**Settings…**), with Ctrl+E in the popup, and by itself the first time ClipBench runs.
+The window with the sections General, Shortcuts, History, Privacy, Paste, Snippets and About. It opens from the tray menu (**Settings…**), from the gear in the popup or Ctrl+, there (Ctrl+E opens it on Snippets), and by itself the first time ClipBench runs.
 
 **Notice**:
 A short message shown next to the tray icon when something that happened in the background did not work, such as a shortcut another program already uses. Its text is always written by the app, never taken from a clip.

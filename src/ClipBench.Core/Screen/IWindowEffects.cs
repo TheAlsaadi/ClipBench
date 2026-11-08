@@ -30,12 +30,20 @@ public interface IWindowEffects
     Result UseRoundedCorners(WindowHandle window);
 
     /// <summary>
-    /// Asks Windows not to draw its own border line around a window, so the window can draw a border of its own that
-    /// follows its theme.
+    /// Sets the colour of the border line Windows draws around a window. Windows draws it along its own rounded corner, so
+    /// it never parts from the corner as a border drawn by the window can.
     /// </summary>
     /// <param name="window">The window.</param>
+    /// <param name="red">The red channel.</param>
+    /// <param name="green">The green channel.</param>
+    /// <param name="blue">The blue channel.</param>
     /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/>. Windows 10 does not support it, so a failure is not an error to show.</returns>
-    Result HideSystemBorder(WindowHandle window);
+    Result SetSystemBorderColor(WindowHandle window, byte red, byte green, byte blue);
+
+    /// <summary>Lets Windows choose the colour of a window's border again, as it must in a high-contrast theme.</summary>
+    /// <param name="window">The window.</param>
+    /// <returns>Success, or <see cref="ErrorCode.PlatformFailure"/>. Windows 10 does not support it, so a failure is not an error to show.</returns>
+    Result UseDefaultSystemBorder(WindowHandle window);
 
     /// <summary>
     /// Makes the area for a window's content fill the whole window. A window that has no border or title bar can still keep

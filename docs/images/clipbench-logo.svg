@@ -1,0 +1,137 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-labelledby="title">
+  <title id="title">ClipBench</title>
+  <!--
+    ClipBench, minimal workshop.
+    Pegboard = pinned boards. Clipboard rows = OCR text, links, images, code, table paste.
+    Magnifier = search, scissors = snippets, padlock = encryption and privacy,
+    wrench = paste-time transforms, swatches = colour detection, hourglass = auto-expiring clips.
+  -->
+  <defs>
+    <mask id="wrenchCut" maskUnits="userSpaceOnUse" x="-120" y="-120" width="240" height="240">
+      <rect x="-120" y="-120" width="240" height="240" fill="#FFFFFF"/>
+      <rect x="-12" y="-92" width="24" height="52" fill="#000000"/>
+    </mask>
+  </defs>
+
+  <!-- Tile -->
+  <rect width="1024" height="1024" rx="228" fill="#1E3A8A"/>
+
+  <!-- Pegboard -->
+  <rect x="152" y="152" width="720" height="500" rx="40" fill="none" stroke="#FFFFFF" stroke-width="10"/>
+  <g fill="#FFFFFF">
+    <circle cx="192" cy="192" r="5"/>
+    <circle cx="272" cy="192" r="5"/>
+    <circle cx="352" cy="192" r="5"/>
+    <circle cx="432" cy="192" r="5"/>
+    <circle cx="512" cy="192" r="5"/>
+    <circle cx="592" cy="192" r="5"/>
+    <circle cx="672" cy="192" r="5"/>
+    <circle cx="752" cy="192" r="5"/>
+    <circle cx="832" cy="192" r="5"/>
+    <circle cx="192" cy="272" r="5"/>
+    <circle cx="272" cy="272" r="5"/>
+    <circle cx="352" cy="272" r="5"/>
+    <circle cx="432" cy="272" r="5"/>
+    <circle cx="512" cy="272" r="5"/>
+    <circle cx="592" cy="272" r="5"/>
+    <circle cx="672" cy="272" r="5"/>
+    <circle cx="752" cy="272" r="5"/>
+    <circle cx="832" cy="272" r="5"/>
+    <circle cx="192" cy="352" r="5"/>
+    <circle cx="272" cy="352" r="5"/>
+    <circle cx="352" cy="352" r="5"/>
+    <circle cx="432" cy="352" r="5"/>
+    <circle cx="512" cy="352" r="5"/>
+    <circle cx="592" cy="352" r="5"/>
+    <circle cx="672" cy="352" r="5"/>
+    <circle cx="752" cy="352" r="5"/>
+    <circle cx="832" cy="352" r="5"/>
+    <circle cx="192" cy="432" r="5"/>
+    <circle cx="272" cy="432" r="5"/>
+    <circle cx="352" cy="432" r="5"/>
+    <circle cx="432" cy="432" r="5"/>
+    <circle cx="512" cy="432" r="5"/>
+    <circle cx="592" cy="432" r="5"/>
+    <circle cx="672" cy="432" r="5"/>
+    <circle cx="752" cy="432" r="5"/>
+    <circle cx="832" cy="432" r="5"/>
+    <circle cx="192" cy="512" r="5"/>
+    <circle cx="272" cy="512" r="5"/>
+    <circle cx="352" cy="512" r="5"/>
+    <circle cx="432" cy="512" r="5"/>
+    <circle cx="512" cy="512" r="5"/>
+    <circle cx="592" cy="512" r="5"/>
+    <circle cx="672" cy="512" r="5"/>
+    <circle cx="752" cy="512" r="5"/>
+    <circle cx="832" cy="512" r="5"/>
+    <circle cx="192" cy="592" r="5"/>
+    <circle cx="272" cy="592" r="5"/>
+    <circle cx="352" cy="592" r="5"/>
+    <circle cx="432" cy="592" r="5"/>
+    <circle cx="512" cy="592" r="5"/>
+    <circle cx="592" cy="592" r="5"/>
+    <circle cx="672" cy="592" r="5"/>
+    <circle cx="752" cy="592" r="5"/>
+    <circle cx="832" cy="592" r="5"/>
+  </g>
+
+  <!-- Line tools: magnifier, scissors -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round">
+    <circle cx="240" cy="240" r="38"/>
+    <path d="M268 268 L304 304"/>
+    <path d="M236 430 L270 342 M268 430 L234 342"/>
+    <circle cx="222" cy="458" r="18"/>
+    <circle cx="282" cy="458" r="18"/>
+  </g>
+
+  <!-- Padlock -->
+  <path d="M744 270 V240 a28 28 0 0 1 56 0 V284" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+  <rect x="724" y="262" width="96" height="80" rx="16" fill="#FFFFFF"/>
+  <circle cx="772" cy="300" r="10" fill="#1E3A8A"/>
+
+  <!-- Wrench -->
+  <g transform="translate(772 420) rotate(40)" fill="#FFFFFF" mask="url(#wrenchCut)">
+    <circle cx="0" cy="-40" r="32"/>
+    <rect x="-12" y="-30" width="24" height="86" rx="12"/>
+  </g>
+
+  <!-- Clipboard -->
+  <rect x="352" y="232" width="320" height="420" rx="34" fill="#FFFFFF" stroke="#1E3A8A" stroke-width="12"/>
+  <rect x="432" y="196" width="160" height="76" rx="22" fill="#FFFFFF" stroke="#1E3A8A" stroke-width="12"/>
+  <circle cx="512" cy="230" r="12" fill="#1E3A8A"/>
+  <g fill="none" stroke="#1E3A8A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(380 298) scale(1.6667)"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8h8M7 12h10M7 16h6"/></g>
+    <g transform="translate(380 360) scale(1.6667)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></g>
+    <g transform="translate(380 422) scale(1.6667)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></g>
+    <g transform="translate(380 484) scale(1.6667)"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></g>
+    <g transform="translate(380 546) scale(1.6667)"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M12 3v18"/></g>
+  </g>
+  <rect x="440" y="309" width="180" height="18" rx="9" fill="#1E3A8A"/>
+  <rect x="440" y="371" width="150" height="18" rx="9" fill="#1E3A8A"/>
+  <rect x="440" y="433" width="170" height="18" rx="9" fill="#1E3A8A"/>
+  <rect x="440" y="495" width="130" height="18" rx="9" fill="#1E3A8A"/>
+  <rect x="440" y="557" width="110" height="18" rx="9" fill="#1E3A8A"/>
+
+  <!-- Swatches -->
+  <g transform="translate(252 620)" fill="#FFFFFF" stroke="#1E3A8A" stroke-width="8">
+    <rect x="-17" y="-100" width="34" height="100" rx="10" transform="rotate(-24)"/>
+    <rect x="-17" y="-100" width="34" height="100" rx="10"/>
+    <rect x="-17" y="-100" width="34" height="100" rx="10" transform="rotate(24)"/>
+    <circle r="8" fill="#1E3A8A" stroke="none"/>
+  </g>
+
+  <!-- Hourglass -->
+  <g transform="translate(772 568)" fill="#FFFFFF">
+    <rect x="-36" y="-56" width="72" height="14" rx="7"/>
+    <rect x="-36" y="42" width="72" height="14" rx="7"/>
+    <path d="M-26 -42 H26 L5 0 L26 42 H-26 L-5 0 Z"/>
+  </g>
+
+  <!-- Bench -->
+  <g fill="#FFFFFF">
+    <rect x="200" y="690" width="48" height="190" rx="12"/>
+    <rect x="776" y="690" width="48" height="190" rx="12"/>
+    <rect x="224" y="800" width="576" height="24" rx="12"/>
+  </g>
+  <rect x="136" y="626" width="752" height="72" rx="18" fill="#FFFFFF" stroke="#1E3A8A" stroke-width="12"/>
+</svg>

@@ -13,12 +13,9 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <!-- Windows draws no border of its own (see HideSystemBorder), so this one follows the theme and the corner radius of the window. -->
-    <Border
-        x:Name="Chrome"
-        BorderBrush="{ThemeResource SurfaceStrokeColorDefaultBrush}"
-        BorderThickness="1"
-        CornerRadius="8">
+    <!-- The border line is drawn by Windows along its own rounded corner, in a colour that follows the theme (ApplyBorder):
+         a line drawn here parts from that corner on a scaled screen and shows odd colours there. -->
+    <Border x:Name="Chrome">
     <Grid
         x:Name="Frame"
         Padding="8"
@@ -41,13 +38,28 @@
                 <Setter Property="Padding" Value="0" />
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             </Style>
-            <Style x:Key="RowActionButtonStyle" BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+            <Style x:Key="IconButtonStyle" BasedOn="{StaticResource GhostButtonStyle}" TargetType="Button">
                 <Setter Property="AllowFocusOnInteraction" Value="False" />
-                <Setter Property="Background" Value="Transparent" />
-                <Setter Property="BorderThickness" Value="0" />
+            </Style>
+            <Style x:Key="RowActionButtonStyle" BasedOn="{StaticResource GhostButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
                 <Setter Property="MinHeight" Value="28" />
                 <Setter Property="MinWidth" Value="28" />
-                <Setter Property="Padding" Value="4" />
+            </Style>
+            <!-- The small buttons of the bar under the list. -->
+            <Style x:Key="BarButtonStyle" BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Padding" Value="10,4" />
+            </Style>
+            <!-- No BasedOn: the drop-down button's default style cannot be looked up by name, and Windows applies it underneath anyway. -->
+            <Style x:Key="BarDropDownStyle" TargetType="DropDownButton">
+                <Setter Property="AllowFocusOnInteraction" Value="False" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Padding" Value="10,4" />
+            </Style>
+            <Style x:Key="MutedCaptionStyle" BasedOn="{StaticResource CaptionTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
             </Style>
         </Grid.Resources>
         <Grid.ColumnDefinitions>
@@ -83,30 +95,43 @@
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="boards:SidebarEntryViewModel">
                             <Grid
-                                Padding="12,4"
                                 AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
                                 Background="Transparent"
-                                ColumnSpacing="8"
                                 ContextRequested="SidebarEntry_ContextRequested"
                                 ToolTipService.ToolTip="{x:Bind Name}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <FontIcon
-                                    Grid.Column="0"
-                                    FontSize="14"
-                                    Glyph="{x:Bind local:Glyphs.ForScope(Scope)}" />
-                                <TextBlock
-                                    Grid.Column="1"
-                                    Text="{x:Bind Name}"
-                                    TextTrimming="CharacterEllipsis" />
-                                <TextBlock
-                                    Grid.Column="2"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Text="{x:Bind Count, Mode=OneWay}" />
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <!-- A hairline above the boards and above the snippets, so the groups read apart. -->
+                                <Border
+                                    Grid.Row="0"
+                                    Height="1"
+                                    Margin="10,2,10,4"
+                                    Background="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    Visibility="{x:Bind StartsGroup}" />
+                                <Grid Grid.Row="1" Padding="10,6" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        Grid.Column="0"
+                                        FontSize="14"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Glyph="{x:Bind local:Glyphs.ForScope(Scope)}" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        Text="{x:Bind Name}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Text="{x:Bind Count, Mode=OneWay}" />
+                                </Grid>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -125,6 +150,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <Button
                             AutomationProperties.AutomationId="BoardNameSaveButton"
+                        Style="{StaticResource IconButtonStyle}"
                             AutomationProperties.Name="Save the name"
                             Command="{x:Bind ViewModel.Sidebar.SubmitEditCommand}"
                             ToolTipService.ToolTip="Save (Enter)">
@@ -132,6 +158,7 @@
                         </Button>
                         <Button
                             AutomationProperties.AutomationId="BoardNameCancelButton"
+                        Style="{StaticResource IconButtonStyle}"
                             AutomationProperties.Name="Cancel"
                             Command="{x:Bind ViewModel.Sidebar.CancelEditCommand}"
                             ToolTipService.ToolTip="Cancel (Esc)">
@@ -174,6 +201,7 @@
                     Spacing="4">
                     <Button
                         AutomationProperties.AutomationId="NewBoardButton"
+                        Style="{StaticResource IconButtonStyle}"
                         AutomationProperties.Name="New board"
                         Command="{x:Bind ViewModel.Sidebar.StartNewCommand}"
                         ToolTipService.ToolTip="New board (Ctrl+N)">
@@ -181,6 +209,7 @@
                     </Button>
                     <Button
                         AutomationProperties.AutomationId="RenameBoardButton"
+                        Style="{StaticResource IconButtonStyle}"
                         AutomationProperties.Name="Rename board"
                         Command="{x:Bind ViewModel.Sidebar.StartRenameCommand}"
                         IsEnabled="{x:Bind ViewModel.Sidebar.Current.IsBoard, Mode=OneWay}"
@@ -189,6 +218,7 @@
                     </Button>
                     <Button
                         AutomationProperties.AutomationId="DeleteBoardButton"
+                        Style="{StaticResource IconButtonStyle}"
                         AutomationProperties.Name="Delete board"
                         Command="{x:Bind ViewModel.Sidebar.DeleteBoardCommand}"
                         IsEnabled="{x:Bind ViewModel.Sidebar.Current.IsBoard, Mode=OneWay}"
@@ -197,11 +227,12 @@
                     </Button>
                     <Button
                         AutomationProperties.AutomationId="EditSnippetsButton"
+                        Style="{StaticResource IconButtonStyle}"
                         AutomationProperties.Name="Edit snippets"
                         Command="{x:Bind ViewModel.EditSnippetsCommand}"
                         ToolTipService.ToolTip="Edit the snippets (Ctrl+E)"
                         Visibility="{x:Bind ViewModel.IsSnippetsView, Mode=OneWay}">
-                        <FontIcon FontSize="14" Glyph="&#xE713;" />
+                        <FontIcon FontSize="14" Glyph="&#xE943;" />
                     </Button>
                 </StackPanel>
                 </StackPanel>
@@ -218,10 +249,11 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" ColumnSpacing="4">
+        <Grid Grid.Row="0" ColumnSpacing="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
@@ -232,17 +264,55 @@
                 AutomationProperties.Name="Show or hide the views and boards"
                 Command="{x:Bind ViewModel.Sidebar.ToggleCommand}"
                 IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+                Style="{StaticResource IconButtonStyle}"
                 ToolTipService.ToolTip="Show or hide the views and boards (Ctrl+B)">
-                <FontIcon FontSize="14" Glyph="&#xE700;" />
+                <FontIcon FontSize="16" Glyph="&#xE700;" />
             </Button>
-            <TextBox
-                x:Name="SearchBox"
-                Grid.Column="1"
-                AutomationProperties.AutomationId="SearchBox"
-                AutomationProperties.Name="Search clips"
-                IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
-                PlaceholderText="Search clips"
-                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <!-- The search box is a soft filled field with a search icon, no outline and no coloured line under it. -->
+            <Grid Grid.Column="1" Margin="2,0,4,0">
+                <TextBox
+                    x:Name="SearchBox"
+                    MinHeight="34"
+                    Padding="34,7,10,6"
+                    VerticalContentAlignment="Center"
+                    AutomationProperties.AutomationId="SearchBox"
+                    AutomationProperties.Name="Search clips"
+                    IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
+                    PlaceholderText="Search clips"
+                    Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.Resources>
+                        <ResourceDictionary>
+                            <ResourceDictionary.ThemeDictionaries>
+                                <ResourceDictionary x:Key="Default">
+                                    <StaticResource x:Key="TextControlBackground" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="TextControlBorderBrush" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="SubtleFillColorTransparentBrush" />
+                                </ResourceDictionary>
+                                <ResourceDictionary x:Key="Light">
+                                    <StaticResource x:Key="TextControlBackground" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="SubtleFillColorTertiaryBrush" />
+                                    <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="SubtleFillColorSecondaryBrush" />
+                                    <StaticResource x:Key="TextControlBorderBrush" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="SubtleFillColorTransparentBrush" />
+                                    <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="SubtleFillColorTransparentBrush" />
+                                </ResourceDictionary>
+                            </ResourceDictionary.ThemeDictionaries>
+                        </ResourceDictionary>
+                    </TextBox.Resources>
+                </TextBox>
+                <FontIcon
+                    Margin="12,0,0,0"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center"
+                    FontSize="14"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE721;"
+                    IsHitTestVisible="False" />
+            </Grid>
 
             <!-- Pressing it starts the move that the system does for a title bar, so the popup can be put anywhere. -->
             <Border
@@ -255,25 +325,36 @@
                 ToolTipService.ToolTip="Drag to move the popup">
                 <FontIcon
                     FontSize="14"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                     Glyph="&#xE76F;" />
             </Border>
+            <Button
+                Grid.Column="3"
+                AutomationProperties.AutomationId="SettingsButton"
+                AutomationProperties.Name="Settings"
+                Command="{x:Bind ViewModel.OpenSettingsCommand}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTipService.ToolTip="Settings (Ctrl+,)">
+                <FontIcon FontSize="15" Glyph="&#xE713;" />
+            </Button>
             <ToggleButton
                 x:Name="LockButton"
-                Grid.Column="3"
+                Grid.Column="4"
                 AllowFocusOnInteraction="False"
                 AutomationProperties.AutomationId="LockButton"
                 AutomationProperties.Name="Keep the popup on screen"
                 Command="{x:Bind ViewModel.ToggleLockCommand}"
                 IsChecked="{x:Bind ViewModel.IsLocked, Mode=OneWay}"
+                Style="{StaticResource GhostToggleButtonStyle}"
                 ToolTipService.ToolTip="{x:Bind local:Glyphs.LockTip(ViewModel.IsLocked), Mode=OneWay}">
                 <FontIcon FontSize="14" Glyph="{x:Bind local:Glyphs.LockGlyph(ViewModel.IsLocked), Mode=OneWay}" />
             </ToggleButton>
             <Button
-                Grid.Column="4"
+                Grid.Column="5"
                 AutomationProperties.AutomationId="CloseButton"
                 AutomationProperties.Name="Close"
                 Command="{x:Bind ViewModel.CloseNowCommand}"
+                Style="{StaticResource IconButtonStyle}"
                 ToolTipService.ToolTip="Close (Esc)">
                 <FontIcon FontSize="14" Glyph="&#xE711;" />
             </Button>
@@ -296,10 +377,10 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="rows:ClipRowViewModel">
                     <Grid
-                        Padding="14,6"
+                        Padding="8,7,10,7"
                         AutomationProperties.Name="{x:Bind AutomationName, Mode=OneWay}"
                         Background="Transparent"
-                        ColumnSpacing="10"
+                        ColumnSpacing="12"
                         ContextRequested="Row_ContextRequested"
                         PointerEntered="Row_PointerEntered"
                         PointerExited="Row_PointerExited">
@@ -309,51 +390,60 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Top"
-                            FontSize="16"
-                            Glyph="{x:Bind local:Glyphs.For(Format)}" />
+                        <Border Grid.Column="0" VerticalAlignment="Top" Style="{StaticResource KindTileStyle}">
+                            <FontIcon
+                                FontSize="15"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="{x:Bind local:Glyphs.For(Format)}" />
+                        </Border>
 
-                        <StackPanel Grid.Column="1" Spacing="2">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
                             <TextBlock
                                 MaxLines="2"
                                 Text="{x:Bind DisplayText, Mode=OneWay}"
                                 TextTrimming="CharacterEllipsis"
                                 TextWrapping="Wrap" />
-                            <Image
-                                MaxHeight="64"
+                            <Border
                                 HorizontalAlignment="Left"
-                                Source="{x:Bind local:Glyphs.ThumbnailOf(ImagePng)}"
-                                Visibility="{x:Bind HasImage}" />
-                            <StackPanel
-                                AutomationProperties.AutomationId="RowDetection"
-                                Orientation="Horizontal"
-                                Spacing="6"
-                                Visibility="{x:Bind HasDetection, Mode=OneWay}">
-                                <Border
-                                    Width="12"
-                                    Height="12"
-                                    VerticalAlignment="Center"
-                                    Background="{x:Bind local:Glyphs.SwatchBrush(SwatchRed, SwatchGreen, SwatchBlue, SwatchAlpha), Mode=OneWay}"
-                                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="2"
-                                    Visibility="{x:Bind HasSwatch, Mode=OneWay}" />
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Visibility="{x:Bind HasImage}">
+                                <Image MaxHeight="64" Source="{x:Bind local:Glyphs.ThumbnailOf(ImagePng)}" />
+                            </Border>
+                            <!-- One quiet line: where the clip came from, how old it is, and what it looks like. -->
+                            <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock
-                                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Text="{x:Bind DetectionLabel, Mode=OneWay}" />
+                                    Style="{StaticResource MutedCaptionStyle}"
+                                    Text="{x:Bind Details}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <StackPanel
+                                    AutomationProperties.AutomationId="RowDetection"
+                                    Orientation="Horizontal"
+                                    Spacing="6"
+                                    Visibility="{x:Bind HasDetection, Mode=OneWay}">
+                                    <TextBlock Style="{StaticResource MutedCaptionStyle}" Text="·" />
+                                    <Border
+                                        Width="10"
+                                        Height="10"
+                                        VerticalAlignment="Center"
+                                        Background="{x:Bind local:Glyphs.SwatchBrush(SwatchRed, SwatchGreen, SwatchBlue, SwatchAlpha), Mode=OneWay}"
+                                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="5"
+                                        Visibility="{x:Bind HasSwatch, Mode=OneWay}" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Text="{x:Bind DetectionLabel, Mode=OneWay}" />
+                                </StackPanel>
                             </StackPanel>
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Style="{StaticResource CaptionTextBlockStyle}"
-                                Text="{x:Bind Details}" />
                         </StackPanel>
 
                         <StackPanel
                             Grid.Column="2"
                             VerticalAlignment="Top"
+                            Margin="0,2,0,0"
                             AutomationProperties.AutomationId="RowStatus"
                             Orientation="Horizontal"
                             Spacing="6">
@@ -373,27 +463,28 @@
                             </Border>
                             <FontIcon
                                 FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Glyph="&#xE8F1;"
                                 Visibility="{x:Bind IsOnBoard}" />
                             <FontIcon
                                 FontSize="12"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                                 Glyph="&#xE718;"
                                 Visibility="{x:Bind IsPinned}" />
                         </StackPanel>
 
-                        <!-- Laid over the row while the pointer is over it, so that showing them changes no width. -->
+                        <!-- Laid over the row while the pointer is over it, so that showing them changes no width. The solid
+                             fill keeps the text under them from showing through. -->
                         <StackPanel
                             Grid.Column="1"
                             Grid.ColumnSpan="2"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Top"
                             AutomationProperties.AutomationId="RowActions"
-                            Background="{ThemeResource ControlSolidFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                            BorderThickness="1"
+                            Background="{ThemeResource SolidBackgroundFillColorTertiaryBrush}"
                             CornerRadius="6"
                             Orientation="Horizontal"
-                            Spacing="2"
+                            Spacing="0"
                             Visibility="Collapsed">
                             <Button
                                 AutomationProperties.AutomationId="RowMarkButton"
@@ -450,7 +541,7 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="snippets:SnippetRowViewModel">
                     <StackPanel
-                        Padding="14,6"
+                        Padding="12,7"
                         AutomationProperties.Name="{x:Bind AutomationName}"
                         Background="Transparent"
                         ContextRequested="SnippetRow_ContextRequested"
@@ -489,46 +580,37 @@
             Grid.Row="2"
             IsEnabled="{x:Bind ViewModel.IsMainEnabled, Mode=OneWay}"
             IsTabStop="False">
-        <StackPanel Spacing="4">
-            <Grid ColumnSpacing="4">
-                <Grid.Resources>
-                    <Style BasedOn="{StaticResource DefaultButtonStyle}" TargetType="Button">
-                        <Setter Property="AllowFocusOnInteraction" Value="False" />
-                        <Setter Property="FontSize" Value="12" />
-                        <Setter Property="Padding" Value="8,3" />
-                    </Style>
-                </Grid.Resources>
+        <StackPanel Spacing="6">
+            <!-- Shown only while two or more clips are selected: how to paste them together. -->
+            <Grid
+                Padding="10,5,5,5"
+                AutomationProperties.AutomationId="MultiPasteBar"
+                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                ColumnSpacing="4"
+                CornerRadius="{ThemeResource OverlayCornerRadius}"
+                Visibility="{x:Bind ViewModel.ShowsMultiPasteBar, Mode=OneWay}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-
-                <Button
+                <TextBlock
                     Grid.Column="0"
-                    Padding="10,3"
-                    AutomationProperties.AutomationId="PasteButton"
-                    Command="{x:Bind ViewModel.PasteCommand}"
-                    Content="{x:Bind ViewModel.PasteLabel, Mode=OneWay}"
-                    FontSize="12"
-                    Style="{StaticResource NoFocusAccentButtonStyle}"
-                    ToolTipService.ToolTip="Paste (Enter)" />
+                    VerticalAlignment="Center"
+                    AutomationProperties.AutomationId="MarkedSummary"
+                    Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                    Style="{StaticResource CaptionTextBlockStyle}"
+                    Text="{x:Bind ViewModel.MarkedSummary, Mode=OneWay}" />
 
                 <DropDownButton
-                    AllowFocusOnInteraction="False"
                     x:Name="SeparatorButton"
                     Grid.Column="1"
                     MaxWidth="128"
-                    Padding="8,3"
                     AutomationProperties.AutomationId="SeparatorButton"
                     AutomationProperties.HelpText="{x:Bind ViewModel.SeparatorLabel, Mode=OneWay}"
-                    FontSize="12"
                     AutomationProperties.Name="Separator"
+                    Style="{StaticResource BarDropDownStyle}"
                     ToolTipService.ToolTip="What goes between the clips (Ctrl+S)">
                     <TextBlock Text="{x:Bind ViewModel.SeparatorLabel, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
                     <DropDownButton.Flyout>
@@ -541,15 +623,14 @@
                     AutomationProperties.AutomationId="QueueButton"
                     Command="{x:Bind ViewModel.QueueCommand}"
                     Content="Queue"
+                    Style="{StaticResource BarButtonStyle}"
                     ToolTipService.ToolTip="Paste one clip with each Ctrl+V (Ctrl+Q)" />
 
                 <DropDownButton
-                    AllowFocusOnInteraction="False"
                     Grid.Column="3"
                     AutomationProperties.AutomationId="TableButton"
-                    FontSize="12"
-                    Padding="8,3"
                     Content="Table"
+                    Style="{StaticResource BarDropDownStyle}"
                     ToolTipService.ToolTip="Paste as spreadsheet cells">
                     <DropDownButton.Flyout>
                         <MenuFlyout Placement="Top">
@@ -558,23 +639,45 @@
                         </MenuFlyout>
                     </DropDownButton.Flyout>
                 </DropDownButton>
+            </Grid>
+
+            <Grid ColumnSpacing="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
                 <Button
-                    Grid.Column="4"
+                    Grid.Column="0"
+                    Margin="0,0,4,0"
+                    Padding="16,5"
+                    AutomationProperties.AutomationId="PasteButton"
+                    Command="{x:Bind ViewModel.PasteCommand}"
+                    Content="{x:Bind ViewModel.PasteLabel, Mode=OneWay}"
+                    Style="{StaticResource NoFocusAccentButtonStyle}"
+                    ToolTipService.ToolTip="Paste (Enter)" />
+
+                <Button
+                    Grid.Column="1"
                     AutomationProperties.AutomationId="TransformButton"
                     AutomationProperties.Name="Transform"
                     Command="{x:Bind ViewModel.OpenTransformsCommand}"
+                    Style="{StaticResource IconButtonStyle}"
                     ToolTipService.ToolTip="Change the text before pasting (Shift+Enter)">
-                    <FontIcon FontSize="14" Glyph="&#xE70F;" />
+                    <FontIcon FontSize="15" Glyph="&#xE70F;" />
                 </Button>
 
                 <Button
                     x:Name="BoardButton"
-                    Grid.Column="5"
+                    Grid.Column="2"
                     AutomationProperties.AutomationId="BoardButton"
                     AutomationProperties.Name="Add to board"
+                    Style="{StaticResource IconButtonStyle}"
                     ToolTipService.ToolTip="Add the clip to a board (Ctrl+D)">
-                    <FontIcon FontSize="14" Glyph="&#xE8F1;" />
+                    <FontIcon FontSize="15" Glyph="&#xE8F1;" />
                     <Button.Flyout>
                         <MenuFlyout
                             x:Name="BoardMenu"
@@ -586,21 +689,30 @@
                 </Button>
 
                 <Button
-                    Grid.Column="7"
+                    Grid.Column="4"
+                    Padding="10,0"
                     AutomationProperties.AutomationId="CollectButton"
+                    AutomationProperties.Name="{x:Bind ViewModel.CollectLabel, Mode=OneWay}"
                     Command="{x:Bind ViewModel.ToggleCollectCommand}"
-                    Content="{x:Bind ViewModel.CollectLabel, Mode=OneWay}"
-                    ToolTipService.ToolTip="Add every copy to one clip until you finish (Ctrl+L)" />
+                    Style="{StaticResource IconButtonStyle}"
+                    ToolTipService.ToolTip="Add every copy to one clip until you finish (Ctrl+L)">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                        <TextBlock FontSize="12" Text="{x:Bind ViewModel.CollectLabel, Mode=OneWay}" />
+                    </StackPanel>
+                </Button>
             </Grid>
 
             <TextBlock
                 Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Text="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                TextWrapping="Wrap"
                 Visibility="{x:Bind ViewModel.HasError, Mode=OneWay}" />
             <TextBlock
+                Margin="2,0"
                 AutomationProperties.AutomationId="StatusText"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
                 TextTrimming="CharacterEllipsis" />

@@ -49,6 +49,9 @@ public sealed partial class SidebarEntryViewModel : ObservableObject
     [ObservableProperty]
     public partial int Count { get; set; }
 
+    /// <summary>True when the entry starts a group of the sidebar (the first board, and the snippets), so a divider goes above it.</summary>
+    public bool StartsGroup { get; init; }
+
     /// <summary>True for a board.</summary>
     public bool IsBoard => Scope == PopupScope.Board;
 

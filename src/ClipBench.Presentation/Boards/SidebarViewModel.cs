@@ -133,8 +133,8 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         [
             new(PopupScope.History, null, "History", clips.Length),
             new(PopupScope.Pinned, null, "Pinned", pinned),
-            .. _boards.Boards.Select(board => new SidebarEntryViewModel(PopupScope.Board, board.Id, board.Name, onBoard.GetValueOrDefault(board.Id))),
-            new(PopupScope.Snippets, null, "Snippets", _snippets.Snippets.Length),
+            .. _boards.Boards.Select((board, i) => new SidebarEntryViewModel(PopupScope.Board, board.Id, board.Name, onBoard.GetValueOrDefault(board.Id)) { StartsGroup = i == 0 }),
+            new(PopupScope.Snippets, null, "Snippets", _snippets.Snippets.Length) { StartsGroup = true },
         ];
 
         var chosen = Entries.Count > 0 ? Current : null;

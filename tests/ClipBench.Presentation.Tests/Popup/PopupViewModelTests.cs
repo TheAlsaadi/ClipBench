@@ -907,4 +907,26 @@ public sealed class PopupViewModelTests : IDisposable
 
         Should.NotThrow(_vm.Dispose);
     }
+
+    // --- settings ---
+
+    [Fact]
+    public async Task The_settings_button_asks_for_settings_while_the_popup_still_has_the_focus_then_closes_it()
+    {
+        await CopyAsync("one");
+        _vm.Open();
+        bool? popupWasOpen = null;
+        var asked = 0;
+        _vm.SettingsRequested += (_, _) =>
+        {
+            asked++;
+            popupWasOpen = _vm.IsOpen;
+        };
+
+        _vm.OpenSettingsCommand.Execute(null);
+
+        asked.ShouldBe(1);
+        popupWasOpen.ShouldBe(true);
+        _vm.IsOpen.ShouldBeFalse();
+    }
 }

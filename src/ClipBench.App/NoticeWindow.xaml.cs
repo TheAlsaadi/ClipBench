@@ -16,6 +16,7 @@ public sealed partial class NoticeWindow : Window
     public NoticeWindow()
     {
         InitializeComponent();
+        AppWindow.SetIcon(Glyphs.IconPath);
         AppWindow.Resize(new SizeInt32(560, 280));
         Closed += (_, _) => _ = _answer.TrySetResult(false);
     }

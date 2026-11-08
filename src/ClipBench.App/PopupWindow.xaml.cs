@@ -29,6 +29,9 @@ public sealed partial class PopupWindow : Window
     /// <summary>The width of the popup in device-independent pixels.</summary>
     public const double WidthDip = 440;
 
+    // The comma key (VK_OEM_COMMA), which VirtualKey has no name for. Ctrl+, opens Settings, as in many Windows programs.
+    private const VirtualKey CommaKey = (VirtualKey)0xBC;
+
     /// <summary>The height of the popup in device-independent pixels.</summary>
     public const double HeightDip = 520;
 
@@ -66,6 +69,8 @@ public sealed partial class PopupWindow : Window
         presenter.IsAlwaysOnTop = true;
         AppWindow.SetPresenter(presenter);
         AppWindow.IsShownInSwitchers = false;
+        Chrome.ActualThemeChanged += (_, _) => ApplyBorder();
+        ApplyBorder();
 
         Activated += OnActivated;
 
@@ -141,6 +146,25 @@ public sealed partial class PopupWindow : Window
         // The request lifts the style that keeps a locked popup from taking the focus; it is not lifted by Activate.
         _ = _effects.BringToFront(new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this)));
         Activate();
+    }
+
+    // A quiet grey that suits the theme, never the accent colour Windows can use for borders. In a high-contrast theme
+    // Windows chooses, so the border has the contrast the user asked for.
+    private void ApplyBorder()
+    {
+        var window = new WindowHandle(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        if (new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast)
+        {
+            _ = _effects.UseDefaultSystemBorder(window);
+        }
+        else if (Chrome.ActualTheme == ElementTheme.Light)
+        {
+            _ = _effects.SetSystemBorderColor(window, 204, 204, 204);
+        }
+        else
+        {
+            _ = _effects.SetSystemBorderColor(window, 61, 61, 61);
+        }
     }
 
     private void OnActivated(object sender, Microsoft.UI.Xaml.WindowActivatedEventArgs args)
@@ -570,6 +594,10 @@ public sealed partial class PopupWindow : Window
                 break;
             case VirtualKey.E when control:
                 ViewModel.EditSnippetsCommand.TryExecute(null);
+                e.Handled = true;
+                break;
+            case CommaKey when control:
+                ViewModel.OpenSettingsCommand.TryExecute(null);
                 e.Handled = true;
                 break;
             case VirtualKey.N when control:
