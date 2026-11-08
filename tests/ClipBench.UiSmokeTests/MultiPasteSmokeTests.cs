@@ -22,7 +22,7 @@ public sealed class MultiPasteSmokeTests(AppUnderTest app) : IClassFixture<AppUn
     {
         using var target = ActiveTarget();
         var popup = app.OpenPopup();
-        Mark(popup, "meeting", "invoice");
+        AppUnderTest.MarkClips(popup, "meeting", "invoice");
         AppUnderTest.SaveScreenshot(popup, "popup-two-marked");
 
         Keyboard.Type(VirtualKeyShort.ENTER);
@@ -36,7 +36,7 @@ public sealed class MultiPasteSmokeTests(AppUnderTest app) : IClassFixture<AppUn
     {
         using var target = ActiveTarget();
         var popup = app.OpenPopup();
-        Mark(popup, "invoice", "meeting");
+        AppUnderTest.MarkClips(popup, "invoice", "meeting");
 
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_T);
 
@@ -45,7 +45,7 @@ public sealed class MultiPasteSmokeTests(AppUnderTest app) : IClassFixture<AppUn
         target.TryActivate().ShouldBeTrue();
 
         popup = app.OpenPopup();
-        Mark(popup, "invoice", "meeting");
+        AppUnderTest.MarkClips(popup, "invoice", "meeting");
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SHIFT, VirtualKeyShort.KEY_T);
 
         AppUnderTest.WaitFor(() => target.Text == Invoice + "\t" + Meeting, 15_000).ShouldBeTrue($"the window holds: \"{target.Text}\"");
@@ -56,7 +56,7 @@ public sealed class MultiPasteSmokeTests(AppUnderTest app) : IClassFixture<AppUn
     {
         using var target = ActiveTarget();
         var popup = app.OpenPopup();
-        Mark(popup, "learn.microsoft", "invoice", "meeting");
+        AppUnderTest.MarkClips(popup, "learn.microsoft", "invoice", "meeting");
 
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_Q);
 
@@ -89,7 +89,7 @@ public sealed class MultiPasteSmokeTests(AppUnderTest app) : IClassFixture<AppUn
     {
         using var target = ActiveTarget();
         var popup = app.OpenPopup();
-        Mark(popup, "invoice", "meeting");
+        AppUnderTest.MarkClips(popup, "invoice", "meeting");
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_Q);
         AppUnderTest.WaitFor(() => app.QueueText() is not null, 10_000).ShouldBeTrue("the queue window did not appear");
         target.TryActivate().ShouldBeTrue();
@@ -144,23 +144,6 @@ public sealed class MultiPasteSmokeTests(AppUnderTest app) : IClassFixture<AppUn
         }
 
         return target;
-    }
-
-    /// <summary>Finds each clip by searching for it and marks it with Ctrl+Space, then clears the search.</summary>
-    private static void Mark(Window popup, params string[] searches)
-    {
-        foreach (var search in searches)
-        {
-            Keyboard.Type(search);
-            AppUnderTest.WaitFor(() => AppUnderTest.Rows(popup).Length == 1, 10_000).ShouldBeTrue($"no single clip matches \"{search}\"");
-            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SPACE);
-            for (var i = 0; i < search.Length; i++)
-            {
-                Keyboard.Type(VirtualKeyShort.BACK);
-            }
-
-            AppUnderTest.WaitFor(() => AppUnderTest.Rows(popup).Length > 1, 10_000).ShouldBeTrue("the search did not clear");
-        }
     }
 
     private static int Count(string text, string word)

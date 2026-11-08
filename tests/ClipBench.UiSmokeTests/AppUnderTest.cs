@@ -343,6 +343,34 @@ public class AppUnderTest : IAsyncLifetime
 
     public static string[] RowNames(Window popup) => [.. Rows(popup).Select(row => row.Name)];
 
+    /// <summary>
+    /// Finds each clip by searching for it and marks it with Ctrl+Space, then clears the search. The popup must be in front:
+    /// the keys go to whatever window is.
+    /// </summary>
+    public static void MarkClips(Window popup, params string[] searches)
+    {
+        foreach (var search in searches)
+        {
+            Keyboard.Type(search);
+            WaitFor(() => Rows(popup).Length == 1, 10_000).ShouldBeTrue($"no single clip matches \"{search}\"");
+            Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.SPACE);
+            for (var i = 0; i < search.Length; i++)
+            {
+                Keyboard.Type(VirtualKeyShort.BACK);
+            }
+
+            WaitFor(() => Rows(popup).Length > 1, 10_000).ShouldBeTrue("the search did not clear");
+        }
+    }
+
+    /// <summary>Marks two clips, so that the bar for pasting several clips together shows, and waits for it.</summary>
+    public static void ShowMultiPasteBar(Window popup)
+    {
+        MarkClips(popup, "invoice", "meeting");
+        WaitFor(() => popup.FindFirstDescendant(cf => cf.ByAutomationId("SeparatorButton")) is not null, 10_000)
+            .ShouldBeTrue("the multi-paste bar did not show after two clips were marked");
+    }
+
     /// <summary>Polls until the condition holds. These tests drive a real desktop, so they wait in real time.</summary>
     public static bool WaitFor(Func<bool> condition, int milliseconds)
     {

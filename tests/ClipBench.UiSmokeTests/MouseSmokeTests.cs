@@ -189,6 +189,9 @@ public sealed class MouseSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTe
         PointClick(Button(popup, "TransformBackButton").Center());
         AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByAutomationId("TransformApplyButton")) is null, 10_000).ShouldBeTrue("Back did not close the picker");
 
+        // The separator and table buttons show only while two or more clips are marked.
+        AppUnderTest.IsInFront(popup).ShouldBeTrue("the popup must be in front before keys are typed");
+        AppUnderTest.ShowMultiPasteBar(popup);
         foreach (var (button, item) in new[] { ("SeparatorButton", "Custom…"), ("TableButton", "As a column (Ctrl+T)"), ("BoardButton", "New board…") })
         {
             PointClick(Button(popup, button).Center());

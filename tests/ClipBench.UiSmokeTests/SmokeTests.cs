@@ -111,6 +111,8 @@ public sealed class SmokeTests(AppUnderTest app) : IClassFixture<AppUnderTest>
         app.ClosePopup();
         var popup = app.OpenPopup();
         var pastesBefore = Pastes();
+        AppUnderTest.IsInFront(popup).ShouldBeTrue("the popup must be in front before keys are typed");
+        AppUnderTest.ShowMultiPasteBar(popup);
 
         popup.FindFirstDescendant(cf => cf.ByAutomationId("SeparatorButton"))!.AsButton().Invoke();
         AppUnderTest.WaitFor(() => popup.FindFirstDescendant(cf => cf.ByName("Custom…")) is not null, 10_000).ShouldBeTrue("the separator menu did not open");
