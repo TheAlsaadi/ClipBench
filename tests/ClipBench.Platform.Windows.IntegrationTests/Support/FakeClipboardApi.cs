@@ -32,6 +32,9 @@ internal sealed class FakeClipboardApi : IClipboardApi
     /// <summary>Sizes to report instead of the real ones, to test limits without holding gigabytes in memory.</summary>
     public Dictionary<uint, int> ReportedSizes { get; } = [];
 
+    /// <summary>When true, the list of formats is reported as cut short, as when a clipboard holds more than can be listed.</summary>
+    public bool FormatListCutShort { get; set; }
+
     /// <summary>When true, emptying the clipboard fails.</summary>
     public bool RefuseEmpty { get; set; }
 
@@ -144,7 +147,7 @@ internal sealed class FakeClipboardApi : IClipboardApi
 
     private sealed class Session(FakeClipboardApi owner) : IClipboardSession
     {
-        public IReadOnlyList<ClipboardFormat> Formats() =>
+        public IReadOnlyList<ClipboardFormat>? Formats() => owner.FormatListCutShort ? null :
         [
             .. owner._order.Select(id => new ClipboardFormat(id, owner._registered.FirstOrDefault(pair => pair.Value == id).Key)),
         ];

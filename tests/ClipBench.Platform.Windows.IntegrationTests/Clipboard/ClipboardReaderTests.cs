@@ -332,6 +332,17 @@ public class ClipboardReaderTests
     }
 
     [Fact]
+    public async Task A_clipboard_with_more_formats_than_can_be_listed_is_not_recorded_and_nothing_of_it_is_read()
+    {
+        // A privacy marker could be among the formats past the end of the list.
+        _api.PutText("hunter2");
+        _api.FormatListCutShort = true;
+
+        (await Failure()).ShouldBe(ErrorCode.ClipboardUnreadable);
+        ContentWasTouched.ShouldBeFalse("the text must never have been copied into memory");
+    }
+
+    [Fact]
     public async Task A_history_flag_of_zero_rejects_the_content_and_only_the_flag_itself_is_read()
     {
         _api.PutText("hunter2");

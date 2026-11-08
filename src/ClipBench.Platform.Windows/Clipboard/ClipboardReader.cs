@@ -97,6 +97,12 @@ internal sealed class ClipboardReader : IClipboardReader
     private Collected Collect(IClipboardSession session, CaptureFilter filter, long sequence)
     {
         var formats = session.Formats();
+        if (formats is null)
+        {
+            // A privacy marker could be among the formats that were not listed, so nothing is recorded.
+            return new Ended(Failure(ErrorCode.ClipboardUnreadable, "The clipboard holds more formats than ClipBench can look at, so it was not recorded."));
+        }
+
         var ids = Identify(formats);
         var candidates = Candidates(ids);
         if (candidates.Count == 0)

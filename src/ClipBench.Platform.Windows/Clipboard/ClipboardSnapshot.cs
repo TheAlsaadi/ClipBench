@@ -20,14 +20,23 @@ internal sealed class ClipboardSnapshot : IDisposable
     /// </summary>
     /// <param name="session">The open clipboard.</param>
     /// <param name="maxBytes">The most bytes to copy in all.</param>
-    /// <returns>The snapshot, or null when the clipboard holds more than the limit (nothing is kept then).</returns>
+    /// <returns>
+    /// The snapshot, or null when the clipboard holds more than the limit or more formats than can be listed (nothing is
+    /// kept then: a partial copy could leave out a privacy marker).
+    /// </returns>
     public static ClipboardSnapshot? Take(IClipboardSession session, long maxBytes)
     {
         ArgumentNullException.ThrowIfNull(session);
 
+        var formats = session.Formats();
+        if (formats is null)
+        {
+            return null;
+        }
+
         List<(uint Format, byte[] Data)> entries = [];
         long total = 0;
-        foreach (var format in session.Formats())
+        foreach (var format in formats)
         {
             if (!ClipboardFormats.IsMemoryBlock(format.Id))
             {

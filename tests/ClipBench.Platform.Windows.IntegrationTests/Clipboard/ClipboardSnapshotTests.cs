@@ -200,4 +200,14 @@ public class ClipboardSnapshotTests
 
         buffers.All(buffer => buffer.All(value => value == 0)).ShouldBeTrue();
     }
+
+    [Fact]
+    public void A_clipboard_with_more_formats_than_can_be_listed_is_not_kept_because_the_copy_would_be_incomplete()
+    {
+        // Restoring part of it could drop a privacy marker that was past the end of the list.
+        _api.PutText("original");
+        _api.FormatListCutShort = true;
+
+        Take().ShouldBeNull();
+    }
 }
