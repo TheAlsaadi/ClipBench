@@ -100,9 +100,10 @@ public sealed record StartupOptions
             }
             else if (isDataDirectory)
             {
-                if (value.StartsWith(@"\\", StringComparison.Ordinal))
+                if (value.Length >= 2 && value[0] is '\\' or '/' && value[1] is '\\' or '/')
                 {
                     // A network share or a device path: the app makes no network calls, and the system would make them for it.
+                    // Windows reads either slash as a separator, so "//server/share" is a share too.
                     problems.Add($"{DataDirectorySwitch} needs a folder on this computer, so it was ignored.");
                 }
                 else if (Path.IsPathFullyQualified(value))
