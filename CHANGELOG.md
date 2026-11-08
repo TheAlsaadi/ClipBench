@@ -92,6 +92,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A quieter look for the popup and the settings window. In the popup:
+  - The header buttons have no outline until the pointer is over them.
+  - The search box is a soft filled field with a search icon.
+  - Each clip's type icon sits in a small tile.
+  - Source, age and what a clip looks like share one line.
+  - A pinned clip's pin takes the accent color.
+  - A selected row is shown by its background alone, with no colored bar beside it.
+  - The separator, Queue and Table controls show only while two or more clips are selected, in a bar that says how many.
+  - Thin dividers set the boards and the snippets apart in the sidebar.
+
+  In Settings, each section has an icon, and each setting is a card with an icon, its title, a line about it and its
+  control on the right.
 - The tray menu says **Turn on incognito** and **Turn off incognito**, and has **Settings…** in place of **Snippets…**
   and the **Restore clipboard after paste** tick (now a switch under Paste).
 - Wiping everything keeps the database file and its key, empty (ADR 0017); the glossary said otherwise.
