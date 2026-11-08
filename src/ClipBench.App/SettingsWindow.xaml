@@ -13,11 +13,46 @@
 
     <Grid
         x:Name="Frame"
-        Padding="16"
-        ColumnSpacing="16"
+        Padding="12,16,0,0"
+        ColumnSpacing="12"
         PreviewKeyDown="Frame_PreviewKeyDown">
+        <Grid.Resources>
+            <!-- The page title above each section's cards. -->
+            <Style x:Key="PageTitleStyle" BasedOn="{StaticResource TitleTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,0,0,12" />
+            </Style>
+            <!-- A small heading over a group of cards. -->
+            <Style x:Key="GroupTitleStyle" BasedOn="{StaticResource BodyStrongTextBlockStyle}" TargetType="TextBlock">
+                <Setter Property="Margin" Value="2,16,0,4" />
+            </Style>
+            <!-- The icon at the left of a card. -->
+            <Style x:Key="CardIconStyle" TargetType="FontIcon">
+                <Setter Property="FontSize" Value="20" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
+            </Style>
+            <!-- A switch at the right of a card: no header, as the card says what it is. -->
+            <Style x:Key="CardSwitchStyle" TargetType="ToggleSwitch">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="OnContent" Value="On" />
+                <Setter Property="OffContent" Value="Off" />
+            </Style>
+            <Style x:Key="ErrorTextStyle" TargetType="TextBlock">
+                <Setter Property="Margin" Value="2,8,0,0" />
+                <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <!-- Each section scrolls, with room on the right for the scroll bar. -->
+            <Style x:Key="PageStyle" TargetType="StackPanel">
+                <Setter Property="Spacing" Value="4" />
+                <Setter Property="Margin" Value="4,0,28,24" />
+                <Setter Property="MaxWidth" Value="860" />
+            </Style>
+        </Grid.Resources>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="180" />
+            <ColumnDefinition Width="200" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -31,11 +66,15 @@
             SelectionMode="Single">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="prefs:SettingsSectionItem">
-                    <TextBlock
-                        Padding="0,6"
+                    <StackPanel
+                        Padding="4,9"
                         AutomationProperties.AutomationId="{x:Bind Title}"
                         AutomationProperties.Name="{x:Bind Title}"
-                        Text="{x:Bind Title}" />
+                        Orientation="Horizontal"
+                        Spacing="14">
+                        <FontIcon FontSize="16" Glyph="{x:Bind local:Glyphs.ForSection(Section)}" />
+                        <TextBlock Text="{x:Bind Title}" />
+                    </StackPanel>
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
@@ -44,47 +83,70 @@
 
             <!-- General -->
             <ScrollViewer x:Name="GeneralPanel" AutomationProperties.AutomationId="GeneralPanel">
-                <StackPanel Spacing="16">
-                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="General" />
+                <StackPanel Style="{StaticResource PageStyle}">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="General" />
 
                     <Border
-                        Padding="14"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6"
+                        Margin="0,0,0,12"
+                        Padding="16"
+                        Style="{StaticResource SettingsCardStyle}"
                         Visibility="{x:Bind ViewModel.General.ShowFirstRun, Mode=OneWay}">
-                        <StackPanel Spacing="10">
-                            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Welcome to ClipBench" />
-                            <TextBlock
-                                Text="ClipBench keeps your clipboard history on this PC, encrypted, and never connects to the internet. Should it start when you sign in to Windows? You can change this any time."
-                                TextWrapping="Wrap" />
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button
-                                    AutomationProperties.AutomationId="FirstRunYes"
-                                    Command="{x:Bind ViewModel.General.AcceptFirstRunCommand}"
-                                    Content="Yes, start with Windows"
-                                    Style="{StaticResource AccentButtonStyle}" />
-                                <Button
-                                    AutomationProperties.AutomationId="FirstRunNo"
-                                    Command="{x:Bind ViewModel.General.DeclineFirstRunCommand}"
-                                    Content="No thanks" />
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Top"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE946;"
+                                Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" Spacing="10">
+                                <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Welcome to ClipBench" />
+                                <TextBlock
+                                    Text="ClipBench keeps your clipboard history on this PC, encrypted, and never connects to the internet. Should it start when you sign in to Windows? You can change this any time."
+                                    TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button
+                                        AutomationProperties.AutomationId="FirstRunYes"
+                                        Command="{x:Bind ViewModel.General.AcceptFirstRunCommand}"
+                                        Content="Yes, start with Windows"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                                    <Button
+                                        AutomationProperties.AutomationId="FirstRunNo"
+                                        Command="{x:Bind ViewModel.General.DeclineFirstRunCommand}"
+                                        Content="No thanks" />
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
+                        </Grid>
                     </Border>
 
-                    <ToggleSwitch
-                        AutomationProperties.AutomationId="StartWithWindowsSwitch"
-                        Header="Start ClipBench when I sign in to Windows"
-                        IsEnabled="{x:Bind ViewModel.General.CanStartWithWindows, Mode=OneWay}"
-                        IsOn="{x:Bind ViewModel.General.StartWithWindows, Mode=TwoWay}"
-                        OffContent="Off"
-                        OnContent="On" />
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE7E8;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Start ClipBench when I sign in to Windows" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="It waits in the tray, ready for your shortcut." />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="StartWithWindowsSwitch"
+                                AutomationProperties.Name="Start ClipBench when I sign in to Windows"
+                                IsEnabled="{x:Bind ViewModel.General.CanStartWithWindows, Mode=OneWay}"
+                                IsOn="{x:Bind ViewModel.General.StartWithWindows, Mode=TwoWay}"
+                                Style="{StaticResource CardSwitchStyle}" />
+                        </Grid>
+                    </Border>
+
                     <TextBlock
                         AutomationProperties.AutomationId="GeneralError"
-                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                        Text="{x:Bind ViewModel.General.ErrorMessage, Mode=OneWay}"
-                        TextWrapping="Wrap" />
+                        Style="{StaticResource ErrorTextStyle}"
+                        Text="{x:Bind ViewModel.General.ErrorMessage, Mode=OneWay}" />
                 </StackPanel>
             </ScrollViewer>
 
@@ -93,81 +155,114 @@
                 x:Name="HotkeysPanel"
                 AutomationProperties.AutomationId="HotkeysPanel"
                 Visibility="Collapsed">
-                <StackPanel Spacing="16">
-                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Shortcuts" />
+                <StackPanel Style="{StaticResource PageStyle}">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="Shortcuts" />
                     <TextBlock
+                        Margin="2,0,0,8"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="Click a box and press the keys you want. A shortcut needs Ctrl, Alt or Win, unless it is a function key."
                         TextWrapping="Wrap" />
 
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="PopupHotkeyBox"
-                            AutomationProperties.AutomationId="PopupHotkeyBox"
-                            AutomationProperties.Name="Open the popup"
-                            Header="Open the popup"
-                            IsReadOnly="True"
-                            PreviewKeyDown="PopupHotkeyBox_PreviewKeyDown"
-                            Text="{x:Bind ViewModel.Hotkeys.PopupHotkey, Mode=OneWay}" />
-                        <Button
-                            Grid.Column="1"
-                            VerticalAlignment="Bottom"
-                            AutomationProperties.AutomationId="ResetPopupHotkey"
-                            Command="{x:Bind ViewModel.Hotkeys.ResetPopupCommand}"
-                            Content="Reset" />
-                    </Grid>
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE77F;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Open the popup" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="Shows your clips where you are typing." />
+                            </StackPanel>
+                            <TextBox
+                                x:Name="PopupHotkeyBox"
+                                Grid.Column="2"
+                                Width="200"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="PopupHotkeyBox"
+                                AutomationProperties.Name="Open the popup"
+                                IsReadOnly="True"
+                                PreviewKeyDown="PopupHotkeyBox_PreviewKeyDown"
+                                Text="{x:Bind ViewModel.Hotkeys.PopupHotkey, Mode=OneWay}" />
+                            <Button
+                                Grid.Column="3"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="ResetPopupHotkey"
+                                Command="{x:Bind ViewModel.Hotkeys.ResetPopupCommand}"
+                                Content="Reset" />
+                        </Grid>
+                    </Border>
 
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="CollectHotkeyBox"
-                            AutomationProperties.AutomationId="CollectHotkeyBox"
-                            AutomationProperties.Name="Start and finish collecting"
-                            Header="Start and finish collecting"
-                            IsReadOnly="True"
-                            PreviewKeyDown="CollectHotkeyBox_PreviewKeyDown"
-                            Text="{x:Bind ViewModel.Hotkeys.CollectHotkey, Mode=OneWay}" />
-                        <Button
-                            Grid.Column="1"
-                            VerticalAlignment="Bottom"
-                            AutomationProperties.AutomationId="ResetCollectHotkey"
-                            Command="{x:Bind ViewModel.Hotkeys.ResetCollectCommand}"
-                            Content="Reset" />
-                    </Grid>
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8C8;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Start and finish collecting" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="Gathers several copies into one clip." />
+                            </StackPanel>
+                            <TextBox
+                                x:Name="CollectHotkeyBox"
+                                Grid.Column="2"
+                                Width="200"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="CollectHotkeyBox"
+                                AutomationProperties.Name="Start and finish collecting"
+                                IsReadOnly="True"
+                                PreviewKeyDown="CollectHotkeyBox_PreviewKeyDown"
+                                Text="{x:Bind ViewModel.Hotkeys.CollectHotkey, Mode=OneWay}" />
+                            <Button
+                                Grid.Column="3"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="ResetCollectHotkey"
+                                Command="{x:Bind ViewModel.Hotkeys.ResetCollectCommand}"
+                                Content="Reset" />
+                        </Grid>
+                    </Border>
 
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="CaptureTextHotkeyBox"
-                            AutomationProperties.AutomationId="CaptureTextHotkeyBox"
-                            AutomationProperties.Name="Copy text from the screen"
-                            Header="Copy text from the screen"
-                            IsReadOnly="True"
-                            PreviewKeyDown="CaptureTextHotkeyBox_PreviewKeyDown"
-                            Text="{x:Bind ViewModel.Hotkeys.CaptureTextHotkey, Mode=OneWay}" />
-                        <Button
-                            Grid.Column="1"
-                            VerticalAlignment="Bottom"
-                            AutomationProperties.AutomationId="ResetCaptureTextHotkey"
-                            Command="{x:Bind ViewModel.Hotkeys.ResetCaptureTextCommand}"
-                            Content="Reset" />
-                    </Grid>
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8B3;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Copy text from the screen" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="Drag over text anywhere on screen to copy it. It is read on this PC." />
+                            </StackPanel>
+                            <TextBox
+                                x:Name="CaptureTextHotkeyBox"
+                                Grid.Column="2"
+                                Width="200"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="CaptureTextHotkeyBox"
+                                AutomationProperties.Name="Copy text from the screen"
+                                IsReadOnly="True"
+                                PreviewKeyDown="CaptureTextHotkeyBox_PreviewKeyDown"
+                                Text="{x:Bind ViewModel.Hotkeys.CaptureTextHotkey, Mode=OneWay}" />
+                            <Button
+                                Grid.Column="3"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="ResetCaptureTextHotkey"
+                                Command="{x:Bind ViewModel.Hotkeys.ResetCaptureTextCommand}"
+                                Content="Reset" />
+                        </Grid>
+                    </Border>
 
                     <TextBlock
                         AutomationProperties.AutomationId="HotkeysError"
-                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                        Text="{x:Bind ViewModel.Hotkeys.ErrorMessage, Mode=OneWay}"
-                        TextWrapping="Wrap" />
+                        Style="{StaticResource ErrorTextStyle}"
+                        Text="{x:Bind ViewModel.Hotkeys.ErrorMessage, Mode=OneWay}" />
                 </StackPanel>
             </ScrollViewer>
 
@@ -176,44 +271,84 @@
                 x:Name="HistoryPanel"
                 AutomationProperties.AutomationId="HistoryPanel"
                 Visibility="Collapsed">
-                <StackPanel Spacing="16">
-                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="History" />
+                <StackPanel Style="{StaticResource PageStyle}">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="History" />
                     <TextBlock
+                        Margin="2,0,0,8"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="Pinned clips are never removed. Older clips go first when a limit is reached."
                         TextWrapping="Wrap" />
-                    <NumberBox
-                        x:Name="MaxCountBox"
-                        Width="260"
-                        HorizontalAlignment="Left"
-                        AutomationProperties.AutomationId="MaxCountBox"
-                        Header="Most clips to keep"
-                        SmallChange="10"
-                        SpinButtonPlacementMode="Inline"
-                        ValueChanged="MaxCountBox_ValueChanged" />
-                    <NumberBox
-                        x:Name="MaxAgeBox"
-                        Width="260"
-                        HorizontalAlignment="Left"
-                        AutomationProperties.AutomationId="MaxAgeBox"
-                        Header="Days to keep a clip"
-                        SmallChange="1"
-                        SpinButtonPlacementMode="Inline"
-                        ValueChanged="MaxAgeBox_ValueChanged" />
-                    <NumberBox
-                        x:Name="MaxMegabytesBox"
-                        Width="260"
-                        HorizontalAlignment="Left"
-                        AutomationProperties.AutomationId="MaxMegabytesBox"
-                        Header="Most megabytes of clips to keep"
-                        SmallChange="16"
-                        SpinButtonPlacementMode="Inline"
-                        ValueChanged="MaxMegabytesBox_ValueChanged" />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8FD;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Most clips to keep" />
+                            <NumberBox
+                                x:Name="MaxCountBox"
+                                Grid.Column="2"
+                                Width="170"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="MaxCountBox"
+                                AutomationProperties.Name="Most clips to keep"
+                                SmallChange="10"
+                                SpinButtonPlacementMode="Inline"
+                                ValueChanged="MaxCountBox_ValueChanged" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE787;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Days to keep a clip" />
+                            <NumberBox
+                                x:Name="MaxAgeBox"
+                                Grid.Column="2"
+                                Width="170"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="MaxAgeBox"
+                                AutomationProperties.Name="Days to keep a clip"
+                                SmallChange="1"
+                                SpinButtonPlacementMode="Inline"
+                                ValueChanged="MaxAgeBox_ValueChanged" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xEDA2;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Most megabytes of clips to keep" />
+                            <NumberBox
+                                x:Name="MaxMegabytesBox"
+                                Grid.Column="2"
+                                Width="170"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="MaxMegabytesBox"
+                                AutomationProperties.Name="Most megabytes of clips to keep"
+                                SmallChange="16"
+                                SpinButtonPlacementMode="Inline"
+                                ValueChanged="MaxMegabytesBox_ValueChanged" />
+                        </Grid>
+                    </Border>
+
                     <TextBlock
                         AutomationProperties.AutomationId="HistoryError"
-                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                        Text="{x:Bind ViewModel.History.ErrorMessage, Mode=OneWay}"
-                        TextWrapping="Wrap" />
+                        Style="{StaticResource ErrorTextStyle}"
+                        Text="{x:Bind ViewModel.History.ErrorMessage, Mode=OneWay}" />
                 </StackPanel>
             </ScrollViewer>
 
@@ -222,143 +357,223 @@
                 x:Name="PrivacyPanel"
                 AutomationProperties.AutomationId="PrivacyPanel"
                 Visibility="Collapsed">
-                <StackPanel Spacing="16">
-                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Privacy" />
+                <StackPanel Style="{StaticResource PageStyle}">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="Privacy" />
 
-                    <ToggleSwitch
-                        AutomationProperties.AutomationId="IncognitoSwitch"
-                        Header="Incognito: record nothing until I turn it off"
-                        IsOn="{x:Bind ViewModel.Privacy.IsIncognito, Mode=TwoWay}"
-                        OffContent="Off"
-                        OnContent="On" />
-
-                    <ToggleSwitch
-                        AutomationProperties.AutomationId="MaskSensitiveSwitch"
-                        Header="Hide passwords, keys, tokens and card numbers"
-                        IsOn="{x:Bind ViewModel.Privacy.MaskSensitive, Mode=TwoWay}"
-                        OffContent="Off"
-                        OnContent="On" />
-
-                    <NumberBox
-                        x:Name="SensitiveExpiryBox"
-                        Width="260"
-                        HorizontalAlignment="Left"
-                        AutomationProperties.AutomationId="SensitiveExpiryBox"
-                        Header="Seconds to keep a clip that looks like a secret"
-                        SmallChange="15"
-                        SpinButtonPlacementMode="Inline"
-                        ValueChanged="SensitiveExpiryBox_ValueChanged" />
-
-                    <ToggleSwitch
-                        AutomationProperties.AutomationId="HideFromCaptureSwitch"
-                        Header="Keep ClipBench's windows out of screenshots and screen sharing"
-                        IsOn="{x:Bind ViewModel.Privacy.HideFromScreenCapture, Mode=TwoWay}"
-                        OffContent="Off"
-                        OnContent="On" />
-
-                    <StackPanel Spacing="8">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Programs that are never recorded" />
-                        <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="Anything copied from these programs is ignored. Password managers are listed by default."
-                            TextWrapping="Wrap" />
-                        <ListView
-                            MaxHeight="220"
-                            AutomationProperties.AutomationId="ExcludedPrograms"
-                            AutomationProperties.Name="Programs that are never recorded"
-                            ItemsSource="{x:Bind ViewModel.Privacy.ExcludedPrograms, Mode=OneWay}"
-                            SelectionMode="None">
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="x:String">
-                                    <Grid ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock
-                                            VerticalAlignment="Center"
-                                            Text="{x:Bind}"
-                                            TextTrimming="CharacterEllipsis" />
-                                        <Button
-                                            Grid.Column="1"
-                                            AutomationProperties.Name="Remove"
-                                            Click="RemoveProgram_Click"
-                                            Content="Remove"
-                                            Tag="{x:Bind}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                        <Grid ColumnSpacing="8">
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox
-                                AutomationProperties.AutomationId="NewProgramBox"
-                                AutomationProperties.Name="Program to add"
-                                KeyDown="NewProgramBox_KeyDown"
-                                MaxLength="100"
-                                PlaceholderText="Program name, for example notepad.exe"
-                                Text="{x:Bind ViewModel.Privacy.NewProgram, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button
-                                Grid.Column="1"
-                                AutomationProperties.AutomationId="AddProgramButton"
-                                Command="{x:Bind ViewModel.Privacy.AddProgramCommand}"
-                                Content="Add" />
+                            <FontIcon Glyph="&#xED1A;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Incognito" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="Record nothing until you turn it off." />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="IncognitoSwitch"
+                                AutomationProperties.Name="Incognito: record nothing until I turn it off"
+                                IsOn="{x:Bind ViewModel.Privacy.IsIncognito, Mode=TwoWay}"
+                                Style="{StaticResource CardSwitchStyle}" />
                         </Grid>
-                        <Button
-                            AutomationProperties.AutomationId="RestoreExclusionsButton"
-                            Command="{x:Bind ViewModel.Privacy.RestoreDefaultExclusionsCommand}"
-                            Content="Restore the default list" />
-                    </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE72E;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Hide passwords, keys, tokens and card numbers" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="They show as dots until you reveal them with Ctrl+R." />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="MaskSensitiveSwitch"
+                                AutomationProperties.Name="Hide passwords, keys, tokens and card numbers"
+                                IsOn="{x:Bind ViewModel.Privacy.MaskSensitive, Mode=TwoWay}"
+                                Style="{StaticResource CardSwitchStyle}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE916;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Seconds to keep a clip that looks like a secret" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="After this time it is removed from the history." />
+                            </StackPanel>
+                            <NumberBox
+                                x:Name="SensitiveExpiryBox"
+                                Grid.Column="2"
+                                Width="170"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="SensitiveExpiryBox"
+                                AutomationProperties.Name="Seconds to keep a clip that looks like a secret"
+                                SmallChange="15"
+                                SpinButtonPlacementMode="Inline"
+                                ValueChanged="SensitiveExpiryBox_ValueChanged" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE7F4;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Keep ClipBench's windows out of screenshots and screen sharing" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="Other apps cannot capture them, even when you share your whole screen." />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="HideFromCaptureSwitch"
+                                AutomationProperties.Name="Keep ClipBench's windows out of screenshots and screen sharing"
+                                IsOn="{x:Bind ViewModel.Privacy.HideFromScreenCapture, Mode=TwoWay}"
+                                Style="{StaticResource CardSwitchStyle}" />
+                        </Grid>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource GroupTitleStyle}" Text="Programs that are never recorded" />
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel Spacing="10">
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Anything copied from these programs is ignored. Password managers are listed by default."
+                                TextWrapping="Wrap" />
+                            <ListView
+                                MaxHeight="220"
+                                AutomationProperties.AutomationId="ExcludedPrograms"
+                                AutomationProperties.Name="Programs that are never recorded"
+                                ItemsSource="{x:Bind ViewModel.Privacy.ExcludedPrograms, Mode=OneWay}"
+                                SelectionMode="None">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon
+                                                FontSize="14"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Glyph="&#xE7C4;" />
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Text="{x:Bind}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <Button
+                                                Grid.Column="2"
+                                                AutomationProperties.Name="Remove"
+                                                Click="RemoveProgram_Click"
+                                                Style="{StaticResource GhostButtonStyle}"
+                                                Tag="{x:Bind}"
+                                                ToolTipService.ToolTip="Remove">
+                                                <FontIcon FontSize="12" Glyph="&#xE711;" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    AutomationProperties.AutomationId="NewProgramBox"
+                                    AutomationProperties.Name="Program to add"
+                                    KeyDown="NewProgramBox_KeyDown"
+                                    MaxLength="100"
+                                    PlaceholderText="Program name, for example notepad.exe"
+                                    Text="{x:Bind ViewModel.Privacy.NewProgram, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button
+                                    Grid.Column="1"
+                                    AutomationProperties.AutomationId="AddProgramButton"
+                                    Command="{x:Bind ViewModel.Privacy.AddProgramCommand}"
+                                    Content="Add" />
+                                <Button
+                                    Grid.Column="2"
+                                    AutomationProperties.AutomationId="RestoreExclusionsButton"
+                                    Command="{x:Bind ViewModel.Privacy.RestoreDefaultExclusionsCommand}"
+                                    Content="Restore the default list" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
 
                     <TextBlock
                         AutomationProperties.AutomationId="PrivacyError"
-                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                        Text="{x:Bind ViewModel.Privacy.ErrorMessage, Mode=OneWay}"
-                        TextWrapping="Wrap" />
+                        Style="{StaticResource ErrorTextStyle}"
+                        Text="{x:Bind ViewModel.Privacy.ErrorMessage, Mode=OneWay}" />
 
-                    <StackPanel Spacing="8">
-                        <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="Delete everything" />
-                        <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="Deletes every clip, pinned clip, board and snippet, and scrubs them from disk. This cannot be undone."
-                            TextWrapping="Wrap" />
-                        <Button
-                            AutomationProperties.AutomationId="WipeButton"
-                            Command="{x:Bind ViewModel.Privacy.RequestWipeCommand}"
-                            Content="Delete everything…" />
-                        <Border
-                            Padding="12"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource SystemFillColorCriticalBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6"
-                            Visibility="{x:Bind ViewModel.Privacy.IsConfirmingWipe, Mode=OneWay}">
-                            <StackPanel Spacing="8">
+                    <TextBlock Style="{StaticResource GroupTitleStyle}" Text="Delete everything" />
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Glyph="&#xE74D;" Style="{StaticResource CardIconStyle}" />
                                 <TextBlock
-                                    AutomationProperties.AutomationId="WipeQuestion"
-                                    Text="Delete every clip, board and snippet for good?"
-                                    TextWrapping="Wrap" />
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button
-                                        AutomationProperties.AutomationId="WipeConfirmButton"
-                                        Command="{x:Bind ViewModel.Privacy.ConfirmWipeCommand}"
-                                        Content="Yes, delete everything"
-                                        Style="{StaticResource AccentButtonStyle}" />
-                                    <Button
-                                        AutomationProperties.AutomationId="WipeCancelButton"
-                                        Command="{x:Bind ViewModel.Privacy.CancelWipeCommand}"
-                                        Content="Keep my clips" />
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource CardDescriptionStyle}"
+                                    Text="Deletes every clip, pinned clip, board and snippet, and scrubs them from disk. This cannot be undone." />
+                                <Button
+                                    Grid.Column="2"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.AutomationId="WipeButton"
+                                    Command="{x:Bind ViewModel.Privacy.RequestWipeCommand}"
+                                    Content="Delete everything…" />
+                            </Grid>
+                            <Border
+                                Padding="12"
+                                Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                                CornerRadius="{ThemeResource ControlCornerRadius}"
+                                Visibility="{x:Bind ViewModel.Privacy.IsConfirmingWipe, Mode=OneWay}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock
+                                        AutomationProperties.AutomationId="WipeQuestion"
+                                        Text="Delete every clip, board and snippet for good?"
+                                        TextWrapping="Wrap" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button
+                                            AutomationProperties.AutomationId="WipeConfirmButton"
+                                            Command="{x:Bind ViewModel.Privacy.ConfirmWipeCommand}"
+                                            Content="Yes, delete everything"
+                                            Style="{StaticResource AccentButtonStyle}" />
+                                        <Button
+                                            AutomationProperties.AutomationId="WipeCancelButton"
+                                            Command="{x:Bind ViewModel.Privacy.CancelWipeCommand}"
+                                            Content="Keep my clips" />
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-                        <TextBlock
-                            AutomationProperties.AutomationId="WipeStatus"
-                            Text="{x:Bind ViewModel.Privacy.WipeStatus, Mode=OneWay}"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
+                            </Border>
+                            <TextBlock
+                                AutomationProperties.AutomationId="WipeStatus"
+                                Text="{x:Bind ViewModel.Privacy.WipeStatus, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
 
@@ -367,227 +582,297 @@
                 x:Name="PastePanel"
                 AutomationProperties.AutomationId="PastePanel"
                 Visibility="Collapsed">
-                <StackPanel Spacing="16">
-                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Paste" />
+                <StackPanel Style="{StaticResource PageStyle}">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="Paste" />
 
-                    <ToggleSwitch
-                        AutomationProperties.AutomationId="RestoreClipboardSwitch"
-                        Header="Put my clipboard back after a paste"
-                        IsOn="{x:Bind ViewModel.Paste.RestorePreviousClipboard, Mode=TwoWay}"
-                        OffContent="Off"
-                        OnContent="On" />
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE777;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Put my clipboard back after a paste" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="What you copied last is still there after ClipBench pastes." />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="RestoreClipboardSwitch"
+                                AutomationProperties.Name="Put my clipboard back after a paste"
+                                IsOn="{x:Bind ViewModel.Paste.RestorePreviousClipboard, Mode=TwoWay}"
+                                Style="{StaticResource CardSwitchStyle}" />
+                        </Grid>
+                    </Border>
 
-                    <ToggleSwitch
-                        AutomationProperties.AutomationId="KeepCopiesSwitch"
-                        Header="Also keep each copy as its own clip while collecting"
-                        IsOn="{x:Bind ViewModel.Paste.KeepCopiesWhileCollecting, Mode=TwoWay}"
-                        OffContent="Off"
-                        OnContent="On" />
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8C8;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Also keep each copy as its own clip while collecting" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="Otherwise only the collected clip is kept." />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                AutomationProperties.AutomationId="KeepCopiesSwitch"
+                                AutomationProperties.Name="Also keep each copy as its own clip while collecting"
+                                IsOn="{x:Bind ViewModel.Paste.KeepCopiesWhileCollecting, Mode=TwoWay}"
+                                Style="{StaticResource CardSwitchStyle}" />
+                        </Grid>
+                    </Border>
 
-                    <ComboBox
-                        x:Name="SeparatorBox"
-                        Width="260"
-                        AutomationProperties.AutomationId="SeparatorBox"
-                        Header="What goes between clips in a multi-paste"
-                        SelectionChanged="SeparatorBox_SelectionChanged" />
+                    <TextBlock Style="{StaticResource GroupTitleStyle}" Text="Pasting several clips" />
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8E4;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Text="What goes between clips in a multi-paste"
+                                TextWrapping="Wrap" />
+                            <ComboBox
+                                x:Name="SeparatorBox"
+                                Grid.Column="2"
+                                Width="200"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="SeparatorBox"
+                                AutomationProperties.Name="What goes between clips in a multi-paste"
+                                SelectionChanged="SeparatorBox_SelectionChanged" />
+                        </Grid>
+                    </Border>
 
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="260" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox
-                            x:Name="CustomSeparatorBox"
-                            AutomationProperties.AutomationId="CustomSeparatorBox"
-                            Header="Or type your own, for example \t for a tab"
-                            KeyDown="CustomSeparatorBox_KeyDown"
-                            MaxLength="80" />
-                        <Button
-                            Grid.Column="1"
-                            VerticalAlignment="Bottom"
-                            AutomationProperties.AutomationId="ApplyCustomSeparatorButton"
-                            Click="ApplyCustomSeparator_Click"
-                            Content="Use it" />
-                    </Grid>
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE70F;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Or type your own" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="For example \t for a tab." />
+                            </StackPanel>
+                            <TextBox
+                                x:Name="CustomSeparatorBox"
+                                Grid.Column="2"
+                                Width="200"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="CustomSeparatorBox"
+                                AutomationProperties.Name="Or type your own, for example \t for a tab"
+                                KeyDown="CustomSeparatorBox_KeyDown"
+                                MaxLength="80" />
+                            <Button
+                                Grid.Column="3"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="ApplyCustomSeparatorButton"
+                                Click="ApplyCustomSeparator_Click"
+                                Content="Use it" />
+                        </Grid>
+                    </Border>
 
                     <TextBlock
                         AutomationProperties.AutomationId="PasteError"
-                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                        Text="{x:Bind ViewModel.Paste.ErrorMessage, Mode=OneWay}"
-                        TextWrapping="Wrap" />
+                        Style="{StaticResource ErrorTextStyle}"
+                        Text="{x:Bind ViewModel.Paste.ErrorMessage, Mode=OneWay}" />
                 </StackPanel>
             </ScrollViewer>
 
             <!-- Snippets -->
             <Grid
                 x:Name="SnippetsPanel"
+                Margin="4,0,28,16"
                 AutomationProperties.AutomationId="SnippetsPanel"
-                ColumnSpacing="16"
+                RowSpacing="0"
                 Visibility="Collapsed">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="Snippets" />
 
-                <Grid Grid.Column="0" RowSpacing="8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <Grid Grid.Row="1" ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="200" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-                    <ListView
-                        x:Name="SnippetNames"
-                        Grid.Row="0"
-                        AutomationProperties.AutomationId="SnippetNames"
-                        AutomationProperties.Name="Snippets"
-                        ItemsSource="{x:Bind ViewModel.Snippets.Items}"
-                        SelectedIndex="{x:Bind ViewModel.Snippets.SelectedIndex, Mode=TwoWay}"
-                        SelectionMode="Single">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="snippets:SnippetListItem">
-                                <TextBlock
-                                    Padding="0,6"
-                                    AutomationProperties.Name="{x:Bind Name}"
-                                    Text="{x:Bind Name}"
-                                    TextTrimming="CharacterEllipsis" />
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                    <Border Grid.Column="0" Padding="4" Style="{StaticResource SettingsCardStyle}">
+                        <Grid RowSpacing="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                    <Button
-                        Grid.Row="1"
-                        HorizontalAlignment="Stretch"
-                        AutomationProperties.AutomationId="NewSnippetButton"
-                        Command="{x:Bind ViewModel.Snippets.NewCommand}"
-                        Content="New snippet"
-                        ToolTipService.ToolTip="Start a new snippet (Ctrl+N)" />
-                </Grid>
+                            <ListView
+                                x:Name="SnippetNames"
+                                Grid.Row="0"
+                                AutomationProperties.AutomationId="SnippetNames"
+                                AutomationProperties.Name="Snippets"
+                                ItemsSource="{x:Bind ViewModel.Snippets.Items}"
+                                SelectedIndex="{x:Bind ViewModel.Snippets.SelectedIndex, Mode=TwoWay}"
+                                SelectionMode="Single">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="snippets:SnippetListItem">
+                                        <TextBlock
+                                            Padding="0,7"
+                                            AutomationProperties.Name="{x:Bind Name}"
+                                            Text="{x:Bind Name}"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
 
-                <Grid Grid.Column="1" RowSpacing="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <TextBox
-                        x:Name="NameBox"
-                        Grid.Row="0"
-                        AutomationProperties.AutomationId="SnippetNameBox"
-                        AutomationProperties.Name="Name"
-                        Header="Name"
-                        IsEnabled="{x:Bind ViewModel.Snippets.CanEdit, Mode=OneWay}"
-                        MaxLength="64"
-                        Text="{x:Bind ViewModel.Snippets.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                    <TextBox
-                        x:Name="BodyBox"
-                        Grid.Row="1"
-                        MinHeight="160"
-                        AcceptsReturn="True"
-                        AutomationProperties.AutomationId="SnippetBodyBox"
-                        AutomationProperties.Name="Text"
-                        FontFamily="Consolas"
-                        Header="Text"
-                        IsEnabled="{x:Bind ViewModel.Snippets.CanEdit, Mode=OneWay}"
-                        IsSpellCheckEnabled="False"
-                        ScrollViewer.VerticalScrollBarVisibility="Auto"
-                        Text="{x:Bind ViewModel.Snippets.Body, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                        TextWrapping="Wrap" />
-
-                    <TextBlock
-                        Grid.Row="2"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Style="{StaticResource CaptionTextBlockStyle}"
-                        Text="{x:Bind local:SettingsWindow.SnippetHelp}"
-                        TextWrapping="Wrap" />
-
-                    <ItemsControl
-                        Grid.Row="3"
-                        AutomationProperties.AutomationId="SnippetWarnings"
-                        AutomationProperties.Name="Problems in the text"
-                        IsTabStop="False"
-                        ItemsSource="{x:Bind ViewModel.Snippets.Warnings}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="x:String">
-                                <TextBlock
-                                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
-                                    Text="{x:Bind}"
-                                    TextWrapping="Wrap" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <Border
-                        Grid.Row="4"
-                        MinHeight="48"
-                        MaxHeight="120"
-                        Padding="10,8"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Style="{StaticResource CaptionTextBlockStyle}"
-                                Text="Preview, with a stand-in for each value" />
-                            <TextBlock
-                                AutomationProperties.AutomationId="SnippetPreview"
-                                AutomationProperties.Name="Preview"
-                                MaxLines="4"
-                                Text="{x:Bind ViewModel.Snippets.Preview, Mode=OneWay}"
-                                TextTrimming="CharacterEllipsis"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
+                            <Button
+                                Grid.Row="1"
+                                Margin="4"
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.AutomationId="NewSnippetButton"
+                                Command="{x:Bind ViewModel.Snippets.NewCommand}"
+                                ToolTipService.ToolTip="Start a new snippet (Ctrl+N)">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                    <TextBlock Text="New snippet" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
                     </Border>
 
-                    <StackPanel Grid.Row="5" Spacing="6">
-                        <TextBlock
-                            AutomationProperties.AutomationId="SnippetEditorError"
-                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                            Style="{StaticResource CaptionTextBlockStyle}"
-                            Text="{x:Bind ViewModel.Snippets.ErrorMessage, Mode=OneWay}"
+                    <Grid Grid.Column="1" RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBox
+                            x:Name="NameBox"
+                            Grid.Row="0"
+                            AutomationProperties.AutomationId="SnippetNameBox"
+                            AutomationProperties.Name="Name"
+                            Header="Name"
+                            IsEnabled="{x:Bind ViewModel.Snippets.CanEdit, Mode=OneWay}"
+                            MaxLength="64"
+                            Text="{x:Bind ViewModel.Snippets.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBox
+                            x:Name="BodyBox"
+                            Grid.Row="1"
+                            MinHeight="160"
+                            AcceptsReturn="True"
+                            AutomationProperties.AutomationId="SnippetBodyBox"
+                            AutomationProperties.Name="Text"
+                            FontFamily="Cascadia Mono, Consolas"
+                            Header="Text"
+                            IsEnabled="{x:Bind ViewModel.Snippets.CanEdit, Mode=OneWay}"
+                            IsSpellCheckEnabled="False"
+                            ScrollViewer.VerticalScrollBarVisibility="Auto"
+                            Text="{x:Bind ViewModel.Snippets.Body, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                             TextWrapping="Wrap" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button
-                                AutomationProperties.AutomationId="SaveSnippetButton"
-                                Command="{x:Bind ViewModel.Snippets.SaveCommand}"
-                                Content="Save"
-                                IsEnabled="{x:Bind ViewModel.Snippets.IsDirty, Mode=OneWay}"
-                                Style="{StaticResource AccentButtonStyle}"
-                                ToolTipService.ToolTip="Save (Ctrl+S)" />
-                            <Button
-                                AutomationProperties.AutomationId="DiscardSnippetButton"
-                                Command="{x:Bind ViewModel.Snippets.DiscardCommand}"
-                                Content="Discard changes"
-                                IsEnabled="{x:Bind ViewModel.Snippets.IsDirty, Mode=OneWay}" />
-                            <Button
-                                AutomationProperties.AutomationId="DeleteSnippetButton"
-                                Command="{x:Bind ViewModel.Snippets.DeleteCommand}"
-                                Content="Delete"
-                                IsEnabled="{x:Bind ViewModel.Snippets.HasSelection, Mode=OneWay}"
-                                ToolTipService.ToolTip="Delete the snippet (Ctrl+Delete)" />
-                        </StackPanel>
-                        <StackPanel
-                            Orientation="Horizontal"
-                            Spacing="8"
-                            Visibility="{x:Bind ViewModel.Snippets.IsConfirmingDelete, Mode=OneWay}">
+
+                        <TextBlock
+                            Grid.Row="2"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Text="{x:Bind local:SettingsWindow.SnippetHelp}"
+                            TextWrapping="Wrap" />
+
+                        <ItemsControl
+                            Grid.Row="3"
+                            AutomationProperties.AutomationId="SnippetWarnings"
+                            AutomationProperties.Name="Problems in the text"
+                            IsTabStop="False"
+                            ItemsSource="{x:Bind ViewModel.Snippets.Warnings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock
+                                        Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Text="{x:Bind}"
+                                        TextWrapping="Wrap" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <Border
+                            Grid.Row="4"
+                            MinHeight="48"
+                            MaxHeight="120"
+                            Padding="12,10"
+                            Style="{StaticResource SettingsCardStyle}">
+                            <StackPanel Spacing="2">
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="Preview, with a stand-in for each value" />
+                                <TextBlock
+                                    AutomationProperties.AutomationId="SnippetPreview"
+                                    AutomationProperties.Name="Preview"
+                                    MaxLines="4"
+                                    Text="{x:Bind ViewModel.Snippets.Preview, Mode=OneWay}"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Grid.Row="5" Spacing="6">
                             <TextBlock
-                                VerticalAlignment="Center"
-                                AutomationProperties.AutomationId="DeleteSnippetQuestion"
-                                Text="{x:Bind ViewModel.Snippets.DeleteQuestion, Mode=OneWay}"
+                                AutomationProperties.AutomationId="SnippetEditorError"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Text="{x:Bind ViewModel.Snippets.ErrorMessage, Mode=OneWay}"
                                 TextWrapping="Wrap" />
-                            <Button
-                                AutomationProperties.AutomationId="KeepSnippetButton"
-                                Command="{x:Bind ViewModel.Snippets.CancelDeleteCommand}"
-                                Content="Keep it" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    AutomationProperties.AutomationId="SaveSnippetButton"
+                                    Command="{x:Bind ViewModel.Snippets.SaveCommand}"
+                                    Content="Save"
+                                    IsEnabled="{x:Bind ViewModel.Snippets.IsDirty, Mode=OneWay}"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    ToolTipService.ToolTip="Save (Ctrl+S)" />
+                                <Button
+                                    AutomationProperties.AutomationId="DiscardSnippetButton"
+                                    Command="{x:Bind ViewModel.Snippets.DiscardCommand}"
+                                    Content="Discard changes"
+                                    IsEnabled="{x:Bind ViewModel.Snippets.IsDirty, Mode=OneWay}" />
+                                <Button
+                                    AutomationProperties.AutomationId="DeleteSnippetButton"
+                                    Command="{x:Bind ViewModel.Snippets.DeleteCommand}"
+                                    Content="Delete"
+                                    IsEnabled="{x:Bind ViewModel.Snippets.HasSelection, Mode=OneWay}"
+                                    ToolTipService.ToolTip="Delete the snippet (Ctrl+Delete)" />
+                            </StackPanel>
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="8"
+                                Visibility="{x:Bind ViewModel.Snippets.IsConfirmingDelete, Mode=OneWay}">
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.AutomationId="DeleteSnippetQuestion"
+                                    Text="{x:Bind ViewModel.Snippets.DeleteQuestion, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <Button
+                                    AutomationProperties.AutomationId="KeepSnippetButton"
+                                    Command="{x:Bind ViewModel.Snippets.CancelDeleteCommand}"
+                                    Content="Keep it" />
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
+                    </Grid>
                 </Grid>
             </Grid>
 
@@ -596,26 +881,83 @@
                 x:Name="AboutPanel"
                 AutomationProperties.AutomationId="AboutPanel"
                 Visibility="Collapsed">
-                <StackPanel Spacing="12">
-                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="About" />
-                    <TextBlock Style="{StaticResource TitleTextBlockStyle}" Text="{x:Bind prefs:AboutViewModel.Title}" />
-                    <TextBlock
-                        AutomationProperties.AutomationId="AboutVersion"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="{x:Bind ViewModel.About.Version}" />
-                    <TextBlock
-                        AutomationProperties.AutomationId="AboutLicense"
-                        Text="{x:Bind prefs:AboutViewModel.License}"
-                        TextWrapping="Wrap" />
-                    <TextBlock
-                        AutomationProperties.AutomationId="AboutNoNetwork"
-                        Text="{x:Bind prefs:AboutViewModel.NoNetworkPromise}"
-                        TextWrapping="Wrap" />
-                    <HyperlinkButton
-                        Padding="0"
-                        AutomationProperties.AutomationId="AboutRepository"
-                        Command="{x:Bind ViewModel.About.OpenRepositoryCommand}"
-                        Content="{x:Bind prefs:AboutViewModel.RepositoryUrl}" />
+                <StackPanel Style="{StaticResource PageStyle}">
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="About" />
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border
+                                Width="48"
+                                Height="48"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                CornerRadius="10">
+                                <FontIcon
+                                    FontSize="24"
+                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                    Glyph="&#xE77F;" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="{x:Bind prefs:AboutViewModel.Title}" />
+                                <TextBlock
+                                    AutomationProperties.AutomationId="AboutVersion"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind ViewModel.About.Version}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xEA18;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="AboutNoNetwork"
+                                Text="{x:Bind prefs:AboutViewModel.NoNetworkPromise}"
+                                TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE8A5;" Style="{StaticResource CardIconStyle}" />
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="AboutLicense"
+                                Text="{x:Bind prefs:AboutViewModel.License}"
+                                TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE71B;" Style="{StaticResource CardIconStyle}" />
+                            <HyperlinkButton
+                                Grid.Column="1"
+                                Padding="0"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="AboutRepository"
+                                Command="{x:Bind ViewModel.About.OpenRepositoryCommand}"
+                                Content="{x:Bind prefs:AboutViewModel.RepositoryUrl}" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>
