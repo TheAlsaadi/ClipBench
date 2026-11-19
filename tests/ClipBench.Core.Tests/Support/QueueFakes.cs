@@ -45,8 +45,16 @@ internal sealed class FakeHotkeyService : IHotkeyService
         return Task.FromResult(Result.Success(new HotkeyId(id)));
     }
 
+    /// <summary>When set, every release throws it, as a broken message pump would.</summary>
+    public Exception? UnregisterThrows { get; set; }
+
     public Task<Result> UnregisterAsync(HotkeyId id, CancellationToken cancellationToken)
     {
+        if (UnregisterThrows is { } exception)
+        {
+            throw exception;
+        }
+
         if (!_registered.Remove(id.Value, out var hotkey))
         {
             return Task.FromResult(Result.Failure(new ResultError(ErrorCode.HotkeyNotRegistered, "unknown")));

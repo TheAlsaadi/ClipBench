@@ -327,6 +327,56 @@ public sealed class QueueRunnerTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task When_ctrl_v_cannot_be_claimed_again_the_stop_is_a_failure_not_a_fault()
+    {
+        await StartAsync("one", "two");
+        _hotkeys.FailNextClaimOf = _ctrlV;
+
+        _hotkeys.Press(_ctrlV);
+
+        _log.Entries.ShouldContain(entry => entry.Activity == ActivityEvent.QueueFailed && entry.Details.Error == ErrorCode.HotkeyUnavailable);
+        _log.Entries.ShouldNotContain(entry => entry.Activity == ActivityEvent.QueueFaulted);
+    }
+
+    [Fact]
+    public async Task A_queue_stopped_by_a_failed_paste_announces_that_it_stopped()
+    {
+        _injector.Answer = _ => Task.FromResult(Result.Failure(new ResultError(ErrorCode.InputBlocked, "blocked")));
+        var states = new List<QueueState>();
+        _runner.Changed += (_, _) => states.Add(_runner.Progress.State);
+        await StartAsync("one", "two");
+
+        _hotkeys.Press(_ctrlV);
+
+        states.ShouldBe([QueueState.Armed, QueueState.Cancelled]);
+    }
+
+    [Fact]
+    public async Task A_ctrl_v_reported_late_under_the_key_s_old_id_pastes_nothing()
+    {
+        await StartAsync("one", "two", "three");
+        _hotkeys.Press(_ctrlV);
+
+        // Ctrl+V was let go and claimed again under a new id while "one" was pasted. A press of the old id is stale.
+        _hotkeys.PressId(100);
+
+        PastedTexts().ShouldBe(["one"]);
+        _runner.Progress.ShouldBe(new QueueProgress(QueueState.Armed, 1, 3));
+    }
+
+    [Fact]
+    public async Task An_exception_while_handling_a_key_is_logged_by_type_and_goes_no_further()
+    {
+        await StartAsync("one");
+        _hotkeys.UnregisterThrows = new InvalidOperationException("the message pump is gone");
+
+        _hotkeys.Press(_esc);
+
+        _log.Entries.ShouldContain(entry => entry.Activity == ActivityEvent.QueueFaulted && entry.Details.ExceptionType == typeof(InvalidOperationException));
+        _hotkeys.UnregisterThrows = null;
+    }
+
+    [Fact]
     public async Task Starting_a_new_queue_replaces_the_running_one()
     {
         await StartAsync("old one", "old two");

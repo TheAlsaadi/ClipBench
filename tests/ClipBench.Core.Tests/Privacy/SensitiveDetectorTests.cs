@@ -285,6 +285,46 @@ public class SensitiveDetectorTests
     }
 
     [Fact]
+    public void An_end_line_right_after_the_begin_marker_still_ends_the_block_and_a_token_after_it_is_flagged()
+    {
+        Detect("-----BEGIN -----END CERTIFICATE-----\ntoken: k3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA").ShouldBe(SensitiveKind.Token);
+    }
+
+    [Fact]
+    public void A_block_whose_end_line_is_the_last_line_is_blanked_to_the_end_of_that_line()
+    {
+        Detect("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE k3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA").ShouldBe(SensitiveKind.None);
+    }
+
+    [Fact]
+    public void Every_line_of_a_block_is_blanked_up_to_its_end_line_whatever_the_length_of_that_line()
+    {
+        // The last data line ends in characters that read as a token on their own: they must be blanked with the rest.
+        Detect("-----BEGIN CERTIFICATE REQUEST-----\nMIIBk3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA\n-----END CERTIFICATE REQUEST-----\n").ShouldBe(SensitiveKind.None);
+    }
+
+    [Fact]
+    public void The_copy_made_to_blank_certificate_blocks_is_cleared_before_it_goes_back_to_the_shared_pool()
+    {
+        const string Secret = "k3J9xQ2mT7vB5nZ8pL4wR6yH1cD0fGsA";
+        var text = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\ntoken: " + Secret;
+
+        // Hold the array this thread keeps for quick reuse, so the one the detector returns is the one handed out next.
+        var held = System.Buffers.ArrayPool<char>.Shared.Rent(text.Length);
+        Detect(text).ShouldBe(SensitiveKind.Token);
+        var next = System.Buffers.ArrayPool<char>.Shared.Rent(text.Length);
+        try
+        {
+            new string(next, 0, text.Length).ShouldNotContain(Secret);
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<char>.Shared.Return(next);
+            System.Buffers.ArrayPool<char>.Shared.Return(held);
+        }
+    }
+
+    [Fact]
     public void A_certificate_block_with_no_end_line_is_not_flagged()
     {
         Detect("-----BEGIN CERTIFICATE-----\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa\nMIIDdzCCAl+gAwIBAgIEAgAAuTANBgkqhkiG9w0BAQUFADBa").ShouldBe(SensitiveKind.None);

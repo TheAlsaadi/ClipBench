@@ -34,6 +34,9 @@ internal sealed class FakeKeyProtector(string user = "alice") : IKeyProtector
 
     public int UnprotectCalls { get; private set; }
 
+    /// <summary>Every secret handed out by <see cref="Unprotect"/>, so a test can check the caller wiped its copy.</summary>
+    public List<byte[]> Unwrapped { get; } = [];
+
     public Result<byte[]> Protect(ReadOnlySpan<byte> secret)
     {
         ProtectCalls++;
@@ -86,6 +89,7 @@ internal sealed class FakeKeyProtector(string user = "alice") : IKeyProtector
             secret[i] = (byte)(body[i] ^ Mask(i));
         }
 
+        Unwrapped.Add(secret);
         return Result.Success(secret);
     }
 
