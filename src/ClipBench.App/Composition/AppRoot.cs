@@ -144,7 +144,15 @@ internal sealed class AppRoot : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(log);
         var time = TimeProvider.System;
+
+        // Before the first file is written: the history, its key, the settings and the log are for this user only.
+        var secured = new PrivateFolder().Secure(paths.Root);
         log.Write(ActivityLevel.Information, ActivityEvent.AppStarted);
+        if (secured.IsFailure)
+        {
+            // The content is encrypted either way, so the app still starts.
+            log.Write(ActivityLevel.Warning, ActivityEvent.FolderPermissionsFailed, new ActivityDetails { Error = secured.Error.Code });
+        }
 
         var created = WindowsPlatform.Create(time);
         if (created.IsFailure)

@@ -151,6 +151,9 @@ public enum ActivityEvent
 
     /// <summary>A background task faulted and nothing observed it, with the exception type; the app kept running.</summary>
     BackgroundFaulted,
+
+    /// <summary>The history folder's permissions could not be limited to the user and SYSTEM, with the reason as an error code.</summary>
+    FolderPermissionsFailed,
 }
 
 /// <summary>
