@@ -47,6 +47,9 @@ public class AppUnderTest : IAsyncLifetime
     /// <summary>True when the first-run question is already answered, so the Settings window does not open by itself.</summary>
     protected virtual bool FirstRunAnswered => true;
 
+    /// <summary>The settings file written before the app starts, when the first-run question counts as answered.</summary>
+    protected virtual string SettingsJson => "{ \"version\": 1, \"firstRunCompleted\": true, \"captureTextHotkey\": \"F22\" }";
+
     public Process Process => _process ?? throw new InvalidOperationException("The app was not started.");
 
     public async ValueTask InitializeAsync()
@@ -56,17 +59,34 @@ public class AppUnderTest : IAsyncLifetime
         // The first-run question opens the Settings window by itself; most tests are about the popup, so it counts as answered.
         if (FirstRunAnswered)
         {
-            await File.WriteAllTextAsync(SettingsPath, "{ \"version\": 1, \"firstRunCompleted\": true, \"captureTextHotkey\": \"F22\" }", Ct);
+            await File.WriteAllTextAsync(SettingsPath, SettingsJson, Ct);
         }
 
+        _automation = new UIA3Automation();
+        Launch();
+    }
+
+    /// <summary>Ends the running app the hard way and starts it again on the same history, as a crash and a restart would.</summary>
+    public void Restart()
+    {
+        _process!.Kill(entireProcessTree: true);
+        _process.WaitForExit(10_000);
+        _process.Dispose();
+        Launch();
+    }
+
+    private void Launch()
+    {
+        var readyBefore = File.Exists(LogPath) ? CountInLog(" AppReady") : 0;
         var start = new ProcessStartInfo(FindApp(), ["--data-dir", _folder, "--hotkey", "F24", "--collect-hotkey", "F23", "--allow-screen-capture"]) { UseShellExecute = false };
         _process = Process.Start(start) ?? throw new InvalidOperationException("The app did not start.");
-        _automation = new UIA3Automation();
         _application = FlaUI.Core.Application.Attach(_process);
 
-        WaitFor(() => File.Exists(LogPath) && ReadLog().Contains("HotkeyRegistered", StringComparison.Ordinal), 30_000)
-            .ShouldBeTrue("the app never reported its shortcut. The log says: " + (File.Exists(LogPath) ? ReadLog() : "(no log)"));
+        WaitFor(() => File.Exists(LogPath) && CountInLog(" AppReady") > readyBefore, 60_000)
+            .ShouldBeTrue("the app never reported that it was ready. The log says: " + (File.Exists(LogPath) ? ReadLog() : "(no log)"));
     }
+
+    private int CountInLog(string text) => ReadLog().Split('\n').Count(line => line.Contains(text, StringComparison.Ordinal));
 
     public ValueTask DisposeAsync()
     {
@@ -408,7 +428,15 @@ public class AppUnderTest : IAsyncLifetime
             var clip = new Clip(ClipId.New(), new TextContent(SeededTexts[i]), now.AddMinutes(-(i + 1)), "notepad.exe", IsPinned: false);
             (await storage.Repository.SaveAsync(clip, Ct)).IsSuccess.ShouldBeTrue();
         }
+
+        await SeedMoreAsync(storage, now.AddMinutes(-(SeededTexts.Length + 1)));
     }
+
+    /// <summary>Saves more clips, older than the shared ones, before the app starts.</summary>
+    /// <param name="storage">The open history.</param>
+    /// <param name="before">Every clip saved here is older than this.</param>
+    /// <returns>A task that completes when they are saved.</returns>
+    protected virtual Task SeedMoreAsync(ClipStorage storage, DateTimeOffset before) => Task.CompletedTask;
 
     // The tests run from tests/ClipBench.UiSmokeTests/bin/<config>/<tfm>, the app from src/ClipBench.App/bin/<platform>/<config>/<tfm>/win-<platform>.
     private static string FindApp()
