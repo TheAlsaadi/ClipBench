@@ -27,16 +27,20 @@ public sealed partial class SettingsWindow : Window
     private const string CustomLabel = "Custom";
 
     private readonly Dictionary<SettingsSection, FrameworkElement> _panels;
+    private readonly Func<string> _diagnosticReport;
     private bool _closing;
     private bool _sized;
     private bool _syncing;
 
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
-    public SettingsWindow(SettingsViewModel viewModel)
+    /// <param name="diagnosticReport">Builds the text of a diagnostic report, when the user asks to save one.</param>
+    public SettingsWindow(SettingsViewModel viewModel, Func<string> diagnosticReport)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(diagnosticReport);
         ViewModel = viewModel;
+        _diagnosticReport = diagnosticReport;
         InitializeComponent();
         AppWindow.SetIcon(Glyphs.IconPath);
 
@@ -74,6 +78,7 @@ public sealed partial class SettingsWindow : Window
         ViewModel.Privacy.PropertyChanged += (_, _) => SyncControls();
         ViewModel.Paste.PropertyChanged += (_, _) => SyncControls();
         ViewModel.About.OpenRepositoryRequested += OnOpenRepositoryRequested;
+        ViewModel.About.SaveDiagnosticReportRequested += OnSaveDiagnosticReportRequested;
 
         AppWindow.Closing += OnClosing;
         ApplySelection();
@@ -246,6 +251,29 @@ public sealed partial class SettingsWindow : Window
         if (ClipBench.Core.Detection.LinkDetector.ToBrowserAddress(e.Url) is { } address && address.Scheme == Uri.UriSchemeHttps)
         {
             _ = Launcher.LaunchUriAsync(address);
+        }
+    }
+
+    // The user picks where the report goes; nothing is written until they do. The report is built off the UI thread
+    // because it reads the log files.
+    private async void OnSaveDiagnosticReportRequested(object? sender, EventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = "ClipBench diagnostic report" };
+            picker.FileTypeChoices.Add("Text file", [".txt"]);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            if (await picker.PickSaveFileAsync() is not { } file)
+            {
+                return;
+            }
+
+            var report = await Task.Run(_diagnosticReport);
+            await Windows.Storage.FileIO.WriteTextAsync(file, report, Windows.Storage.Streams.UnicodeEncoding.Utf8);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+        {
+            // A place that cannot be written leaves nothing behind; the user can choose another.
         }
     }
 

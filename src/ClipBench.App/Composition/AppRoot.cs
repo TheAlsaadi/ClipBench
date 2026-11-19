@@ -58,6 +58,7 @@ internal sealed class AppRoot : IAsyncDisposable
     private readonly ISingleInstanceGuard _guard;
     private readonly IUiDispatcher _dispatcher;
     private readonly StartupOptions _options;
+    private readonly string _logFolder;
     private SettingsWindow? _settingsWindow;
     private EventHandler? _settingsChanged;
     private bool _windowsHidden;
@@ -75,9 +76,11 @@ internal sealed class AppRoot : IAsyncDisposable
         IActivityLog log,
         ISingleInstanceGuard guard,
         IUiDispatcher dispatcher,
-        StartupOptions options)
+        StartupOptions options,
+        string logFolder)
     {
         _options = options;
+        _logFolder = logFolder;
         _services = services;
         _platform = platform;
         _storage = storage;
@@ -93,6 +96,24 @@ internal sealed class AppRoot : IAsyncDisposable
 
     /// <summary>Raised on the UI thread when the user chooses Exit in the tray menu.</summary>
     public event EventHandler? ExitRequested;
+
+    // The text of the report the user can save from About. It states versions and counts, and only the log lines the log
+    // itself could have written: nothing the user copied, named or excluded.
+    private string BuildDiagnosticReport()
+    {
+        var clips = _services.GetRequiredService<ClipHistory>().Clips;
+        var facts = new DiagnosticFacts(
+            ProgramVersion(),
+            Environment.OSVersion.Version.ToString(),
+            System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+            clips.Length,
+            clips.Count(clip => clip.IsPinned),
+            _services.GetRequiredService<BoardCatalog>().Boards.Length,
+            _services.GetRequiredService<SnippetCatalog>().Snippets.Length,
+            _services.GetRequiredService<SettingsService>().Current.ExcludedPrograms.Count);
+        var excerpt = ActivityLogReader.ReadRecent(_logFolder);
+        return DiagnosticReport.Build(facts, excerpt.Lines, excerpt.Dropped);
+    }
 
     /// <summary>Gets the folder the activity log is written to.</summary>
     /// <param name="paths">Where the history lives.</param>
@@ -225,7 +246,7 @@ internal sealed class AppRoot : IAsyncDisposable
             _ = platform.WindowEffects.UseRoundedCorners(new Core.Pasting.WindowHandle(handle));
 
             hud = CreateQueueWindow(services, platform, options);
-            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options);
+            var root = new AppRoot(services, platform, storage, popup, hud, popupViewModel, services.GetRequiredService<TrayViewModel>(), tray, log, guard, dispatcher, options, LogFolder(paths));
             popupViewModel.EditSnippetsRequested += (_, _) => root.OpenSettings(SettingsSection.Snippets);
             popupViewModel.SettingsRequested += (_, _) => root.OpenSettings();
             await root.ShowTrayAsync(cancellationToken);
@@ -356,7 +377,7 @@ internal sealed class AppRoot : IAsyncDisposable
 
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(_services.GetRequiredService<SettingsViewModel>());
+            _settingsWindow = new SettingsWindow(_services.GetRequiredService<SettingsViewModel>(), BuildDiagnosticReport);
 
             // It shows the user's snippets and excluded programs, so it is kept out of screen captures like the popup.
             if (HideFromCapture(_options, _services))

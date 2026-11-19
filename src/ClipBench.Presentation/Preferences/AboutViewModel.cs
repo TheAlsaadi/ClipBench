@@ -28,6 +28,9 @@ public sealed partial class AboutViewModel : ObservableObject
     /// <summary>Raised when the user chose to open the project's page. The app opens it; ClipBench itself never connects.</summary>
     public event EventHandler<OpenAddressEventArgs>? OpenRepositoryRequested;
 
+    /// <summary>Raised when the user chose to save a diagnostic report. The app asks where, then writes it.</summary>
+    public event EventHandler? SaveDiagnosticReportRequested;
+
     /// <summary>The name of the program.</summary>
     public static string Title => "ClipBench";
 
@@ -43,6 +46,13 @@ public sealed partial class AboutViewModel : ObservableObject
 
     /// <summary>The project's page.</summary>
     public static string RepositoryUrl => Repository;
+
+    /// <summary>What a diagnostic report holds, and that it is saved only when the user asks.</summary>
+    public static string DiagnosticReportDescription =>
+        "A text file with versions, counts and the recent log, for when you report a problem. It never contains anything you copied. Nothing is saved unless you choose a place for it.";
+
+    [RelayCommand]
+    private void SaveDiagnosticReport() => SaveDiagnosticReportRequested?.Invoke(this, EventArgs.Empty);
 
     [RelayCommand]
     private void OpenRepository() => OpenRepositoryRequested?.Invoke(this, new OpenAddressEventArgs(Repository));
