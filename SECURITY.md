@@ -18,7 +18,8 @@ Only the maintainers can see the report. Please include:
 - whether you want to be credited
 
 Never include real clipboard contents, passwords or keys in a report. Describe
-them, or use dummy values.
+them, or use dummy values. A diagnostic report (Settings → About → **Save report…**)
+is safe to attach: it holds versions, counts and log lines, never anything you copied.
 
 ## What to expect
 
@@ -39,7 +40,9 @@ supported.
 In scope:
 
 - the application, its installer and its portable build
-- the encrypted history: key handling, the database, wipe and expiry
+- the encrypted history: key handling, the database, the history folder's permissions, wipe and expiry
+- crash handling and the diagnostic report: anything that lets clipboard content reach a log, a crash report or a
+  saved report
 - clipboard capture, paste injection and the privacy markers
 - the build and release workflows in this repository
 

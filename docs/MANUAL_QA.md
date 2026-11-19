@@ -258,6 +258,25 @@ Every privacy setting has an item here. Open the Settings window from the tray m
 - [ ] Copy a link that has a long token in it so that it shows as dots: no label and no link menu item show until you reveal it with **Ctrl+R**.
 - [ ] With Narrator on, a link row is read as a link, a color row names the color.
 
+## Phase 9: crashes, diagnostics and the history folder
+
+### History folder
+
+- [ ] Start ClipBench once, then run `icacls "%LOCALAPPDATA%\ClipBench"` in a terminal. Only your account and `NT AUTHORITY\SYSTEM` are listed, each with `(OI)(CI)(F)`. Run it on `clipbench.db` inside: the same two, marked `(I)` for inherited.
+
+### Diagnostic report
+
+- [ ] Settings → About → **Save report…** opens a save dialog. Cancel it: no file is written.
+- [ ] Save it to the desktop and open it: versions, counts and up to 200 log lines. Search it for a word you copied today, a board name, a snippet and an excluded program: none is there. The excluded programs appear only as a number.
+- [ ] Add a line of your own text to `%LOCALAPPDATA%\ClipBench\logs\clipbench.log` and save the report again: your line is missing, and the heading says one line was left out.
+
+### A crash
+
+These need a debugger, so they are for a developer build:
+
+- [ ] Start ClipBench under Visual Studio, break in any button handler of the popup and throw an `InvalidOperationException` from the Immediate window. The services stop, one notice says ClipBench has to close, and after **Close** the process ends. The log ends with `ERR AppCrashed exception=System.InvalidOperationException source=UiThread`, with no message text.
+- [ ] Run `Get-ItemProperty "HKCU:\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps\ClipBench.App.exe" -ErrorAction SilentlyContinue`: nothing is set by ClipBench. ClipBench writes no dump of its own.
+
 ## Tests that need a person
 
 These send real keys or use the real clipboard, so nobody may type while they run. The smoke tests also run batch, table, queue and collect paste; the collect test saves what is on your clipboard first and puts it back afterwards.

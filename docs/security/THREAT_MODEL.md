@@ -2,8 +2,8 @@
 
 **Status:** first draft, written in Phase 0 before any feature exists. Section 2 (storage)
 was brought up to date in Phase 2 and sections 1 and 4 (capture and paste) in Phase 3, with what was
-built and tested. Phase 9 revisits every
-row and checks that each mitigation has a test or a documented reason.
+built and tested. Phase 9 revisited every row: the evidence audit at the end names the test
+classes behind each section, and the rows without an automated test give the reason.
 
 ClipBench sees everything a user copies, including passwords, tokens and personal data.
 That makes it a high-value target, and it shapes every decision below.
@@ -69,13 +69,13 @@ binding (DPAPI, current user, ClipBench's own entropy) was built first in Phase 
 | I | Reading the history database (`clipbench.db`) from disk or a backup | AES-256-GCM per value (content, preview, source app); the master key is wrapped for the current user, with the Windows binding in Phase 3 | 2, 3 | Leak tests read every byte of every file in the storage folder (database, `-wal`, `-shm`, key file) in UTF-8 and UTF-16, while open, after close and after later changes; a control proves the scan can see a leak; mutations that store a preview, source, content or key in plain are caught |
 | T | Swapping or editing ciphertext | GCM tag plus associated data (clip id, column, format); failure is closed; a damaged record is skipped and counted and never returned | 2 | Tests flip every bit of a sealed value and swap values between rows, columns, ids and formats |
 | T | Editing the plain metadata (times, pin flag, size, format) | **Residual, accepted.** An attacker with the file can reorder, pin, expire or break clips. They cannot reveal, forge or move content, and the format is bound into the content | 2 | A test records what a change can and cannot do |
-| T | Deleting rows, or putting back an older copy of the database | **Residual, not defended.** The history has no counter beyond the schema version | | |
+| T | Deleting rows, or putting back an older copy of the database | **Residual, not defended.** The history has no counter beyond the schema version. Someone who can replace the file runs as the user, and a counter kept anywhere that user can write could be put back too | 2 | None possible: see the reason in the evidence audit |
 | I | Guessing a clip by comparing hashes | Duplicate detection uses HMAC-SHA256 under a key derived from the master key, over the format and the content | 2 | Different keys give different hashes; a known-answer test pins the derivation |
 | I | Using the wrong key shows garbage or fails clip by clip | A sealed key check is verified once at open; a wrong key is one clear "history can't be decrypted" error and nothing is changed | 2 | Open and storage tests |
-| I | Content in logs, crash dumps or temp files | Storage logs nothing, and prints no clip, summary or result with its text. SQLite keeps temp files in memory. Phase 4 adds logging with a marker test; Phase 9 adds crash handling and an audit | 2, 4, 9 | Print tests; the leak tests see no extra files; log marker test later |
+| I | Content in logs, crash dumps or temp files | Storage logs nothing, and prints no clip, summary or result with its text. SQLite keeps temp files in memory. Phase 4 adds logging with a marker test; Phase 9 adds crash handling and an audit | 2, 4, 9 | Print tests; the leak tests see no extra files; the log marker test; `LoggingSafetyTests`; crash handling in section 10 |
 | I | Another program of the same user unwraps the key by accident | The wrap uses ClipBench's own entropy, so a program that calls DPAPI without it cannot unwrap the key. **Residual:** the entropy is a constant in the open source, so it does not stop malware running as the same user that knows it (see the assumptions) | 3 | Wrong entropy fails, every byte of a wrap changed in turn fails, a truncated wrap fails (tests run against the real DPAPI, also on CI) |
 | I | Key material or plaintext lingers in memory | Working keys and the master key are zeroed when disposed, and plaintext buffers after use. **Residual:** .NET strings cannot be wiped, and the search index holds decrypted text | 2 | Review |
-| I | `key.bin` readable by other users | The file is created in the folder the caller names and inherits its permissions. For `%LOCALAPPDATA%` that is the current user only | 2, 3, 9 | Review; Phase 9 checks the real folder |
+| I | `key.bin` readable by other users | At start the history folder gets a protected access list of its own: the current user and SYSTEM, full control, inherited by every file inside, nothing from the folder above (ADR 0020). A redirected or shared `%LOCALAPPDATA%` therefore cannot widen it | 2, 3, 9 | `PrivateFolderTests` (the exact two entries, inheritance by new and existing files); checked on a real start with `icacls` |
 | I | A deleted or evicted clip stays in the file | `secure_delete`; evicting, deleting and sweeping overwrite the value and empty the write-ahead log, which is best effort while another process has the database open (it has to wait for that reader). Wipe all also rebuilds the file, empties the log, deletes the files and overwrites the key file before deleting it (best effort on a solid-state drive, where old blocks may remain out of reach) | 2 | Tests read the files after delete, retention and sweep (while the database is still open, and after it is closed), after wipe, and at the moment the files are deleted |
 | E | SQL injection | Constants and named parameters only. CA2100 is an error, the one helper that takes variable SQL accepts constants only (CA1857), and a source scan rejects anything else | 2 | Hostile-text tests; the scan test; mutations that add concatenation, interpolation and a variable name are caught |
 | D | A lost, wrong or damaged key or database | One recoverable error; nothing is replaced; the user is offered a fresh start, which is a separate action. A database whose key file is missing is never given a new key. A database from a newer version is refused | 2 | Key store and storage tests |
@@ -197,18 +197,46 @@ download a new one, which is an accepted cost of having no network code.
 | I | Deleting everything leaves a clip behind | Clips, boards and snippets are deleted, the file rebuilt and its log emptied; a copy being saved finishes first; collect and queue copies in memory are dropped; when the disk wipe fails the window keeps showing what is on disk and says why. The database file and key stay (see ADR 0017) | 7 | Library, service and store wipe tests; the Phase 2 disk-scan wipe tests |
 | E | A shortcut change takes over a shortcut another program uses, or two actions share one | The new shortcut is claimed first and the old one kept if Windows refuses; one shortcut cannot do two things; no keyboard hook is used | 7 | Bindings tests |
 | I | The Settings window shows snippets and the excluded programs on a shared screen | It is hidden from screen capture while the setting is on (the default), and the setting applies to every window at once | 7 | Manual QA |
-| I | The About link leaks that ClipBench is used | The address is a constant opened by Windows in the user's browser only on a click; the app opens no connection | 7 | Review; Phase 9 network test |
+| I | The About link leaks that ClipBench is used | The address is a constant opened by Windows in the user's browser only on a click; the app opens no connection | 7 | Review; the network check in section 10 |
 | D | A hostile or huge exclusion list or number | At most 200 names of 100 characters; numbers are clamped; the settings file stays capped at 64 KiB | 7 | Exclusion list and store tests |
+
+## 10. Crash handling and diagnostics (Phase 9)
+
+| STRIDE | Threat | Mitigation | Phase | Evidence |
+|---|---|---|---|---|
+| I | A crash record carries what was copied | An exception nothing caught is logged by type and where it surfaced, never its message or stack; the log takes no text at all | 9 | `CrashHandlerTests` (a message never reaches the log or the notice); `LoggingSafetyTests` |
+| I | A Windows crash report carries decrypted clips | `WerSetFlags(WER_FAULT_REPORTING_FLAG_NOHEAP)` before anything is decrypted; ClipBench writes no dump of its own. **Residual:** a crash report still holds the stack and registers, which may hold a few bytes of a clip being handled at the time | 9 | `WindowsErrorReportingTests` |
+| D, T | After an unexpected error the app carries on in a state that can no longer be trusted, holding decrypted clips | An error on the UI thread stops every service, shows one notice and closes the app; a faulted background task is logged and the app carries on. Handling a crash never throws | 9 | `CrashHandlerTests` (a failing log and notifier, a second crash); manual QA |
+| I | A diagnostic report carries content, a board or snippet name, or an excluded program | Saved only when the user asks, where the user chooses. It states versions and counts only. A log line goes in only if it matches exactly what the log writer can produce (event, error, format, rejection and source names from the enums); any other line is left out and counted | 9 | `DiagnosticReportTests`; `ActivityLogReaderTests` (a hand-added line with text is dropped) |
+| I | The history folder is readable by other accounts | See section 2, `key.bin` row | 9 | `PrivateFolderTests` |
+
+## Phase 9 evidence audit
+
+Every row above was read again in Phase 9. Below are the test classes behind each section. Each name was checked to exist in the test projects. The rows that rest on review or manual QA give the reason no automated test can exist.
+
+| Section | Test classes | Rows without an automated test, and why |
+|---|---|---|
+| 1. Capture | `CaptureFilterTests`, `ClipboardReaderTests`, `RealClipboardTests`, `SensitiveDetectorTests`, `ClipPreviewTests`, `ClipSearchTests`, `ClipboardOpenerTests`, `ClipboardListenerTests`, `ClipboardWriterTests`, `ClipboardSnapshotTests`, `OwnerProcessTests`, `ProcessImagePathTests`, `ClipboardFormatsTests`, `HtmlFormatTests`, `DropFilesTests`, `DibTests`, `PngTests`, `HtmlFormatProperties`, `DropFilesProperties`, `ImageProperties`, `RtfReadingProperties`, `CollectControllerTests`, `CollectSessionTests`, `AppManifestTests`, `PlatformSafetyTests` | none |
+| 2. Storage | `PlaintextLeakTests`, `ClipRepositoryTamperTests`, `RecordAadTests`, `AesGcmCryptoServiceTests`, `MasterKeyTests`, `MasterKeyStoreTests`, `DpapiKeyProtectorTests`, `ClipRepositoryOpenTests`, `ClipRepositoryWipeTests`, `ClipRepositoryRetentionTests`, `ClipRepositoryExpiryTests`, `ClipContentCodecTests`, `SqlSafetyTests`, `SchemaMigratorTests`, `BoardsMigrationTests`, `ClipRepositoryBoardTests`, `ClipRepositorySnippetTests`, `PrivateFolderTests` | Putting back an older copy of the database (a residual risk: any counter the app could check is kept where the same user can put an older copy back too); key material lingering in memory (no test can prove a buffer was cleared; the zeroing is reviewed) |
+| 3. Popup | `ClipRowViewModelTests`, `RowTextTests`, `PopupViewModelTests`, `PopupLockTests`, `PasteFlowTests`, `StartupOptionsTests`, `JsonSettingsStoreTests`, `SingleInstanceGuardTests`, `TrayIconTests`, `RealTrayTests`, `RealWindowEffectsTests`, `BoardCatalogTests`, `SnippetCatalogTests`, `LoggingSafetyTests`, `FileActivityLogTests`, the UI smoke tests | How a hidden, locked or dragged window looks on a shared screen (manual QA: only a person can judge it; the capture setting itself is read back from Windows in `RealWindowEffectsTests`); script in HTML (no web view is used: `NetworkRulesTests` forbids the WebView2 namespace) |
+| 4. Paste | `PasteInjectorTests`, `KeystrokePlanTests`, `RealPasteTests`, `ForegroundTrackerTests`, `ClipboardSnapshotTests`, `QueueRunnerTests`, `PasteQueueTests`, `PasteFlowTests`, `PasteFlowHoldTests`, `QueueHudViewModelTests`, `PasteComposerBatchTests`, `PasteComposerTableTests`, `PasteComposerProperties`, `PopupSnippetTests`, `SnippetEngineTests`, `SnippetProperties`, `SnippetsViewModelTests`, the UI smoke tests | Esc and Ctrl+V in other programs while a queue runs (manual QA: it depends on the other program) |
+| 5. OCR and detection | `ScreenTextServiceTests`, `GdiScreenCapturerTests`, `RealScreenTests`, `SelectionOverlayTests`, `OverlayRendererTests`, `TesseractEngineTests`, `WindowsOcrEngineTests`, `AdaptiveRecognizerTests`, `RegionMathTests`, `ContentDetectorTests`, `LinkEmailPhoneTests`, `ColorDetectorTests`, `CodeDetectorTests`, `PlatformSafetyTests` | Hostile image content (the engines get raw pixels only, which review confirms: no file or stream reader is called); a site learning that ClipBench is used from a link (the user's own browser opens it, outside ClipBench) |
+| 6. Installer | Phase 10 | Not built yet |
+| 7. Supply chain | `WorkflowTests`, `DependabotTests`, `RepositoryGuardrailTests`, `ProjectStructureTests`, and `scripts/audit-dependencies.ps1 -Check` in CI | Secrets in the repository (review and GitHub secret scanning; no test can prove an absence) |
+| 8. Transforms | `FindReplaceTests`, `JsonTransformsTests`, `TransformPipelineTests`, `EncodingTransformsTests`, `TextTransformsTests`, `TransformPickerTests`, `PopupTransformTests` | none |
+| 9. Privacy center and settings | `JsonSettingsStoreTests`, `AppSettingsTests`, `SettingsServiceTests`, `ExpirySweeperTests`, `ClipHistoryExpiryTests`, `ClipLibraryExpiryTests`, `ClipRepositoryExpiryTests`, `TrayViewModelTests`, `StartWithWindowsServiceTests`, `RegistryStartupRegistrationTests`, `WipeServiceTests`, `ClipLibraryWipeTests`, `HotkeyBindingsTests`, `ExclusionListTests` | The Settings window on a shared screen (manual QA, as for the popup) |
+| 10. Crash handling | `CrashHandlerTests`, `WindowsErrorReportingTests`, `DiagnosticReportTests`, `ActivityLogReaderTests`, `PrivateFolderTests` | The notice after a crash on the UI thread (manual QA: forcing a real crash needs a debugger) |
 
 ## Open questions
 
 - Does the Windows App SDK runtime open any network connection in an unpackaged,
   self-contained app? (Phase 9)
 - Which Windows reserved hotkeys will a future update claim? (ADR 0004)
-- Which permission does the real storage folder have on a machine whose
-  `%LOCALAPPDATA%` is redirected or shared? (Phase 3 and Phase 9)
-
 Answered:
+
+- **The storage folder on a redirected or shared `%LOCALAPPDATA%`** (Phase 9): it no longer
+  depends on the folder above. ClipBench sets its own protected access list, the current user
+  and SYSTEM only (ADR 0020, `PrivateFolderTests`).
 
 - **If DPAPI cannot unwrap the key** (a roaming profile restored on a new machine, a
   changed account): the key store reports "history can't be decrypted" and changes
