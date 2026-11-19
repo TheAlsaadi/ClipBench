@@ -131,6 +131,7 @@ internal sealed class AppRoot : IAsyncDisposable
     /// <param name="queue">The UI thread's dispatcher queue.</param>
     /// <param name="confirmStartFresh">Asks the user whether to throw away a history that cannot be read.</param>
     /// <param name="log">The activity log, shared with the crash handler so both write through one file writer.</param>
+    /// <param name="startupTimer">Started on the first line of the program; logged as ready once the shortcuts are registered.</param>
     /// <param name="cancellationToken">Cancels start-up.</param>
     /// <returns>The running app, or the reason it cannot run.</returns>
     public static async Task<StartOutcome> StartAsync(
@@ -140,6 +141,7 @@ internal sealed class AppRoot : IAsyncDisposable
         DispatcherQueue queue,
         Func<Task<bool>> confirmStartFresh,
         FileActivityLog log,
+        ActivityTimer startupTimer,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(log);
@@ -290,6 +292,7 @@ internal sealed class AppRoot : IAsyncDisposable
             }
 
             guard.ShowRequested += root.OnShowRequested;
+            startupTimer.Stop(log, ActivityEvent.AppReady);
             return new StartOutcome(root, null);
         }
         catch
@@ -313,7 +316,8 @@ internal sealed class AppRoot : IAsyncDisposable
     /// True when the tray icon was used: the window that has focus is then the taskbar, which is no place to paste, so
     /// the paste goes to whatever has focus once the popup is hidden.
     /// </param>
-    public void TogglePopup(bool fromTray = false)
+    /// <param name="shown">When given, started at the key press: the popup is logged as shown once the UI thread is idle after it.</param>
+    public void TogglePopup(bool fromTray = false, ActivityTimer? shown = null)
     {
         if (_disposed)
         {
@@ -349,6 +353,11 @@ internal sealed class AppRoot : IAsyncDisposable
         // Opening records the window that has focus now, so it has to come before the popup takes focus.
         _popupViewModel.Open(pasteIntoPreviousWindow: !fromTray);
         _popup.ShowAt(bounds);
+        if (shown is { } timer)
+        {
+            // Low priority runs after layout and rendering work that is already queued, so this is when the window can be seen.
+            _ = _popup.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => timer.Stop(_log, ActivityEvent.PopupShown));
+        }
     }
 
     // Puts every window in or out of screenshots and screen recordings to match the setting. Runs on the UI thread.
@@ -651,7 +660,8 @@ internal sealed class AppRoot : IAsyncDisposable
     {
         if (e.Action == HotkeyAction.OpenPopup)
         {
-            _dispatcher.Post(() => TogglePopup());
+            var pressed = ActivityTimer.Start(TimeProvider.System);
+            _dispatcher.Post(() => TogglePopup(shown: pressed));
         }
         else if (e.Action == HotkeyAction.ToggleCollect)
         {

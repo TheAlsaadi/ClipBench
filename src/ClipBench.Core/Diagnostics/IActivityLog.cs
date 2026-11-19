@@ -154,6 +154,12 @@ public enum ActivityEvent
 
     /// <summary>The history folder's permissions could not be limited to the user and SYSTEM, with the reason as an error code.</summary>
     FolderPermissionsFailed,
+
+    /// <summary>The app is ready: the history is loaded and the shortcuts are registered, with the time it took in milliseconds.</summary>
+    AppReady,
+
+    /// <summary>The popup was shown after its shortcut, with the time from the key press to the shown window in milliseconds.</summary>
+    PopupShown,
 }
 
 /// <summary>

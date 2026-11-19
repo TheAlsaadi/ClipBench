@@ -19,6 +19,7 @@ public partial class App : Application
     private readonly FileActivityLog _log;
     private readonly CrashNotice _crashNotice = new();
     private readonly CrashHandler _crashHandler;
+    private readonly ActivityTimer _startup;
     private NoticeWindow? _notice;
     private AppRoot? _root;
     private int _closingAfterCrash;
@@ -27,11 +28,13 @@ public partial class App : Application
     /// <param name="options">The command-line options.</param>
     /// <param name="paths">Where the history lives.</param>
     /// <param name="guard">The one-copy guard.</param>
-    public App(StartupOptions options, StoragePaths paths, ISingleInstanceGuard guard)
+    /// <param name="startup">Started on the first line of the program; stopped once the app is ready.</param>
+    public App(StartupOptions options, StoragePaths paths, ISingleInstanceGuard guard, ActivityTimer startup)
     {
         _options = options;
         _paths = paths;
         _guard = guard;
+        _startup = startup;
 
         // The log and the crash handler come first, so an exception anywhere after this line is recorded by type.
         _log = new FileActivityLog(AppRoot.LogFolder(paths), TimeProvider.System);
@@ -56,7 +59,7 @@ public partial class App : Application
         StartOutcome outcome;
         try
         {
-            outcome = await AppRoot.StartAsync(_options, _paths, _guard, DispatcherQueue.GetForCurrentThread(), AskStartFreshAsync, _log, CancellationToken.None);
+            outcome = await AppRoot.StartAsync(_options, _paths, _guard, DispatcherQueue.GetForCurrentThread(), AskStartFreshAsync, _log, _startup, CancellationToken.None);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
