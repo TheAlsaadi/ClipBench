@@ -4,7 +4,7 @@ namespace ClipBench.Core.Tests.Diagnostics;
 
 public sealed class DiagnosticReportTests
 {
-    private static readonly DiagnosticFacts Facts = new(
+    private static readonly DiagnosticFacts _facts = new(
         AppVersion: "1.2.3",
         WindowsVersion: "10.0.26300",
         Architecture: "X64",
@@ -14,7 +14,7 @@ public sealed class DiagnosticReportTests
         SnippetCount: 4,
         ExcludedAppCount: 5);
 
-    private static readonly string[] LogLines =
+    private static readonly string[] _logLines =
     [
         "2026-11-20T10:00:00.0000000+00:00 INF AppStarted ms=420",
         "2026-11-20T10:00:01.0000000+00:00 INF HistoryLoaded count=12",
@@ -23,7 +23,7 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void The_report_lists_the_facts_and_then_the_log_lines_in_order()
     {
-        var report = DiagnosticReport.Build(Facts, LogLines, droppedLines: 0);
+        var report = DiagnosticReport.Build(_facts, _logLines, droppedLines: 0);
 
         var expected = string.Join(
             "\r\n",
@@ -40,8 +40,8 @@ public sealed class DiagnosticReportTests
             "Excluded programs: 5",
             string.Empty,
             "Recent log (2 lines):",
-            LogLines[0],
-            LogLines[1],
+            _logLines[0],
+            _logLines[1],
             string.Empty);
         report.ShouldBe(expected);
     }
@@ -62,7 +62,7 @@ public sealed class DiagnosticReportTests
     [InlineData(3, "Recent log (2 lines; 3 lines were left out because ClipBench could not have written them):")]
     public void The_report_says_how_many_lines_were_left_out(int dropped, string heading)
     {
-        var report = DiagnosticReport.Build(Facts, LogLines, dropped);
+        var report = DiagnosticReport.Build(_facts, _logLines, dropped);
 
         report.ShouldContain("\r\n" + heading + "\r\n");
     }
@@ -70,7 +70,7 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void An_empty_log_says_so()
     {
-        var report = DiagnosticReport.Build(Facts, [], droppedLines: 0);
+        var report = DiagnosticReport.Build(_facts, [], droppedLines: 0);
 
         report.ShouldEndWith("Recent log (0 lines):\r\n(empty)\r\n");
     }
@@ -78,6 +78,6 @@ public sealed class DiagnosticReportTests
     [Fact]
     public void A_negative_number_of_dropped_lines_is_a_bug_in_the_caller()
     {
-        _ = Should.Throw<ArgumentOutOfRangeException>(() => DiagnosticReport.Build(Facts, LogLines, -1));
+        _ = Should.Throw<ArgumentOutOfRangeException>(() => DiagnosticReport.Build(_facts, _logLines, -1));
     }
 }
