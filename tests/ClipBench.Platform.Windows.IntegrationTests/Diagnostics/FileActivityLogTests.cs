@@ -100,6 +100,22 @@ public sealed class FileActivityLogTests : IDisposable
     }
 
     [Fact]
+    public void Where_a_crash_surfaced_and_how_long_something_took_are_written_as_names_and_numbers()
+    {
+        var log = Create();
+
+        log.Write(
+            ActivityLevel.Error,
+            ActivityEvent.AppCrashed,
+            new ActivityDetails { ExceptionType = typeof(InvalidOperationException), Source = CrashSource.UiThread });
+        log.Write(ActivityLevel.Information, ActivityEvent.AppStarted, new ActivityDetails { Milliseconds = 42 });
+
+        var lines = Lines();
+        lines[0].ShouldEndWith("AppCrashed exception=System.InvalidOperationException source=UiThread");
+        lines[1].ShouldEndWith("AppStarted ms=42");
+    }
+
+    [Fact]
     public void The_time_comes_from_the_clock_it_was_given()
     {
         var log = Create();

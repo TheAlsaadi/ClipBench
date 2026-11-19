@@ -1,4 +1,5 @@
 using ClipBench.Platform.Windows;
+using ClipBench.Platform.Windows.Diagnostics;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Storage;
 using Microsoft.UI.Dispatching;
@@ -18,6 +19,9 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Before anything is decrypted: a crash report Windows makes for this process leaves the heap out. It fails only
+        // on a Windows without error reporting, where there is no report to keep clips out of.
+        _ = WindowsErrorReporting.ExcludeHeap();
         WinRT.ComWrappersSupport.InitializeComWrappers();
 
         var options = StartupOptions.Parse(args);

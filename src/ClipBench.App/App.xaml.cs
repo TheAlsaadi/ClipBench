@@ -1,5 +1,8 @@
 using ClipBench.App.Composition;
+using ClipBench.Core.Diagnostics;
 using ClipBench.Core.Hosting;
+using ClipBench.Core.Notifications;
+using ClipBench.Platform.Windows.Diagnostics;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Storage;
 using Microsoft.UI.Dispatching;
@@ -13,8 +16,12 @@ public partial class App : Application
     private readonly StartupOptions _options;
     private readonly StoragePaths _paths;
     private readonly ISingleInstanceGuard _guard;
+    private readonly FileActivityLog _log;
+    private readonly CrashNotice _crashNotice = new();
+    private readonly CrashHandler _crashHandler;
     private NoticeWindow? _notice;
     private AppRoot? _root;
+    private int _closingAfterCrash;
 
     /// <summary>Creates the application.</summary>
     /// <param name="options">The command-line options.</param>
@@ -25,6 +32,14 @@ public partial class App : Application
         _options = options;
         _paths = paths;
         _guard = guard;
+
+        // The log and the crash handler come first, so an exception anywhere after this line is recorded by type.
+        _log = new FileActivityLog(AppRoot.LogFolder(paths), TimeProvider.System);
+        _crashHandler = new CrashHandler(_log, _crashNotice);
+        UnhandledException += OnUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        AppDomain.CurrentDomain.UnhandledException += OnProcessCrashing;
+
         InitializeComponent();
 
         // ClipBench lives in the tray, and every way out calls Exit itself. By default the message loop ends when the last
@@ -41,11 +56,12 @@ public partial class App : Application
         StartOutcome outcome;
         try
         {
-            outcome = await AppRoot.StartAsync(_options, _paths, _guard, DispatcherQueue.GetForCurrentThread(), AskStartFreshAsync, CancellationToken.None);
+            outcome = await AppRoot.StartAsync(_options, _paths, _guard, DispatcherQueue.GetForCurrentThread(), AskStartFreshAsync, _log, CancellationToken.None);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            // Only the type is shown: a message can quote what was being read.
+            // Only the type is shown and logged: a message can quote what was being read.
+            _log.Write(ActivityLevel.Error, ActivityEvent.AppCrashed, new ActivityDetails { ExceptionType = exception.GetType(), Source = CrashSource.UiThread });
             outcome = new StartOutcome(null, $"ClipBench could not start ({exception.GetType().Name}). Please start it again.");
         }
 
@@ -83,16 +99,85 @@ public partial class App : Application
     {
         try
         {
-            if (_root is { } root)
-            {
-                _root = null;
-                await root.DisposeAsync();
-            }
+            await StopRootAsync();
         }
         finally
         {
             // Whatever went wrong while stopping, the app still has to end: nothing is left running to clean up.
             Exit();
+        }
+    }
+
+    private async Task StopRootAsync()
+    {
+        if (_root is { } root)
+        {
+            _root = null;
+            await root.DisposeAsync();
+        }
+    }
+
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        // Handled, so WinUI does not end the process before the history is closed; the app closes itself below.
+        e.Handled = true;
+        if (_crashHandler.Handle(e.Exception, CrashSource.UiThread) == CrashResponse.CloseApp
+            && Interlocked.Exchange(ref _closingAfterCrash, 1) == 0)
+        {
+            _ = CloseAfterCrashAsync();
+        }
+    }
+
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        _ = _crashHandler.Handle(e.Exception, CrashSource.BackgroundTask);
+        e.SetObserved();
+    }
+
+    private void OnProcessCrashing(object sender, System.UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception exception)
+        {
+            _ = _crashHandler.Handle(exception, CrashSource.Process);
+        }
+    }
+
+    // Stops every service first, so nothing keeps capturing or holding decrypted clips in a state that can no longer be
+    // trusted, then says why the app is closing, then exits.
+    private async Task CloseAfterCrashAsync()
+    {
+        try
+        {
+            await StopRootAsync();
+            if (_crashNotice.Text is { } text)
+            {
+                _notice ??= new NoticeWindow();
+                _ = await _notice.AskAsync(_crashNotice.Title ?? CrashHandler.Title, text, "Close", secondary: null);
+            }
+        }
+#pragma warning disable CA1031 // The app is closing after a crash: a second failure here must not stop it from exiting.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+        }
+        finally
+        {
+            Exit();
+        }
+    }
+
+    // Keeps the notice the crash handler asks for, so it can be shown in a window once the services are stopped. The
+    // tray's own notices would disappear with the tray icon as the app exits.
+    private sealed class CrashNotice : IUserNotifier
+    {
+        public string? Title { get; private set; }
+
+        public string? Text { get; private set; }
+
+        public void Show(string title, string message)
+        {
+            Title = title;
+            Text = message;
         }
     }
 }

@@ -115,6 +115,16 @@ public sealed class FileActivityLog : IActivityLog
             _ = line.Append(" exception=").Append(exceptionType.FullName ?? exceptionType.Name);
         }
 
+        if (details.Source is { } source)
+        {
+            _ = line.Append(" source=").Append(source);
+        }
+
+        if (details.Milliseconds is { } milliseconds)
+        {
+            _ = line.Append(" ms=").Append(milliseconds.ToString(CultureInfo.InvariantCulture));
+        }
+
         return line.ToString();
     }
 

@@ -145,6 +145,12 @@ public enum ActivityEvent
 
     /// <summary>A snippet could not be filled in, with the reason as an error code.</summary>
     SnippetFailed,
+
+    /// <summary>An exception nothing caught ended the app, with its type and where it surfaced.</summary>
+    AppCrashed,
+
+    /// <summary>A background task faulted and nothing observed it, with the exception type; the app kept running.</summary>
+    BackgroundFaulted,
 }
 
 /// <summary>
@@ -170,6 +176,12 @@ public readonly record struct ActivityDetails
 
     /// <summary>The type of an unexpected exception. Its message is never recorded: messages can quote content.</summary>
     public Type? ExceptionType { get; init; }
+
+    /// <summary>Where an unexpected exception surfaced.</summary>
+    public CrashSource? Source { get; init; }
+
+    /// <summary>How long something took, in milliseconds.</summary>
+    public long? Milliseconds { get; init; }
 }
 
 /// <summary>Records what the app does, without ever recording what the user copied.</summary>

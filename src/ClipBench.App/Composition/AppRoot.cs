@@ -94,12 +94,22 @@ internal sealed class AppRoot : IAsyncDisposable
     /// <summary>Raised on the UI thread when the user chooses Exit in the tray menu.</summary>
     public event EventHandler? ExitRequested;
 
+    /// <summary>Gets the folder the activity log is written to.</summary>
+    /// <param name="paths">Where the history lives.</param>
+    /// <returns>The log folder, next to the history.</returns>
+    public static string LogFolder(StoragePaths paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        return Path.Combine(paths.Root, "logs");
+    }
+
     /// <summary>Opens the history, creates and wires the services, and registers the popup shortcut.</summary>
     /// <param name="options">The command-line options.</param>
     /// <param name="paths">Where the history, its key and the log live.</param>
     /// <param name="guard">The one-copy guard; a second launch asks it to open the popup.</param>
     /// <param name="queue">The UI thread's dispatcher queue.</param>
     /// <param name="confirmStartFresh">Asks the user whether to throw away a history that cannot be read.</param>
+    /// <param name="log">The activity log, shared with the crash handler so both write through one file writer.</param>
     /// <param name="cancellationToken">Cancels start-up.</param>
     /// <returns>The running app, or the reason it cannot run.</returns>
     public static async Task<StartOutcome> StartAsync(
@@ -108,10 +118,11 @@ internal sealed class AppRoot : IAsyncDisposable
         ISingleInstanceGuard guard,
         DispatcherQueue queue,
         Func<Task<bool>> confirmStartFresh,
+        FileActivityLog log,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(log);
         var time = TimeProvider.System;
-        var log = new FileActivityLog(Path.Combine(paths.Root, "logs"), time);
         log.Write(ActivityLevel.Information, ActivityEvent.AppStarted);
 
         var created = WindowsPlatform.Create(time);
