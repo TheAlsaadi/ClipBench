@@ -108,6 +108,10 @@ jobs:
           Configuration: Release
         run: dotnet format --verify-no-changes
 
+      - name: Audit the licenses and notices of shipped packages
+        shell: pwsh
+        run: ./scripts/audit-dependencies.ps1 -Check
+
       - name: Check for vulnerable packages
         shell: bash
         run: |
