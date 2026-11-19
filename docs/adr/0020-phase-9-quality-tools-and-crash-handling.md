@@ -26,7 +26,9 @@ Every property runs 1,000 cases from one fixed seed, so a run is the same every 
 
 ### D2. Stryker.NET for mutation testing
 
-`dotnet-stryker` is a local dotnet tool, listed in `.config/dotnet-tools.json`. It runs by hand (`scripts/run-mutation.ps1`), not in CI, and never ships. The version, the license and the results are recorded in `docs/MUTATION.md` when the tool is first run.
+`dotnet-stryker` 5.1.0 (Apache-2.0, by the Stryker Mutator project) is a local dotnet tool, listed in `dotnet-tools.json` at the repository root, where the .NET 10 SDK puts a new tool manifest. It runs by hand (`scripts/run-mutation.ps1`), not in CI, and never ships. It drives the tests through Microsoft.Testing.Platform (`"test-runner": "mtp"`). The scores and every explained survivor are in `docs/MUTATION.md`.
+
+**Considered options:** no mutation testing (rejected: PLAN.md asks for it, and line coverage alone cannot show whether the tests would notice a wrong comparison); running it in CI (rejected for now: a full Core run takes about 15 minutes).
 
 Stryker runs on `ClipBench.Core` and, beyond what PLAN.md names, on the encryption code in `ClipBench.Storage` (`Crypto/` and `Keys/`). PLAN.md asks for the crypto wrappers to be checked, and they live in Storage, not in Core.
 
