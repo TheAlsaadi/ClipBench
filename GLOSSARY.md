@@ -216,3 +216,11 @@ _Avoid_: toast, alert, notification
 The small file of what the app did: event names, kinds, sizes and error codes. It cannot hold a copied text, a file name or a program name.
 _Avoid_: debug log, trace
 
+**Diagnostic report**:
+A text file the user can choose to save from Settings → About, to attach to a problem report: versions, counts and the recent Activity log lines that ClipBench itself could have written. It never holds a clip, a name or an excluded program.
+_Avoid_: crash dump, bug report
+
+**Crash**:
+An exception nothing caught. It is logged by type only; on the window thread ClipBench stops its services, shows one Notice and closes.
+_Avoid_: fault, failure (a Failure is an expected outcome with an error code)
+

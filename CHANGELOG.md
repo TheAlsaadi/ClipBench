@@ -89,6 +89,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   button closes a locked popup; Esc gives the focus back to the program, and the shortcut takes the popup up again
   (pressed in the popup, it gives the focus back). The handle beside the lock button moves the popup with the mouse,
   locked or not. A popup that is closed opens unlocked, near the active window as before.
+- **Diagnostic report** (Settings → About → **Save report…**). It saves a text file only where you choose. The file
+  holds the versions, the counts (clips, pins, boards, snippets, excluded programs as a number) and the recent log, and
+  only log lines ClipBench itself could have written; any other line is left out and counted. It never holds anything
+  you copied.
+- **Crash handling** (ADR 0020). An error nothing caught is logged by its type, never its message. On the window thread
+  the services stop, one notice says ClipBench has to close, and it closes; in a background task the error is logged
+  and ClipBench carries on. Windows crash reports leave ClipBench's memory out, so no clip can travel in one.
+- The log records how long start-up and opening the popup took, as numbers (`AppReady ms=`, `PopupShown ms=`).
 
 ### Changed
 
@@ -121,6 +129,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Windows.
 - The popup has a thin border and rounded corners of its own that follow the theme, instead of the bright outline
   Windows drew around it.
+- Start-up with a large history is about twice as fast. The saved clips are added in one pass instead of one at a
+  time: a history of 10,000 clips is ready in 0.65 s instead of 1.3 s and takes 70 MB less memory
+  (`docs/PERFORMANCE.md`).
+- `THIRD_PARTY_NOTICES.md` names every package that ships, at the version that ships, including the parts the Windows
+  App SDK 2.x brings in (WebView2, Windows ML), which ClipBench never uses.
 
 ### Fixed
 
@@ -162,6 +175,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The architecture rules now also forbid the Windows Runtime and WinHTTP, WinINet and Winsock networking APIs, keep the
   Tesseract library in the Windows layer, forbid hand-written native imports, and allow the app to open only checked web
   addresses, from two places. The attribution guard runs again when a pull request's title or body is edited.
+- The history folder is private to you: ClipBench gives it an access list of its own, your account and SYSTEM only, so
+  a redirected or shared `%LOCALAPPDATA%` cannot open it to other accounts (ADR 0020).
+- Security and quality pass (Phase 9):
+  - The threat model names the tests behind every section.
+  - A UI test shows the running app, Windows App SDK included, opens no network connection.
+  - Architecture tests forbid any way of writing diagnostics except the activity log, and any read of an exception message.
+  - 21 property tests feed random and damaged input to every clipboard reader, the snippet parser and the paste composer.
+  - Mutation testing (Stryker.NET) runs on Core and the encryption code, with every surviving change explained in
+    `docs/MUTATION.md`.
+  - CI checks the license of every shipped package (`docs/DEPENDENCIES.md`).
+  - `docs/security/ENABLE_PRIVATE_REPORTING.md` gives the steps to turn on private vulnerability reporting.
 
 ## [0.1.0] - 2026-10-23
 
