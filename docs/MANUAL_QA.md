@@ -275,6 +275,7 @@ Every privacy setting has an item here. Open the Settings window from the tray m
 These need a debugger, so they are for a developer build:
 
 - [ ] Start ClipBench under Visual Studio, break in any button handler of the popup and throw an `InvalidOperationException` from the Immediate window. The services stop, one notice says ClipBench has to close, and after **Close** the process ends. The log ends with `ERR AppCrashed exception=System.InvalidOperationException source=UiThread`, with no message text.
+- [ ] With a history that cannot be decrypted (rename `key.bin`, then put a file of the same name with other bytes in its place), start ClipBench: the question about the saved history opens. Under a debugger, cause a crash while it is open. The crash notice opens in a window of its own, and **Close** on it ends ClipBench without deleting anything: `clipbench.db` is still there.
 - [ ] Run `Get-ItemProperty "HKCU:\Software\Microsoft\Windows\Windows Error Reporting\LocalDumps\ClipBench.App.exe" -ErrorAction SilentlyContinue`: nothing is set by ClipBench. ClipBench writes no dump of its own.
 
 ## Tests that need a person

@@ -6,9 +6,11 @@ PLAN.md Phase 9 sets the budgets: a history of 10,000 clips (the most the settin
 
 All measurements were taken on one machine: Intel Core i7-13700KF, 32 GB, SSD, Windows 11 build 26300, x64 Release build. The history held 10,000 clips: 9,900 short texts and 100 pictures of about a megabyte each, 84 MB on disk in all. Each figure is the median of 5 runs.
 
+**These are warm starts on a fast desktop.** The first run comes right after the test wrote the history, and the other four come straight after the app was ended, so Windows already had the files in memory. PLAN.md asks for under a second on a *mid-range* PC, and that is **not yet measured**. A cold start (after a restart of Windows) on a mid-range laptop reads the 84 MB from disk and does the same decryption on a slower processor; with 646 ms on this machine, the margin is not proven. Measuring it is an open item for the owner before v1.0. The command is at the end of this page.
+
 | What | Budget | Measured | Test |
 |---|---|---|---|
-| App ready, from process start | under 1 s | 646 ms | `PerformanceSmokeTests.Startup_with_10000_clips_is_ready_in_under_a_second` |
+| App ready, from process start (warm) | under 1 s on a mid-range PC: not yet measured there | 646 ms | `PerformanceSmokeTests.Startup_with_10000_clips_is_ready_in_under_a_second` |
 | App ready, from the first line of `Main` | | 601 ms | the same test, `AppReady ms=` in the log |
 | Popup shown, from the shortcut press | under 100 ms | 26 ms (138 ms the first time) | `PerformanceSmokeTests.The_popup_opens_in_under_100_ms` |
 | Private memory after loading 10,000 clips and opening the popup once | 370 MB (291 MB measured plus a quarter, rounded up to 10 MB) | 283 to 292 MB; working set 340 to 347 MB | `PerformanceSmokeTests.Memory_after_loading_10000_clips_stays_within_its_budget` |
