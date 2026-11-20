@@ -72,7 +72,10 @@ public partial class App : Application
         {
             _root = root;
             root.ExitRequested += (_, _) => _ = ShutDownAsync();
+
+            // A closed window cannot be shown again, so the field is cleared: a crash later makes a new one for its notice.
             _notice?.Close();
+            _notice = null;
             return;
         }
 

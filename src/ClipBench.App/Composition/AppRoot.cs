@@ -99,7 +99,7 @@ internal sealed class AppRoot : IAsyncDisposable
 
     // The text of the report the user can save from About. It states versions and counts, and only the log lines the log
     // itself could have written: nothing the user copied, named or excluded.
-    private string BuildDiagnosticReport()
+    private async Task<string> BuildDiagnosticReportAsync(CancellationToken cancellationToken)
     {
         var clips = _services.GetRequiredService<ClipHistory>().Clips;
         var facts = new DiagnosticFacts(
@@ -111,7 +111,7 @@ internal sealed class AppRoot : IAsyncDisposable
             _services.GetRequiredService<BoardCatalog>().Boards.Length,
             _services.GetRequiredService<SnippetCatalog>().Snippets.Length,
             _services.GetRequiredService<SettingsService>().Current.ExcludedPrograms.Count);
-        var excerpt = ActivityLogReader.ReadRecent(_logFolder);
+        var excerpt = await ActivityLogReader.ReadRecentAsync(_logFolder, cancellationToken: cancellationToken).ConfigureAwait(false);
         return DiagnosticReport.Build(facts, excerpt.Lines, excerpt.Dropped);
     }
 
@@ -394,7 +394,7 @@ internal sealed class AppRoot : IAsyncDisposable
 
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(_services.GetRequiredService<SettingsViewModel>(), BuildDiagnosticReport);
+            _settingsWindow = new SettingsWindow(_services.GetRequiredService<SettingsViewModel>(), BuildDiagnosticReportAsync);
 
             // It shows the user's snippets and excluded programs, so it is kept out of screen captures like the popup.
             if (HideFromCapture(_options, _services))

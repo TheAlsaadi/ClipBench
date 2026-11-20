@@ -25,11 +25,28 @@ public static class ActivityLogReader
 
     private static readonly Lazy<Regex> _wellFormed = new(BuildPattern);
 
+    /// <summary>
+    /// The details a line can carry, in the order <see cref="FileActivityLog"/> writes them, each with what its value may
+    /// look like. There is one for every field of <see cref="ActivityDetails"/>.
+    /// </summary>
+    public static IReadOnlyList<(string Key, string Value)> DetailKeys { get; } =
+    [
+        ("error", Names<ErrorCode>()),
+        ("format", Names<ClipFormat>()),
+        ("bytes", @"-?\d{1,19}"),
+        ("count", @"-?\d{1,10}"),
+        ("rejection", Names<CaptureRejection>()),
+        ("exception", @"[A-Za-z_][A-Za-z0-9_.+`]{0,200}"),
+        ("source", Names<CrashSource>()),
+        ("ms", @"-?\d{1,19}"),
+    ];
+
     /// <summary>Reads the last lines of the log, across the rotated files, oldest first.</summary>
     /// <param name="directory">The log folder.</param>
     /// <param name="maxLines">How many of the newest lines to look at. At least 1.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
     /// <returns>The lines the log could have written, and how many of the newest lines were not.</returns>
-    public static LogExcerpt ReadRecent(string directory, int maxLines = 200)
+    public static async Task<LogExcerpt> ReadRecentAsync(string directory, int maxLines = 200, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directory);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxLines, 1);
@@ -37,7 +54,7 @@ public static class ActivityLogReader
         var newest = new Queue<string>(maxLines);
         foreach (var file in FilesOldestFirst(directory))
         {
-            foreach (var line in ReadLines(file))
+            foreach (var line in await ReadLinesAsync(file, cancellationToken).ConfigureAwait(false))
             {
                 if (line.Length == 0)
                 {
@@ -90,15 +107,16 @@ public static class ActivityLogReader
         return int.TryParse(middle, NumberStyles.None, CultureInfo.InvariantCulture, out var index) ? index : 0;
     }
 
-    private static IEnumerable<string> ReadLines(string path)
+    private static async Task<IEnumerable<string>> ReadLinesAsync(string path, CancellationToken cancellationToken)
     {
         string text;
         try
         {
             // The log may be writing: share the file rather than wait for it.
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            await using var stream = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, bufferSize: 4096, useAsync: true);
             using var reader = new StreamReader(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            text = reader.ReadToEnd();
+            text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -109,23 +127,17 @@ public static class ActivityLogReader
         return text.Split('\n').Select(line => line.TrimEnd('\r'));
     }
 
-    // Built from the enums the log writes, so a new event or error code is accepted without a change here, and a word
-    // that is not one of them is not.
+    // Names come from the enums the log writes, so a new event or error code is accepted without a change here, and a
+    // word that is not one of them is not.
+    private static string Names<T>()
+        where T : struct, Enum => string.Join('|', Enum.GetNames<T>());
+
     private static Regex BuildPattern()
     {
-        static string Names<T>()
-            where T : struct, Enum => string.Join('|', Enum.GetNames<T>());
-
         var pattern =
             @"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,7})?(Z|[+-]\d{2}:\d{2}) (INF|WRN|ERR) (" + Names<ActivityEvent>() + ")"
-            + "( error=(" + Names<ErrorCode>() + "))?"
-            + "( format=(" + Names<ClipFormat>() + "))?"
-            + @"( bytes=-?\d{1,19})?"
-            + @"( count=-?\d{1,10})?"
-            + "( rejection=(" + Names<CaptureRejection>() + "))?"
-            + @"( exception=[A-Za-z_][A-Za-z0-9_.+`]{0,200})?"
-            + "( source=(" + Names<CrashSource>() + "))?"
-            + @"( ms=-?\d{1,19})?$";
+            + string.Concat(DetailKeys.Select(detail => $"( {detail.Key}=({detail.Value}))?"))
+            + "$";
         return new Regex(pattern, RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, TimeSpan.FromSeconds(1));
     }
 }

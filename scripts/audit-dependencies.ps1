@@ -96,7 +96,8 @@ $rows = foreach ($package in $packages.Values | Sort-Object Id) {
     for ($count = $parts.Length; $count -ge 1 -and -not $line; $count--) {
         $name = ($parts[0..($count - 1)] -join '.')
         if ($count -eq 1 -and @('Microsoft', 'System') -contains $name) { break }
-        $line = $notices | Where-Object { $_ -match ('(?<![\w.])' + [regex]::Escape($name) + '(?![\w])') } | Select-Object -First 1
+        # The name must stand alone: Microsoft.Extensions.DependencyInjection must not match the line of its .Abstractions.
+        $line = $notices | Where-Object { $_ -match ('(?<![\w.])' + [regex]::Escape($name) + '(?![\w.])') } | Select-Object -First 1
     }
     if (-not $line) {
         $findings.Add("$($package.Id) $($package.Version): not named in THIRD_PARTY_NOTICES.md")

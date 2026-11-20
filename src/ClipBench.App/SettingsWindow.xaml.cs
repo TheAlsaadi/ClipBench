@@ -27,7 +27,7 @@ public sealed partial class SettingsWindow : Window
     private const string CustomLabel = "Custom";
 
     private readonly Dictionary<SettingsSection, FrameworkElement> _panels;
-    private readonly Func<string> _diagnosticReport;
+    private readonly Func<CancellationToken, Task<string>> _diagnosticReport;
     private bool _closing;
     private bool _sized;
     private bool _syncing;
@@ -35,7 +35,7 @@ public sealed partial class SettingsWindow : Window
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
     /// <param name="diagnosticReport">Builds the text of a diagnostic report, when the user asks to save one.</param>
-    public SettingsWindow(SettingsViewModel viewModel, Func<string> diagnosticReport)
+    public SettingsWindow(SettingsViewModel viewModel, Func<CancellationToken, Task<string>> diagnosticReport)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(diagnosticReport);
@@ -254,8 +254,8 @@ public sealed partial class SettingsWindow : Window
         }
     }
 
-    // The user picks where the report goes; nothing is written until they do. The report is built off the UI thread
-    // because it reads the log files.
+    // The user picks where the report goes; nothing is written until they do. Saving a report is never worth closing the
+    // app over, so whatever goes wrong here is dropped: the user can try again.
     private async void OnSaveDiagnosticReportRequested(object? sender, EventArgs e)
     {
         try
@@ -268,12 +268,14 @@ public sealed partial class SettingsWindow : Window
                 return;
             }
 
-            var report = await Task.Run(_diagnosticReport);
+            var report = await _diagnosticReport(CancellationToken.None);
             await Windows.Storage.FileIO.WriteTextAsync(file, report, Windows.Storage.Streams.UnicodeEncoding.Utf8);
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.COMException)
+#pragma warning disable CA1031 // An async void handler: anything not caught here would reach the crash handler and close the app.
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+#pragma warning restore CA1031
         {
-            // A place that cannot be written leaves nothing behind; the user can choose another.
+            // Nothing was written, or a file the user chose is incomplete; the user can save again.
         }
     }
 

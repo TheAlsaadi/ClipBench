@@ -12,18 +12,17 @@ namespace ClipBench.Platform.Windows.Diagnostics;
 public static class WindowsErrorReporting
 {
     /// <summary>Tells Windows Error Reporting to leave the heap out of any crash report for this process.</summary>
-    /// <returns>Success, or the reason Windows refused.</returns>
+    /// <returns>Success once Windows reports the flag as set, or the reason it is not.</returns>
     public static Result ExcludeHeap()
     {
         var set = PInvoke.WerSetFlags(WER_FAULT_REPORTING.WER_FAULT_REPORTING_FLAG_NOHEAP);
-        return set.Succeeded
+        return set.Succeeded && IsHeapExcluded()
             ? Result.Success()
             : Result.Failure(new ResultError(ErrorCode.PlatformFailure, "Windows would not leave memory out of its crash reports."));
     }
 
-    /// <summary>Says whether crash reports for this process leave the heap out.</summary>
-    /// <returns><see langword="true"/> when the heap is left out.</returns>
-    public static bool IsHeapExcluded()
+    // Asks Windows what it will do, rather than trusting the call that set it.
+    internal static bool IsHeapExcluded()
     {
         // The pseudo-handle of the current process needs no closing.
         using var self = new SafeProcessHandle(PInvoke.GetCurrentProcess(), ownsHandle: false);
