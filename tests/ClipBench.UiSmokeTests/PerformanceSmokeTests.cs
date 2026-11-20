@@ -63,7 +63,7 @@ public sealed class PerformanceSmokeTests(LargeHistoryApp app) : IClassFixture<L
     private const int Runs = 5;
 
     // The measured private memory with 10,000 clips (docs/PERFORMANCE.md) plus a quarter, rounded up to 10 MB.
-    private const long MemoryBudgetMegabytes = 0;
+    private const long MemoryBudgetMegabytes = 370;
 
     private readonly ITestOutputHelper _output = TestContext.Current.TestOutputHelper!;
 

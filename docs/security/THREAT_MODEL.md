@@ -170,7 +170,7 @@ download a new one, which is an accepted cost of having no network code.
 | T | A compromised workflow action | Every action pinned by commit SHA; read-only permissions; no `pull_request_target`; event text never reaches a script | 0 | Workflow tests |
 | T | Static analysis finds a flaw late | CodeQL, OpenSSF Scorecard | 0 | CI |
 | I | Secrets in the repository | `.gitignore` for keys and `.env`; deny rules for reading them; none are used | 0 | Review |
-| I | Runtime or test-runner telemetry | CI and contributors opt out of the test runner's; the Windows App SDK terms allow usage data, so Phase 9 tests that the running app opens no network connections | 0, 9 | CI env; Phase 9 test |
+| I | Runtime or test-runner telemetry | CI and contributors opt out of the test runner's; the Windows App SDK terms allow usage data, so Phase 9 tests that the running app opens no network connections | 0, 9 | CI env; `NetworkSmokeTests` (the running app, Windows App SDK included, has no TCP connection or UDP endpoint) |
 | R | Authorship of the history is falsified | Commit hook plus a CI guard on messages, identities and pull request text | 0 | Guard tests |
 
 ## 8. Transforms (Phase 6)
@@ -209,6 +209,7 @@ download a new one, which is an accepted cost of having no network code.
 | D, T | After an unexpected error the app carries on in a state that can no longer be trusted, holding decrypted clips | An error on the UI thread stops every service, shows one notice and closes the app; a faulted background task is logged and the app carries on. Handling a crash never throws | 9 | `CrashHandlerTests` (a failing log and notifier, a second crash); manual QA |
 | I | A diagnostic report carries content, a board or snippet name, or an excluded program | Saved only when the user asks, where the user chooses. It states versions and counts only. A log line goes in only if it matches exactly what the log writer can produce (event, error, format, rejection and source names from the enums); any other line is left out and counted | 9 | `DiagnosticReportTests`; `ActivityLogReaderTests` (a hand-added line with text is dropped) |
 | I | The history folder is readable by other accounts | See section 2, `key.bin` row | 9 | `PrivateFolderTests` |
+| I | The running app talks to the network, through ClipBench or the Windows App SDK | No networking type in ClipBench's code; the running app is watched for connections | 0, 9 | `NetworkRulesTests`; `NetworkSmokeTests` |
 
 ## Phase 9 evidence audit
 
@@ -225,14 +226,16 @@ Every row above was read again in Phase 9. Below are the test classes behind eac
 | 7. Supply chain | `WorkflowTests`, `DependabotTests`, `RepositoryGuardrailTests`, `ProjectStructureTests`, and `scripts/audit-dependencies.ps1 -Check` in CI | Secrets in the repository (review and GitHub secret scanning; no test can prove an absence) |
 | 8. Transforms | `FindReplaceTests`, `JsonTransformsTests`, `TransformPipelineTests`, `EncodingTransformsTests`, `TextTransformsTests`, `TransformPickerTests`, `PopupTransformTests` | none |
 | 9. Privacy center and settings | `JsonSettingsStoreTests`, `AppSettingsTests`, `SettingsServiceTests`, `ExpirySweeperTests`, `ClipHistoryExpiryTests`, `ClipLibraryExpiryTests`, `ClipRepositoryExpiryTests`, `TrayViewModelTests`, `StartWithWindowsServiceTests`, `RegistryStartupRegistrationTests`, `WipeServiceTests`, `ClipLibraryWipeTests`, `HotkeyBindingsTests`, `ExclusionListTests` | The Settings window on a shared screen (manual QA, as for the popup) |
-| 10. Crash handling | `CrashHandlerTests`, `WindowsErrorReportingTests`, `DiagnosticReportTests`, `ActivityLogReaderTests`, `PrivateFolderTests` | The notice after a crash on the UI thread (manual QA: forcing a real crash needs a debugger) |
+| 10. Crash handling and diagnostics | `CrashHandlerTests`, `WindowsErrorReportingTests`, `DiagnosticReportTests`, `ActivityLogReaderTests`, `PrivateFolderTests`, `NetworkRulesTests`, `NetworkSmokeTests` | The notice after a crash on the UI thread (manual QA: forcing a real crash needs a debugger) |
 
 ## Open questions
 
-- Does the Windows App SDK runtime open any network connection in an unpackaged,
-  self-contained app? (Phase 9)
 - Which Windows reserved hotkeys will a future update claim? (ADR 0004)
 Answered:
+
+- **Does the Windows App SDK runtime open a network connection?** (Phase 9) Not in what
+  ClipBench uses. `NetworkSmokeTests` lists the app's TCP connections and UDP endpoints after
+  start, with the popup open, with Settings open and two seconds after closing them, and finds none.
 
 - **The storage folder on a redirected or shared `%LOCALAPPDATA%`** (Phase 9): it no longer
   depends on the folder above. ClipBench sets its own protected access list, the current user
