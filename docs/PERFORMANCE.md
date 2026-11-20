@@ -21,7 +21,7 @@ Most of the memory holds the 100 pictures, kept decrypted in the history while t
 
 ## What Phase 9 changed
 
-The first run measured startup at 1.3 s with 10,000 clips. Adding the loaded clips to the history one at a time copied and searched the whole list for every clip, which cost 709 ms for 10,000 clips. `ClipHistory.AddRange` now adds them in one pass, in 7 ms. Two property tests show the result is the same as adding them one by one. Startup fell to 646 ms and memory from 351 MB to 283 MB.
+The first run measured startup at 1.3 s with 10,000 clips. Adding the loaded clips to the history one at a time copied and searched the whole list for every clip, which cost 709 ms for 10,000 clips. `ClipHistory.AddRange` now adds them in one pass: 7 ms for 10,000 text clips (pictures add the time to compare their bytes). Two property tests show the result is the same as adding them one by one. Startup fell to 646 ms and memory from 351 MB to 283 MB.
 
 ## How to measure again
 
