@@ -174,9 +174,12 @@ public sealed class LockSmokeTests(AppUnderTest app) : IClassFixture<AppUnderTes
         var screen = System.Windows.Forms.Screen.FromPoint(area.Location).WorkingArea;
         var left = area.Left - clicked.Bounds.Width - 20;
         clicked.MoveTo(new System.Drawing.Point(left >= screen.Left ? left : area.Right + 20, area.Top));
+        clicked.KeepOnTop();
         Thread.Sleep(500);
-        PointClick(new System.Drawing.Point(clicked.Bounds.X + (clicked.Bounds.Width / 2), clicked.Bounds.Y + (clicked.Bounds.Height / 2)));
-        AppUnderTest.WaitFor(() => clicked.IsInFront, 10_000).ShouldBeTrue("a click did not bring the second window to the front");
+        var clickAt = new System.Drawing.Point(clicked.Bounds.X + (clicked.Bounds.Width / 2), clicked.Bounds.Y + (clicked.Bounds.Height / 2));
+        PointClick(clickAt);
+        AppUnderTest.WaitFor(() => clicked.IsInFront, 10_000).ShouldBeTrue(
+            $"a click did not bring the second window to the front. Popup {area}, screen {screen}, window {clicked.Bounds}, click at {clickAt}; in front: {AppUnderTest.ForegroundDescription()}");
 
         // A click on the locked popup must not take the focus: it is checked with a button that pastes nothing.
         PointClick(Control(popup, "SidebarToggleButton").Center());
