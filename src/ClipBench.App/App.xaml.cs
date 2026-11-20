@@ -20,7 +20,10 @@ public partial class App : Application
     private readonly CrashNotice _crashNotice = new();
     private readonly CrashHandler _crashHandler;
     private readonly ActivityTimer _startup;
-    private NoticeWindow? _notice;
+
+    // How long closing after a crash waits for the services to stop, and for the user to read the notice.
+    private static readonly TimeSpan _stopAfterCrashLimit = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan _noticeAfterCrashLimit = TimeSpan.FromMinutes(2);
     private AppRoot? _root;
     private int _closingAfterCrash;
 
@@ -56,47 +59,76 @@ public partial class App : Application
 
     private async Task StartAsync()
     {
-        StartOutcome outcome;
+        var running = false;
         try
         {
-            outcome = await AppRoot.StartAsync(_options, _paths, _guard, DispatcherQueue.GetForCurrentThread(), AskStartFreshAsync, _log, _startup, CancellationToken.None);
+            StartOutcome outcome;
+            try
+            {
+                outcome = await AppRoot.StartAsync(_options, _paths, _guard, DispatcherQueue.GetForCurrentThread(), AskStartFreshAsync, _log, _startup, CancellationToken.None);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                // Only the type is shown and logged: a message can quote what was being read.
+                _log.Write(ActivityLevel.Error, ActivityEvent.AppCrashed, new ActivityDetails { ExceptionType = exception.GetType(), Source = CrashSource.UiThread });
+                outcome = new StartOutcome(null, $"ClipBench could not start ({exception.GetType().Name}). Please start it again.");
+            }
+
+            if (outcome.Root is { } root)
+            {
+                // A crash while the services were starting is already closing the app: what has just started is let go
+                // again, so the history is closed and the shortcuts and tray icon are given back.
+                if (Volatile.Read(ref _closingAfterCrash) != 0)
+                {
+                    await root.DisposeAsync();
+                    return;
+                }
+
+                _root = root;
+                root.ExitRequested += (_, _) => _ = ShutDownAsync();
+                running = true;
+                return;
+            }
+
+            if (outcome.Failure is { } failure)
+            {
+                _ = await AskInNewWindowAsync("ClipBench cannot start", failure, "Close", secondary: null);
+            }
         }
-        catch (Exception exception) when (exception is not OutOfMemoryException)
+        finally
         {
-            // Only the type is shown and logged: a message can quote what was being read.
-            _log.Write(ActivityLevel.Error, ActivityEvent.AppCrashed, new ActivityDetails { ExceptionType = exception.GetType(), Source = CrashSource.UiThread });
-            outcome = new StartOutcome(null, $"ClipBench could not start ({exception.GetType().Name}). Please start it again.");
+            // Every way out of a start that did not leave the app running ends the process: with no window and no tray
+            // icon, a process left behind would only stop the next start from working.
+            if (!running)
+            {
+                Exit();
+            }
         }
-
-        if (outcome.Root is { } root)
-        {
-            _root = root;
-            root.ExitRequested += (_, _) => _ = ShutDownAsync();
-
-            // A closed window cannot be shown again, so the field is cleared: a crash later makes a new one for its notice.
-            _notice?.Close();
-            _notice = null;
-            return;
-        }
-
-        if (outcome.Failure is { } failure)
-        {
-            _notice ??= new NoticeWindow();
-            _ = await _notice.AskAsync("ClipBench cannot start", failure, "Close", secondary: null);
-        }
-
-        _notice?.Close();
-        Exit();
     }
 
-    private Task<bool> AskStartFreshAsync()
+    // A crash that is closing the app answers for the user: Quit, which leaves the history files untouched.
+    private Task<bool> AskStartFreshAsync() =>
+        Volatile.Read(ref _closingAfterCrash) != 0
+            ? Task.FromResult(false)
+            : AskInNewWindowAsync(
+                "ClipBench cannot read your saved history",
+                "The saved history cannot be decrypted. That happens after a change to your Windows account or when the file is damaged. ClipBench can start with an empty history, which deletes the old one for good, or you can quit and leave the files untouched.",
+                "Start with an empty history",
+                "Quit");
+
+    // Each question gets a window of its own. A notice window answers once, so sharing one would let the answer to one
+    // question (Close on a crash notice) count as the answer to another (start with an empty history).
+    private static async Task<bool> AskInNewWindowAsync(string title, string message, string primary, string? secondary)
     {
-        _notice ??= new NoticeWindow();
-        return _notice.AskAsync(
-            "ClipBench cannot read your saved history",
-            "The saved history cannot be decrypted. That happens after a change to your Windows account or when the file is damaged. ClipBench can start with an empty history, which deletes the old one for good, or you can quit and leave the files untouched.",
-            "Start with an empty history",
-            "Quit");
+        var notice = new NoticeWindow();
+        try
+        {
+            return await notice.AskAsync(title, message, primary, secondary);
+        }
+        finally
+        {
+            notice.Close();
+        }
     }
 
     /// <summary>Stops the app cleanly: services first, then the window that keeps it alive.</summary>
@@ -149,16 +181,19 @@ public partial class App : Application
     }
 
     // Stops every service first, so nothing keeps capturing or holding decrypted clips in a state that can no longer be
-    // trusted, then says why the app is closing, then exits.
+    // trusted, then says why the app is closing, then exits. Neither step may keep the process alive: a service that
+    // never stops, or a notice nobody can see after a broken window, would leave a process with no tray icon that stops
+    // the next start from working. Each step therefore has a time limit.
     private async Task CloseAfterCrashAsync()
     {
         try
         {
-            await StopRootAsync();
+            _ = await Task.WhenAny(StopRootAsync(), Task.Delay(_stopAfterCrashLimit));
             if (_crashNotice.Text is { } text)
             {
-                _notice ??= new NoticeWindow();
-                _ = await _notice.AskAsync(_crashNotice.Title ?? CrashHandler.Title, text, "Close", secondary: null);
+                _ = await Task.WhenAny(
+                    AskInNewWindowAsync(_crashNotice.Title ?? CrashHandler.Title, text, "Close", secondary: null),
+                    Task.Delay(_noticeAfterCrashLimit));
             }
         }
 #pragma warning disable CA1031 // The app is closing after a crash: a second failure here must not stop it from exiting.
