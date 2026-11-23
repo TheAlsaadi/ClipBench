@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup Label="UI platform (ADR 0001)">
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
   </ItemGroup>
 
   <ItemGroup Label="UI smoke test (ADR 0013)">
