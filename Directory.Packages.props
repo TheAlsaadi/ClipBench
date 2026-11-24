@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Storage (ADR 0008)">
-    <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Win32 interop (ADR 0010)">
