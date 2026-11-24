@@ -161,4 +161,7 @@ public enum ErrorCode
 
     /// <summary>Text is already being copied from the screen.</summary>
     ScreenTextBusy,
+
+    /// <summary>The history folder could not be made readable by the user and SYSTEM only.</summary>
+    FolderNotPrivate,
 }

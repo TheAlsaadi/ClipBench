@@ -1,4 +1,6 @@
+using ClipBench.Core.Diagnostics;
 using ClipBench.Platform.Windows;
+using ClipBench.Platform.Windows.Diagnostics;
 using ClipBench.Presentation.Hosting;
 using ClipBench.Storage;
 using Microsoft.UI.Dispatching;
@@ -18,6 +20,12 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Start-up is timed from here, the first line of the program; the runtime's own start comes before it.
+        var startup = ActivityTimer.Start(TimeProvider.System);
+
+        // Before anything is decrypted: a crash report Windows makes for this process leaves the heap out. It fails only
+        // on a Windows without error reporting, where there is no report to keep clips out of.
+        _ = WindowsErrorReporting.ExcludeHeap();
         WinRT.ComWrappersSupport.InitializeComWrappers();
 
         var options = StartupOptions.Parse(args);
@@ -33,7 +41,7 @@ public static class Program
         Application.Start(callback =>
         {
             SynchronizationContext.SetSynchronizationContext(new DispatcherQueueSynchronizationContext(DispatcherQueue.GetForCurrentThread()));
-            _ = new App(options, paths, guard);
+            _ = new App(options, paths, guard, startup);
         });
 
         return 0;

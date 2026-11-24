@@ -24,6 +24,17 @@ internal sealed class PasteTargetWindow : IDisposable
     /// <param name="location">The new top-left corner.</param>
     public void MoveTo(Point location) => _form!.Invoke(() => _form.Location = location);
 
+    /// <summary>
+    /// Keeps the window above every window that is not top-most, without making it the window in front. A test that clicks
+    /// it needs that: whatever program the person running the tests has open could otherwise cover the spot and take the click.
+    /// The style is set off and on again, because Windows can drop it from a window shown without being activated.
+    /// </summary>
+    public void KeepOnTop() => _form!.Invoke(() =>
+    {
+        _form.TopMost = false;
+        _form.TopMost = true;
+    });
+
     public string Text => (string)_form!.Invoke(() => _box!.Text);
 
     /// <summary>Empties the text box.</summary>

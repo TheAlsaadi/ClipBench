@@ -280,6 +280,74 @@ public sealed class MasterKeyStoreTests : IDisposable
         seen.ShouldNotBe(original);
     }
 
+    [Fact]
+    public async Task A_key_file_of_the_largest_size_a_key_file_can_have_is_overwritten_before_it_is_deleted()
+    {
+        var original = Enumerable.Repeat((byte)0x5A, 4096).ToArray();
+        await File.WriteAllBytesAsync(KeyFile, original, Ct);
+
+        await using var reader = new FileStream(KeyFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        (await Store().DeleteAsync(Ct)).IsSuccess.ShouldBeTrue();
+        var seen = new byte[original.Length];
+        await reader.ReadExactlyAsync(seen, Ct);
+
+        seen.ShouldNotBe(original);
+    }
+
+    [Fact]
+    public async Task A_file_too_large_to_be_a_key_file_is_deleted_without_being_overwritten()
+    {
+        // It cannot hold a key, and overwriting it would mean making that many random bytes in memory.
+        var original = Enumerable.Repeat((byte)0x5A, 4097).ToArray();
+        await File.WriteAllBytesAsync(KeyFile, original, Ct);
+
+        await using var reader = new FileStream(KeyFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        (await Store().DeleteAsync(Ct)).IsSuccess.ShouldBeTrue();
+        var seen = new byte[original.Length];
+        await reader.ReadExactlyAsync(seen, Ct);
+
+        File.Exists(KeyFile).ShouldBeFalse();
+        seen.ShouldBe(original);
+    }
+
+    [Fact]
+    public async Task A_cancelled_delete_throws_and_leaves_the_file()
+    {
+        await File.WriteAllBytesAsync(KeyFile, [], Ct);
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => Store().DeleteAsync(cancelled.Token));
+        File.Exists(KeyFile).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task The_copy_unwrapped_to_check_a_new_key_is_wiped()
+    {
+        using var key = await Open(Store());
+
+        _protector.Unwrapped.ShouldHaveSingleItem().ShouldAllBe(value => value == 0);
+    }
+
+    [Fact]
+    public async Task A_key_file_another_program_holds_open_is_a_disk_error_for_reading_and_for_deleting()
+    {
+        using (await Open(Store()))
+        {
+        }
+
+        await using (new FileStream(KeyFile, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            (await OpenFails(Store())).Code.ShouldBe(ErrorCode.StorageFailure);
+            var deleted = await Store().DeleteAsync(Ct);
+            deleted.IsFailure.ShouldBeTrue();
+            deleted.Error.Code.ShouldBe(ErrorCode.StorageFailure);
+            deleted.Error.Message.ShouldBe("The encryption key file could not be read or written.");
+        }
+
+        File.Exists(KeyFile).ShouldBeTrue();
+    }
+
     // --- cancellation and construction ---
 
     [Fact]

@@ -91,14 +91,7 @@ public sealed class ClipHistory
 
             if (wasDuplicate)
             {
-                var existing = clips[existingIndex];
-                stored = existing with
-                {
-                    CapturedAt = clip.CapturedAt,
-                    SourceApp = clip.SourceApp,
-                    IsPinned = existing.IsPinned || clip.IsPinned,
-                    ExpiresAt = existing.IsPinned || clip.IsPinned ? null : clip.ExpiresAt,
-                };
+                stored = Merge(clips[existingIndex], clip);
                 clips.RemoveAt(existingIndex);
             }
 
@@ -106,6 +99,62 @@ public sealed class ClipHistory
             _clips = clips.ToImmutable();
 
             return new AddResult(stored, wasDuplicate, TrimLocked());
+        }
+    }
+
+    /// <summary>
+    /// Adds many clips at once, oldest first, as loading the saved history does. The history ends as it would after one
+    /// <see cref="Add"/> per clip in that order, except that the limits are applied once, at the end: so a content that
+    /// repeats keeps its first entry even if one add at a time would have pushed that entry out in between. Each clip is
+    /// looked up once, instead of the whole list being copied and searched for every clip.
+    /// </summary>
+    /// <param name="oldestFirst">The clips, oldest first.</param>
+    /// <returns>The clips the limits pushed out.</returns>
+    public ImmutableArray<Clip> AddRange(IReadOnlyList<Clip> oldestFirst)
+    {
+        ArgumentNullException.ThrowIfNull(oldestFirst);
+
+        lock (_gate)
+        {
+            if (oldestFirst.Count == 0)
+            {
+                return [];
+            }
+
+            // Oldest first, so a clip is appended; a repeat leaves a hole where its entry was and moves to the end.
+            var ordered = new List<Clip?>(_clips.Length + oldestFirst.Count);
+            var positions = new Dictionary<ClipContent, int>(_clips.Length + oldestFirst.Count);
+            for (var i = _clips.Length - 1; i >= 0; i--)
+            {
+                positions[_clips[i].Content] = ordered.Count;
+                ordered.Add(_clips[i]);
+            }
+
+            foreach (var clip in oldestFirst)
+            {
+                ArgumentNullException.ThrowIfNull(clip, nameof(oldestFirst));
+                var stored = clip;
+                if (positions.TryGetValue(clip.Content, out var position))
+                {
+                    stored = Merge(ordered[position]!, clip);
+                    ordered[position] = null;
+                }
+
+                positions[clip.Content] = ordered.Count;
+                ordered.Add(stored);
+            }
+
+            var newestFirst = ImmutableArray.CreateBuilder<Clip>(positions.Count);
+            for (var i = ordered.Count - 1; i >= 0; i--)
+            {
+                if (ordered[i] is { } kept)
+                {
+                    newestFirst.Add(kept);
+                }
+            }
+
+            _clips = newestFirst.ToImmutable();
+            return TrimLocked();
         }
     }
 
@@ -356,6 +405,16 @@ public sealed class ClipHistory
 
         return -1;
     }
+
+    // A copy of content that is already there: the entry keeps its id and board, and takes the new time and source. A pin
+    // on either keeps it pinned, and a pinned clip never expires.
+    private static Clip Merge(Clip existing, Clip clip) => existing with
+    {
+        CapturedAt = clip.CapturedAt,
+        SourceApp = clip.SourceApp,
+        IsPinned = existing.IsPinned || clip.IsPinned,
+        ExpiresAt = existing.IsPinned || clip.IsPinned ? null : clip.ExpiresAt,
+    };
 
     private static int IndexOfContent(ImmutableArray<Clip>.Builder clips, ClipContent content)
     {

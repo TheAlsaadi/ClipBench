@@ -128,3 +128,7 @@ DefSubclassProc
 SwitchToThisWindow
 GetWindowLong
 SetWindowLong
+
+// Windows Error Reporting: crash reports carry no heap memory, so no clip can travel in one
+WerSetFlags
+WerGetFlags

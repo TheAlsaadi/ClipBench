@@ -14,6 +14,23 @@
           "Microsoft.Testing.Platform": "2.4.1"
         }
       },
+      "FsCheck.Xunit.v3": {
+        "type": "Direct",
+        "requested": "[3.6.0, )",
+        "resolved": "3.6.0",
+        "contentHash": "rIR16Wi63jv4e5tOGkyyCZ9nMyhZc2CRuWLxIdFrBJ22zuvJ6zzAL/F1b2157J1lV6WGdBjOlGeMDryw4ECBSg==",
+        "dependencies": {
+          "FSharp.Core": "5.0.2",
+          "FsCheck": "[3.6.0]",
+          "xunit.v3.extensibility.core": "[4.0.0, 5.0.0)"
+        }
+      },
+      "FSharp.Core": {
+        "type": "Direct",
+        "requested": "[11.0.101, )",
+        "resolved": "11.0.101",
+        "contentHash": "XL1wfb0gujXAtnJfO7rYfxKgwufCiT8aOKqGoqKB83oxRAZ9+yiNWXinHO4x9StYuunTl/AH8eERc0hv7UXJVQ=="
+      },
       "Shouldly": {
         "type": "Direct",
         "requested": "[4.3.0, )",
@@ -253,6 +270,15 @@
       },
       "clipbench.core": {
         "type": "Project"
+      },
+      "FsCheck": {
+        "type": "CentralTransitive",
+        "requested": "[3.6.0, )",
+        "resolved": "3.6.0",
+        "contentHash": "XjZ5sWf/QKLqB9aMKG7FvrT/8Ak2fPo0ygRstindBWZWU8P3EcmvYJ5UkX0daIL4+bZeaiD9ThkftGlIx3ZewQ==",
+        "dependencies": {
+          "FSharp.Core": "5.0.2"
+        }
       },
       "Microsoft.Extensions.DependencyInjection": {
         "type": "CentralTransitive",

@@ -27,16 +27,20 @@ public sealed partial class SettingsWindow : Window
     private const string CustomLabel = "Custom";
 
     private readonly Dictionary<SettingsSection, FrameworkElement> _panels;
+    private readonly Func<CancellationToken, Task<string>> _diagnosticReport;
     private bool _closing;
     private bool _sized;
     private bool _syncing;
 
     /// <summary>Creates the window, hidden.</summary>
     /// <param name="viewModel">What the window shows.</param>
-    public SettingsWindow(SettingsViewModel viewModel)
+    /// <param name="diagnosticReport">Builds the text of a diagnostic report, when the user asks to save one.</param>
+    public SettingsWindow(SettingsViewModel viewModel, Func<CancellationToken, Task<string>> diagnosticReport)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
+        ArgumentNullException.ThrowIfNull(diagnosticReport);
         ViewModel = viewModel;
+        _diagnosticReport = diagnosticReport;
         InitializeComponent();
         AppWindow.SetIcon(Glyphs.IconPath);
 
@@ -74,6 +78,7 @@ public sealed partial class SettingsWindow : Window
         ViewModel.Privacy.PropertyChanged += (_, _) => SyncControls();
         ViewModel.Paste.PropertyChanged += (_, _) => SyncControls();
         ViewModel.About.OpenRepositoryRequested += OnOpenRepositoryRequested;
+        ViewModel.About.SaveDiagnosticReportRequested += OnSaveDiagnosticReportRequested;
 
         AppWindow.Closing += OnClosing;
         ApplySelection();
@@ -246,6 +251,31 @@ public sealed partial class SettingsWindow : Window
         if (ClipBench.Core.Detection.LinkDetector.ToBrowserAddress(e.Url) is { } address && address.Scheme == Uri.UriSchemeHttps)
         {
             _ = Launcher.LaunchUriAsync(address);
+        }
+    }
+
+    // The user picks where the report goes; nothing is written until they do. Saving a report is never worth closing the
+    // app over, so whatever goes wrong here is dropped: the user can try again.
+    private async void OnSaveDiagnosticReportRequested(object? sender, EventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = "ClipBench diagnostic report" };
+            picker.FileTypeChoices.Add("Text file", [".txt"]);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            if (await picker.PickSaveFileAsync() is not { } file)
+            {
+                return;
+            }
+
+            var report = await _diagnosticReport(CancellationToken.None);
+            await Windows.Storage.FileIO.WriteTextAsync(file, report, Windows.Storage.Streams.UnicodeEncoding.Utf8);
+        }
+#pragma warning disable CA1031 // An async void handler: anything not caught here would reach the crash handler and close the app.
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+#pragma warning restore CA1031
+        {
+            // Nothing was written, or a file the user chose is incomplete; the user can save again.
         }
     }
 

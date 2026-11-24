@@ -95,15 +95,12 @@ public sealed class ClipLibrary : IDisposable
                 return Result.Failure<LibraryLoad>(stored.Error);
             }
 
-            var evicted = new List<Clip>();
+            // The store lists newest first and the history puts each added clip on top, so the oldest goes in first. All of
+            // them go in at once: one at a time copies and searches the whole list for every clip.
+            var oldestFirst = stored.Value.Clips.Reverse().ToArray();
+            var evicted = _history.AddRange(oldestFirst);
 
-            // The store lists newest first and the history puts each added clip on top, so add the oldest first.
-            for (var i = stored.Value.Clips.Length - 1; i >= 0; i--)
-            {
-                evicted.AddRange(_history.Add(stored.Value.Clips[i]).Evicted);
-            }
-
-            if (evicted.Count > 0)
+            if (evicted.Length > 0)
             {
                 ForgetSensitivity(evicted);
                 _ = await _store.DeleteAsync([.. evicted.Select(clip => clip.Id)], cancellationToken).ConfigureAwait(false);

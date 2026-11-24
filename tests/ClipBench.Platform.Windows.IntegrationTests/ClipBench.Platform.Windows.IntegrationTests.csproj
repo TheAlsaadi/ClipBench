@@ -6,6 +6,11 @@
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
+  <ItemGroup Label="Property tests (ADR 0020)">
+    <PackageReference Include="FsCheck.Xunit.v3" />
+    <PackageReference Include="FSharp.Core" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClipBench.Platform.Windows\ClipBench.Platform.Windows.csproj" />
   </ItemGroup>

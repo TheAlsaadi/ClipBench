@@ -185,4 +185,23 @@ public sealed class HistoryAndPasteSettingsTests : IDisposable
     {
         Should.Throw<ArgumentNullException>(() => new AboutViewModel(null!));
     }
+
+    [Fact]
+    public void The_save_command_asks_the_view_to_save_a_diagnostic_report()
+    {
+        var about = new AboutViewModel("1.0");
+        var asked = 0;
+        about.SaveDiagnosticReportRequested += (_, _) => asked++;
+
+        about.SaveDiagnosticReportCommand.Execute(null);
+
+        asked.ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_diagnostic_report_card_says_what_the_file_holds()
+    {
+        AboutViewModel.DiagnosticReportDescription.ShouldBe(
+            "A text file with versions, counts and the recent log, for when you report a problem. It never contains anything you copied. Nothing is saved unless you choose a place for it.");
+    }
 }

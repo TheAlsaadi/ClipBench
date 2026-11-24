@@ -951,6 +951,27 @@
                                 Content="{x:Bind prefs:AboutViewModel.RepositoryUrl}" />
                         </Grid>
                     </Border>
+
+                    <Border Style="{StaticResource SettingsCardStyle}">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Glyph="&#xE9D9;" Style="{StaticResource CardIconStyle}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Diagnostic report" TextWrapping="Wrap" />
+                                <TextBlock Style="{StaticResource CardDescriptionStyle}" Text="{x:Bind prefs:AboutViewModel.DiagnosticReportDescription}" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                AutomationProperties.AutomationId="SaveDiagnosticReportButton"
+                                Command="{x:Bind ViewModel.About.SaveDiagnosticReportCommand}"
+                                Content="Save report…" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

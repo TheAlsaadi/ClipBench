@@ -52,6 +52,14 @@ Run them on their own with:
 dotnet test --project tests/ClipBench.Platform.Windows.IntegrationTests -c Release --filter-trait "Category=Integration"
 ```
 
+Mutation testing (Stryker.NET, ADR 0020) runs by hand, not in CI. It shows where a
+test would miss a bug. See `docs/MUTATION.md` for the scores and the explained survivors:
+
+```bash
+pwsh ./scripts/run-mutation.ps1                  # ClipBench.Core, about 15 minutes
+pwsh ./scripts/run-mutation.ps1 -Project Storage # the encryption code
+```
+
 Coverage runs once per test project, measuring only that project's assembly:
 
 ```bash

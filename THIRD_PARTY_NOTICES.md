@@ -6,13 +6,17 @@ ClipBench is MIT-licensed (see `LICENSE`). The release also contains the softwar
 
 | Component | Version | License | Where it is |
 |---|---|---|---|
-| Windows App SDK (WinUI 3), by Microsoft | 2.5.1 | Microsoft Software License Terms for the Windows App SDK | beside the program |
+| Windows App SDK (WinUI 3): `Microsoft.WindowsAppSDK` and its parts (`.Base`, `.Foundation`, `.WinUI`, `.DWrite`, `.InteractiveExperiences`, `.Runtime`, `.AI`, `.ML`, `.Search`, `.Widgets`), by Microsoft | 2.6.5 | Microsoft Software License Terms for the Windows App SDK | beside the program |
+| WebView2 SDK (`Microsoft.Web.WebView2`), by Microsoft, brought in by the Windows App SDK; ClipBench never uses it | 1.0.3719.77 | Microsoft license terms (in the package) | beside the program |
+| Windows ML (`Microsoft.Windows.AI.MachineLearning`, with ONNX Runtime and DirectML), by Microsoft, brought in by the Windows App SDK; ClipBench never uses it | 2.4.89 | Microsoft license terms (in the package) | beside the program |
+| System.Numerics.Tensors, by Microsoft and the .NET Foundation, brought in by the Windows App SDK | 9.0.0 | MIT | beside the program |
 | .NET runtime, by Microsoft and the .NET Foundation | 10 | MIT | beside the program (self-contained) |
 | Microsoft.Data.Sqlite, by Microsoft and the .NET Foundation | 10.0.12 | MIT | beside the program |
 | SQLitePCLRaw (`SQLitePCLRaw.core`, `bundle_e_sqlite3`, `provider.e_sqlite3`), by Eric Sink | 2.1.12 | Apache-2.0 | beside the program |
 | SQLite (`e_sqlite3.dll`), by the SQLite developers | bundled with SQLitePCLRaw 2.1.12 | Public domain | beside the program |
 | CommunityToolkit.Mvvm, by Microsoft and the .NET Foundation | 8.4.2 | MIT | beside the program |
 | Microsoft.Extensions.DependencyInjection, by Microsoft | 10.0.13 | MIT | beside the program |
+| Microsoft.Extensions.DependencyInjection.Abstractions, by Microsoft | 10.0.13 | MIT | beside the program |
 
 The Visual C++ runtime that the text-recognition libraries need is to ship beside the program from Phase 10, under Microsoft's redistribution terms, and gets its row then. The full MIT and Apache-2.0 texts ship with the installer and the portable zip (Phase 10 checklist).
 
@@ -24,7 +28,7 @@ The Visual C++ runtime that the text-recognition libraries need is to ship besid
 | Leptonica (`leptonica-1.85.0.dll`), by Dan Bloomberg and contributors | 1.85.0 | Leptonica license (BSD-2-Clause style), below | `x64/` beside the program |
 | TesseractOCR (.NET wrapper), by Kees van Spelde, based on the work of Charles Weld | 5.5.2 | Apache-2.0 | `TesseractOCR.dll` |
 | `eng.traineddata` from `tessdata_fast`, by the Tesseract OCR project | not tagged upstream; SHA-256 `7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2` | Apache-2.0 | `tessdata/` beside the program |
-| Microsoft.Extensions.Logging.Abstractions and Microsoft.Extensions.DependencyInjection.Abstractions, by Microsoft | 10.0.3 | MIT | beside the program |
+| Microsoft.Extensions.Logging.Abstractions, by Microsoft | 10.0.3 | MIT | beside the program |
 
 The full text of the Apache License 2.0 is at <https://www.apache.org/licenses/LICENSE-2.0>. The installer and the portable zip must carry that text next to this file (Phase 10 checklist).
 

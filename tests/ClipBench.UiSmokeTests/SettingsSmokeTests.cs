@@ -46,6 +46,7 @@ public sealed class SettingsSmokeTests(AppUnderTest app) : IClassFixture<AppUnde
         Find(settings, "AboutLicense")!.Name.ShouldContain("MIT");
         Find(settings, "AboutNoNetwork")!.Name.ShouldContain("no network");
         Find(settings, "AboutVersion")!.Name.ShouldNotBeNullOrWhiteSpace();
+        Find(settings, "SaveDiagnosticReportButton").ShouldNotBeNull("the diagnostic report button did not show");
         CloseSettings(settings);
     }
 

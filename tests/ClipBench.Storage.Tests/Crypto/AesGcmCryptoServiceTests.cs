@@ -375,4 +375,13 @@ public sealed class AesGcmCryptoServiceTests : IDisposable
         Should.Throw<ObjectDisposedException>(() => crypto.ComputeContentHash(0, Bytes("x")));
         crypto.Dispose(); // disposing twice is allowed
     }
+
+    [Fact]
+    public void A_disposed_service_refuses_even_a_value_too_short_to_open()
+    {
+        var crypto = new AesGcmCryptoService(TestKeys.Master(1));
+        crypto.Dispose();
+
+        Should.Throw<ObjectDisposedException>(() => crypto.Decrypt(new byte[3], _aad));
+    }
 }

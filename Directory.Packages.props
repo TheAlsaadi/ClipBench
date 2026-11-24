@@ -19,6 +19,12 @@
     <PackageVersion Include="TngTech.ArchUnitNET" Version="0.13.4" />
   </ItemGroup>
 
+  <ItemGroup Label="Property tests (ADR 0020)">
+    <PackageVersion Include="FsCheck" Version="3.6.0" />
+    <PackageVersion Include="FsCheck.Xunit.v3" Version="3.6.0" />
+    <PackageVersion Include="FSharp.Core" Version="11.0.101" />
+  </ItemGroup>
+
   <ItemGroup Label="Storage (ADR 0008)">
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
   </ItemGroup>

@@ -1,0 +1,23 @@
+{
+  "stryker-config": {
+    "project": "ClipBench.Core.csproj",
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "mutation-level": "Standard",
+    "coverage-analysis": "perTest",
+    "reporters": [
+      "progress",
+      "cleartext",
+      "html",
+      "json"
+    ],
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 84
+    },
+    "ignore-methods": [
+      "ConfigureAwait"
+    ]
+  }
+}
